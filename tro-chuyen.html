@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="theme-color" content="#1769aa">
+	<link rel="stylesheet" href="./style.css">
+	<link rel="icon" type="image/png" href="./DIEU.png?v=1">
+	<title>Phòng Trò Chuyện - DIEUNW</title>
+</head>
+<body class="chat-page">
+	<header class="navbar">
+		<div class="nav-left">
+			<a href="./index.html" class="brand-logo-link">
+				<img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo">
+			</a>
+		</div>
+		<nav class="nav-menu" aria-label="Điều hướng chính">
+			<a href="./index.html" class="nav-item">Trang chủ</a>
+			<a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
+			<a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
+			<a href="./tro-chuyen.html" class="nav-item active" aria-current="page">Phòng trò chuyện</a>
+			<a href="./friends.html" class="nav-item">Bạn bè</a>
+			<a href="./messages.html" class="nav-item">Tin nhắn</a>
+			<a href="./clubs.html" class="nav-item">CLB</a>
+			<a href="./announcements.html" class="nav-item">Thông báo</a>
+		</nav>
+		<div class="nav-right">
+			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
+				<img class="nav-user-avatar" src="./DIEU.png" alt="">
+			</a>
+		</div>
+	</header>
+
+	<main class="chat-main">
+		<header class="chat-page-heading">
+			<div>
+				<p class="chat-eyebrow"><span class="live-indicator"></span> CÁC DIEUER ĐANG TRÒ CHUYỆN</p>
+				<h1>Phòng trò chuyện</h1>
+				<p class="chat-page-subtitle">Gặp gỡ mọi người, cùng tham gia một cuộc trò chuyện công khai.</p>
+			</div>
+			<div class="chat-heading-mark" aria-hidden="true">DIEUNW</div>
+		</header>
+
+		<div class="live-workspace">
+			<aside class="room-sidebar" aria-label="Danh sách phòng công khai">
+				<div class="room-sidebar-heading">
+					<div>
+						<p class="chat-eyebrow">KHÔNG GIAN MỞ</p>
+						<h2>Phòng công khai</h2>
+					</div>
+					<button class="create-room-toggle" id="create-room-toggle" type="button" aria-label="Tạo phòng mới" title="Tạo phòng mới">+</button>
+				</div>
+
+				<form class="create-room-form" id="create-room-form" hidden>
+					<label for="new-room-name">Tên phòng</label>
+					<input id="new-room-name" maxlength="60" placeholder="Ví dụ: Cùng ôn thi Toán" required>
+					<label for="new-room-topic">Chủ đề</label>
+					<select id="new-room-topic">
+						<option value="Học tập">Học tập</option>
+						<option value="Tán gẫu">Tán gẫu</option>
+						<option value="Sở thích">Sở thích</option>
+						<option value="Khác">Khác</option>
+					</select>
+					<button class="chat-primary-button" id="create-room-submit" type="submit">Mở phòng</button>
+					<p id="create-room-message" class="chat-form-message" role="status"></p>
+				</form>
+
+				<label class="room-search-box" for="room-search">
+					<span aria-hidden="true">⌕</span>
+					<input id="room-search" type="search" placeholder="Tìm phòng..." autocomplete="off">
+				</label>
+				<div class="room-filter-tabs" role="group" aria-label="Lọc phòng">
+					<button class="room-filter active" type="button" data-topic="Tất cả" aria-pressed="true">Tất cả</button>
+					<button class="room-filter" type="button" data-topic="Học tập" aria-pressed="false">Học tập</button>
+					<button class="room-filter" type="button" data-topic="Tán gẫu" aria-pressed="false">Tán gẫu</button>
+				</div>
+				<div class="room-list-meta"><span id="room-count">Đang tải phòng...</span><span class="room-live-key"><i></i> Đang mở</span></div>
+				<div class="public-room-list" id="public-room-list" aria-live="polite">
+					<p class="room-list-state">Đang tìm phòng trò chuyện...</p>
+				</div>
+			</aside>
+
+			<section class="live-chat-panel" id="live-chat-panel" aria-label="Nội dung trò chuyện">
+				<div class="chat-empty-state" id="chat-empty-state">
+					<div class="empty-chat-art" aria-hidden="true"><span></span><i></i><b></b></div>
+					<p class="chat-eyebrow">KẾT NỐI CÙNG CỘNG ĐỒNG</p>
+					<h2>Chọn một phòng để bắt đầu</h2>
+					<p>Các cuộc trò chuyện công khai đang diễn ra sẽ xuất hiện ở danh sách bên cạnh.</p>
+				</div>
+
+				<div class="active-conversation" id="active-conversation" hidden>
+					<header class="conversation-header">
+						<button class="back-to-rooms" id="back-to-rooms" type="button" aria-label="Quay lại danh sách phòng">‹</button>
+						<div class="conversation-room-icon" id="conversation-room-icon">H</div>
+						<div class="conversation-title-wrap">
+							<p id="conversation-topic" class="chat-eyebrow">HỌC TẬP</p>
+							<h2 id="conversation-title">Tên phòng</h2>
+						</div>
+						<div class="conversation-presence"><span class="live-indicator"></span><span id="conversation-members">Đang kết nối</span></div>
+					</header>
+					<div class="conversation-notice"><span aria-hidden="true">◉</span> Đây là phòng công khai. Hãy trò chuyện văn minh và an toàn.</div>
+					<div class="message-list" id="message-list" aria-live="polite" aria-relevant="additions">
+						<p class="message-list-state">Đang tải tin nhắn...</p>
+					</div>
+					<form class="message-composer" id="message-form">
+						<label class="sr-only" for="message-input">Tin nhắn</label>
+						<textarea id="message-input" maxlength="1000" rows="1" placeholder="Viết tin nhắn..." required></textarea>
+						<span class="message-hint">Enter để gửi · Shift + Enter xuống dòng</span>
+						<button class="send-message-button" id="send-message-button" type="submit" aria-label="Gửi tin nhắn" title="Gửi tin nhắn"><span aria-hidden="true">➤</span></button>
+					</form>
+				</div>
+			</section>
+		</div>
+	</main>
+
+	<script src="./tro-chuyen.js" defer></script>
+	<script src="./nav-profile.js" defer></script>
+</body>
+</html>

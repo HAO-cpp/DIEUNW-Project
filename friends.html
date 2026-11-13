@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="theme-color" content="#1769aa">
+	<link rel="stylesheet" href="./style.css">
+	<link rel="icon" type="image/png" href="./DIEU.png?v=1">
+	<title>Bạn bè - DIEUNW</title>
+</head>
+<body class="chat-page friends-page">
+	<header class="navbar">
+		<div class="nav-left">
+			<a href="./index.html" class="brand-logo-link">
+				<img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo">
+			</a>
+		</div>
+		<nav class="nav-menu" aria-label="Điều hướng chính">
+			<a href="./index.html" class="nav-item">Trang chủ</a>
+			<a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
+			<a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
+			<a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
+			<a href="./friends.html" class="nav-item active" aria-current="page">Bạn bè</a>
+			<a href="./messages.html" class="nav-item">Tin nhắn</a>
+			<a href="./clubs.html" class="nav-item">CLB</a>
+			<a href="./announcements.html" class="nav-item">Thông báo</a>
+		</nav>
+		<div class="nav-right">
+			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
+				<img class="nav-user-avatar" src="./DIEU.png" alt="">
+			</a>
+		</div>
+	</header>
+
+	<main class="friends-main">
+		<header class="friends-heading">
+			<div>
+				<p class="friends-eyebrow"><span></span> KẾT NỐI CỘNG ĐỒNG NQD</p>
+				<h1>Bạn bè</h1>
+				<p class="friends-subtitle">Tìm bạn học, trò chuyện riêng hoặc cùng vào một phòng gọi.</p>
+			</div>
+			<div class="friends-count" aria-live="polite">
+				<strong id="friends-count">0</strong>
+				<span>bạn bè</span>
+			</div>
+		</header>
+
+		<p class="friends-status" id="friends-status" role="status" aria-live="polite"></p>
+
+		<div class="friends-workspace">
+			<aside class="friends-browser" aria-label="Tìm và quản lý bạn bè">
+				<form class="friends-search" id="friends-search-form" role="search">
+					<label for="friends-search-input">Tìm theo tên hoặc email</label>
+					<div class="friends-search-row">
+						<input id="friends-search-input" type="search" placeholder="Ví dụ: tên hoặc @nqd.edu.vn" autocomplete="off">
+						<button type="submit" aria-label="Tìm kiếm">Tìm</button>
+					</div>
+				</form>
+
+				<div class="friends-filter-tabs" role="tablist" aria-label="Danh sách người dùng">
+					<button class="friends-filter active" type="button" role="tab" aria-selected="true" data-friends-filter="discover">Khám phá</button>
+					<button class="friends-filter" type="button" role="tab" aria-selected="false" data-friends-filter="friends">Bạn bè</button>
+					<button class="friends-filter" type="button" role="tab" aria-selected="false" data-friends-filter="requests">Lời mời <span id="request-count">0</span></button>
+				</div>
+
+				<div class="friends-list-heading">
+					<h2 id="friends-list-title">Gợi ý kết bạn</h2>
+					<span id="friends-list-count">0</span>
+				</div>
+				<div class="friends-list" id="friends-list" aria-live="polite">
+					<p class="friends-list-state">Đang tải danh sách...</p>
+				</div>
+			</aside>
+
+			<section class="friends-detail" aria-label="Hồ sơ người dùng">
+				<div class="friends-empty" id="friends-empty">
+					<div class="friends-empty-mark" aria-hidden="true"><span></span><i></i></div>
+					<p class="friends-eyebrow">HỒ SƠ CỘNG ĐỒNG</p>
+					<h2>Chọn một người để xem hồ sơ</h2>
+					<p>Thông tin cá nhân và ảnh bìa của người đó sẽ hiện ở đây.</p>
+				</div>
+
+				<section class="friends-profile" id="friends-profile" aria-label="Hồ sơ người dùng" hidden>
+					<div class="friends-profile-cover">
+						<img id="friend-cover-image" alt="">
+					</div>
+					<div class="friends-profile-body">
+						<img class="friends-profile-avatar" id="friend-avatar-image" src="./DIEU.png" alt="">
+						<p class="friends-eyebrow">THÀNH VIÊN DIEUNW</p>
+						<h2 id="friend-profile-name">Tên bạn</h2>
+						<p class="friends-profile-email" id="friend-profile-email"></p>
+						<p class="friends-profile-class" id="friend-profile-class"></p>
+						<p class="friends-profile-bio" id="friend-profile-bio"></p>
+						<div class="friends-profile-actions">
+							<button class="friends-primary-button" id="friend-profile-message" type="button">Nhắn tin</button>
+							<button class="friends-secondary-button" id="friend-profile-meeting" type="button">Tạo phòng Jitsi</button>
+						</div>
+					</div>
+				</section>
+
+				<section class="friends-meeting" id="friends-meeting" aria-label="Phòng Jitsi" hidden>
+					<header class="friends-meeting-header">
+						<div>
+						<p class="friends-eyebrow">PHÒNG GỌI</p>
+						<h2 id="friends-meeting-title">Jitsi Meet</h2>
+					</div>
+					<button id="friends-meeting-close" type="button" aria-label="Đóng phòng gọi" title="Đóng phòng gọi">×</button>
+					</header>
+					<iframe id="friends-meeting-frame" title="Phòng gọi Jitsi với bạn bè" allow="camera; microphone; fullscreen; display-capture; autoplay" referrerpolicy="strict-origin-when-cross-origin" hidden></iframe>
+					<p class="friends-meeting-note" id="friends-meeting-note">Đang kết nối với Jitsi Meet...</p>
+				</section>
+			</section>
+		</div>
+	</main>
+
+	<div class="friends-auth-overlay" id="friends-auth-modal" hidden>
+		<section class="friends-auth-dialog" role="dialog" aria-modal="true" aria-labelledby="friends-auth-title" aria-describedby="friends-auth-message">
+			<button class="friends-auth-close" id="friends-auth-close" type="button" aria-label="Đóng thông báo">×</button>
+			<p class="friends-eyebrow">KẾT NỐI CỘNG ĐỒNG NQD</p>
+			<h2 id="friends-auth-title">Đăng nhập để tiếp tục</h2>
+			<p class="friends-auth-message" id="friends-auth-message">Đăng nhập hoặc đăng ký để kết nối với bạn học.</p>
+			<div class="friends-auth-actions">
+				<a class="friends-primary-button" href="./profile.html">Đăng nhập</a>
+				<a class="friends-secondary-button" href="./profile.html#register">Đăng ký</a>
+			</div>
+		</section>
+	</div>
+
+	<script src="./friends.js" defer></script>
+	<script src="./nav-profile.js" defer></script>
+</body>
+</html>

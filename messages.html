@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="theme-color" content="#1769aa">
+	<link rel="stylesheet" href="./style.css">
+	<link rel="icon" type="image/png" href="./DIEU.png?v=1">
+	<title>Tin nhắn - DIEUNW</title>
+</head>
+<body class="chat-page messages-page">
+	<header class="navbar">
+		<div class="nav-left">
+			<a href="./index.html" class="brand-logo-link">
+				<img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo">
+			</a>
+		</div>
+		<nav class="nav-menu" aria-label="Điều hướng chính">
+			<a href="./index.html" class="nav-item">Trang chủ</a>
+			<a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
+			<a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
+			<a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
+			<a href="./friends.html" class="nav-item">Bạn bè</a>
+			<a href="./messages.html" class="nav-item active" aria-current="page">Tin nhắn</a>
+			<a href="./clubs.html" class="nav-item">CLB</a>
+			<a href="./announcements.html" class="nav-item">Thông báo</a>
+		</nav>
+		<div class="nav-right">
+			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
+				<img class="nav-user-avatar" src="./DIEU.png" alt="">
+			</a>
+		</div>
+	</header>
+
+	<main class="messages-main">
+		<header class="messages-heading">
+			<div>
+				<p class="chat-eyebrow"><span class="live-indicator"></span> KHÔNG GIAN RIÊNG</p>
+				<h1>Tin nhắn</h1>
+				<p class="chat-page-subtitle">Trò chuyện riêng với bạn bè hoặc tạo nhóm kín của bạn.</p>
+			</div>
+		</header>
+		<p class="messages-loading" id="messages-loading" role="status">Đang tải tin nhắn...</p>
+
+		<section class="messages-auth-gate" id="messages-auth-gate" hidden>
+			<h2>Đăng nhập để xem tin nhắn</h2>
+			<p>Các cuộc trò chuyện riêng chỉ hiển thị với tài khoản đã đăng nhập.</p>
+			<div class="messages-auth-actions">
+				<a class="chat-primary-button" href="./profile.html">Đăng nhập</a>
+				<a class="chat-secondary-button" href="./profile.html#register">Đăng ký</a>
+			</div>
+		</section>
+
+		<section class="messages-app" id="messages-app" hidden>
+			<form class="messages-toolbar" id="messages-search-form" role="search">
+				<label for="messages-search-input">Tìm bạn bè hoặc nhóm chat</label>
+				<div class="messages-search-row">
+					<input id="messages-search-input" type="search" placeholder="Tên bạn bè, email hoặc tên nhóm..." autocomplete="off">
+					<button class="create-private-group" id="create-private-group" type="button"><b>Tạo nhóm riêng</b></button>
+				</div>
+			</form>
+
+			<div class="messages-workspace">
+				<aside class="messages-inbox" aria-label="Danh sách cuộc trò chuyện">
+					<div class="messages-inbox-heading">
+						<h2>Cuộc trò chuyện</h2>
+						<span id="messages-conversation-count">0</span>
+					</div>
+					<div class="messages-conversation-list" id="messages-conversation-list" aria-live="polite">
+						<p class="messages-list-state">Đang tải tin nhắn...</p>
+					</div>
+				</aside>
+
+				<section class="messages-chat-panel" aria-label="Nội dung tin nhắn">
+					<div class="messages-empty" id="messages-empty">
+						<div class="messages-empty-mark" aria-hidden="true"><span></span><i></i></div>
+						<p class="chat-eyebrow">BẮT ĐẦU CUỘC TRÒ CHUYỆN</p>
+						<h2>Chọn một cuộc trò chuyện</h2>
+						<p>Tin nhắn riêng và nhóm bạn tham gia sẽ xuất hiện ở đây.</p>
+					</div>
+
+					<section class="messages-active-chat" id="messages-active-chat" aria-label="Cuộc trò chuyện đang mở" hidden>
+						<header class="messages-chat-header">
+							<div class="messages-chat-avatar" id="messages-chat-avatar" aria-hidden="true">?</div>
+							<div class="messages-chat-title">
+								<h2 id="messages-chat-name">Tên bạn</h2>
+								<p id="messages-chat-subtitle"></p>
+							</div>
+							<button class="messages-call-button" id="messages-call-button" type="button">Call</button>
+						</header>
+						<p class="messages-status" id="messages-status" role="status" aria-live="polite"></p>
+						<div class="messages-meeting" id="messages-meeting" hidden>
+							<div class="messages-meeting-heading">
+								<p id="messages-meeting-room"></p>
+								<button id="messages-meeting-close" type="button" aria-label="Đóng cuộc gọi">×</button>
+							</div>
+							<iframe id="messages-meeting-frame" title="Cuộc gọi Jitsi" allow="camera; microphone; fullscreen; display-capture; autoplay" referrerpolicy="strict-origin-when-cross-origin" hidden></iframe>
+						</div>
+						<div class="messages-log" id="messages-log" aria-live="polite" aria-relevant="additions">
+							<p class="messages-list-state">Chưa có tin nhắn. Hãy bắt đầu cuộc trò chuyện.</p>
+						</div>
+						<form class="messages-composer" id="messages-composer">
+							<label class="sr-only" for="messages-input">Tin nhắn</label>
+							<textarea id="messages-input" maxlength="1000" rows="1" placeholder="Viết tin nhắn..." required></textarea>
+							<button type="submit" aria-label="Gửi tin nhắn" title="Gửi tin nhắn"><span aria-hidden="true">➤</span></button>
+						</form>
+					</section>
+				</section>
+			</div>
+		</section>
+	</main>
+
+	<div class="messages-modal-overlay" id="messages-group-modal" hidden>
+		<form class="messages-group-dialog" id="messages-group-form" role="dialog" aria-modal="true" aria-labelledby="messages-group-title">
+			<header class="messages-group-dialog-header">
+				<div>
+					<p class="chat-eyebrow">NHÓM RIÊNG TƯ</p>
+					<h2 id="messages-group-title">Tạo nhóm mới</h2>
+				</div>
+			<button class="messages-group-close" id="messages-group-close" type="button" aria-label="Đóng">×</button>
+			</header>
+			<label for="messages-group-name">Tên nhóm</label>
+			<input id="messages-group-name" maxlength="60" placeholder="Ví dụ: Ôn thi cuối kỳ" required>
+			<fieldset class="messages-group-members">
+				<legend>Chọn bạn bè</legend>
+				<div id="messages-group-friend-list"></div>
+			</fieldset>
+			<p class="messages-group-error" id="messages-group-error" role="status"></p>
+			<button class="chat-primary-button" id="messages-group-submit" type="submit">Tạo nhóm riêng</button>
+		</form>
+	</div>
+
+	<script src="./messages.js" defer></script>
+	<script src="./nav-profile.js" defer></script>
+</body>
+</html>

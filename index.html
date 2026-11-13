@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <link rel="prefetch" href="./profile.html">
+    <link rel="icon" type="image/png" href="./DIEU.png?v=1">
+    <title>DIEUNW - Trang Chủ</title>
+</head>
+<body>
+    <!-- Thanh điều hướng Navbar -->
+    <header class="navbar nav-scroll">
+        <div class="nav-left">
+            <a href="./index.html" class="brand-logo-link">
+                <img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo">
+            </a>
+        </div>
+        <nav class="nav-menu" aria-label="Điều hướng chính">
+            <a href="./index.html" class="nav-item active" aria-current="page">Trang chủ</a>
+            <a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
+            <a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
+            <a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
+            <a href="./friends.html" class="nav-item">Bạn bè</a>
+            <a href="./messages.html" class="nav-item">Tin nhắn</a>
+            <a href="./clubs.html" class="nav-item">CLB</a>
+            <a href="./announcements.html" class="nav-item">Thông báo</a>
+        </nav>
+        <div class="nav-right">
+            <a href="./profile.html" class="home-profile-link" aria-label="Trang cá nhân" aria-current="page">Hồ sơ</a>
+        </div>
+    </header>
+
+    <!-- Nội dung chính của Trang Chủ -->
+    <main class="main-content page-enter">
+        <section class="home-auth-gate" id="feed-auth-gate">
+            <p class="home-auth-eyebrow">BẢNG TIN DIEUNW</p>
+            <h1>Đăng nhập để kết nối cùng bạn học</h1>
+            <p>Đăng nhập hoặc đăng ký để xem bài viết và chia sẻ nội dung của bạn.</p>
+            <div class="home-auth-actions">
+                <button class="btn-auth" id="feed-login-button" type="button">Đăng nhập</button>
+                <button class="btn-auth btn-register-outline" id="feed-register-button" type="button">Đăng ký</button>
+            </div>
+        </section>
+
+        <!-- THANH KÍCH HOẠT ĐĂNG BÀI (GIỐNG FACEBOOK) -->
+        <div class="feed-trigger-box" id="feed-trigger-box" hidden>
+            <img src="./DIEU.png" alt="Avatar" class="user-avatar-mini">
+            <div id="trigger-modal-input">Dieuer ơi, bạn đang nghĩ gì thế?</div>
+            <button id="btn-trigger-open">Đăng bài</button>
+        </div>
+
+        <!-- NƠI HIỂN THỊ DANH SÁCH BÀI VIẾT ĐÃ ĐĂNG -->
+        <div id="newsfeed-container" hidden>
+            <p class="loading-text">Đang tải bài viết...</p>
+        </div>
+
+    </main>
+
+    <div id="post-modal-overlay" class="modal-overlay" hidden>
+        <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="post-modal-title">
+            <div class="modal-header">
+                <h3 id="post-modal-title">Tạo bài viết</h3>
+                <button id="btn-modal-close" class="close-badge" type="button" aria-label="Đóng">&times;</button>
+            </div>
+            <div class="modal-user-info">
+                <img id="post-author-avatar" src="./DIEU.png" alt="" class="user-avatar-mini">
+                <div>
+                    <h4 id="post-author-name">Tên người đăng</h4>
+                    <span class="privacy-badge" id="post-privacy-label">Công khai</span>
+                </div>
+            </div>
+            <div class="modal-body">
+                <textarea id="post-text-input" placeholder="Bạn đang nghĩ gì thế?"></textarea>
+                <input type="text" id="post-image-input" placeholder="Dán link ảnh tại đây (nếu có)...">
+                <fieldset class="post-visibility-fieldset">
+                    <legend>Ai có thể xem bài viết?</legend>
+                    <label><input type="radio" name="post-visibility" value="public" checked> Công khai</label>
+                    <label><input type="radio" name="post-visibility" value="private"> Riêng tư</label>
+                </fieldset>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-submit-post" type="button">Đăng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Liên kết file xử lý JavaScript riêng biệt -->
+    <script src="./script.js"></script>
+    
+    <main class="main-content page-enter">
+        <div id="auth-container" class="auth-box" style="display: none;">
+            <div id="login-view">
+                <h2>Đăng Nhập DIEUNW</h2>
+                <p class="auth-subtitle">Nhập email trường và mật khẩu để truy cập góc học tập.</p>
+                <div class="input-group">
+                    <input type="email" id="login-email" placeholder="Email trường (@nqd.edu.vn)">
+                </div>
+                <div class="input-group">
+                    <input type="password" id="login-password" placeholder="Mật khẩu của bạn">
+                </div>
+                <button id="btn-login" class="btn-auth">Đăng nhập</button>
+                <div style="margin-top: 15px; display: flex; justify-content: space-between; font-size: 13.5px;">
+                    <a href="#" id="link-to-forgot" style="color: #65676b; text-decoration: none;">Quên mật khẩu?</a>
+                    <a href="#" id="link-to-register" style="color: #0078ff; font-weight: 600; text-decoration: none;">Chưa có tài khoản? Đăng ký</a>
+                </div>
+            </div>
+
+            <div id="register-view" style="display: none;">
+                <h2>Đăng Ký Học Sinh NQD</h2>
+                <p class="auth-subtitle">Xác thực email trường để tạo tài khoản.</p>
+                <div id="reg-step-1">
+                    <div class="input-group">
+                        <input type="text" id="reg-name" placeholder="Tên hiển thị">
+                    </div>
+                    <div class="input-group">
+                        <input type="email" id="reg-email" placeholder="Email trường (@nqd.edu.vn)">
+                    </div>
+                    <div class="input-group">
+                        <input type="password" id="reg-password" placeholder="Tạo mật khẩu (tối thiểu 8 ký tự)">
+                    </div>
+                    <button id="btn-reg-send-otp" class="btn-auth">Gửi mã xác nhận Email</button>
+                </div>
+                <div id="reg-step-2" style="display: none; margin-top: 15px;">
+                    <p class="otp-notice">Mã OTP đã được gửi đến email của bạn.</p>
+                    <div class="input-group">
+                        <input type="text" id="reg-otp-input" placeholder="Nhập mã OTP 6 số" maxlength="6">
+                    </div>
+                    <button id="btn-reg-verify" class="btn-auth btn-success">Hoàn tất Đăng ký</button>
+                </div>
+                <p style="margin-top: 15px; font-size: 13.5px;">
+                    <a href="#" class="link-to-login" style="color: #0078ff; text-decoration: none;">Quay lại Đăng nhập</a>
+                </p>
+            </div>
+
+            <div id="forgot-view" style="display: none;">
+                <h2>Khôi Phục Mật Khẩu</h2>
+                <p class="auth-subtitle">Nhập email đã đăng ký để nhận mã đặt lại mật khẩu.</p>
+                <div id="forgot-step-1">
+                    <div class="input-group">
+                        <input type="email" id="forgot-email" placeholder="Email trường (@nqd.edu.vn)">
+                    </div>
+                    <button id="btn-forgot-send-otp" class="btn-auth">Gửi mã khôi phục</button>
+                </div>
+                <div id="forgot-step-2" style="display: none; margin-top: 15px;">
+                    <p class="otp-notice">Mã khôi phục đã được gửi đến email của bạn.</p>
+                    <div class="input-group">
+                        <input type="text" id="forgot-otp-input" placeholder="Nhập mã OTP 6 số" maxlength="6">
+                    </div>
+                    <div class="input-group">
+                        <input type="password" id="forgot-new-password" placeholder="Nhập mật khẩu mới (tối thiểu 8 ký tự)">
+                    </div>
+                    <button id="btn-forgot-reset" class="btn-auth btn-success">Đổi mật khẩu mới</button>
+                </div>
+                <p style="margin-top: 15px; font-size: 13.5px;">
+                    <a href="#" class="link-to-login" style="color: #0078ff; text-decoration: none;">Quay lại Đăng nhập</a>
+                </p>
+            </div>
+        </div>
+
+        <div id="profile-container" style="display: none; max-width: 680px; margin: 30px auto;">
+            <div class="profile-card-box" style="max-width: 100%; margin: 0 0 25px 0;">
+                <div class="profile-header-info">
+                    <img id="user-display-avatar" src="./DIEU.png" alt="Avatar" class="profile-avatar-large">
+                    <h1 id="user-display-name">Tên Học Sinh</h1>
+                    <p id="user-display-email" class="user-email-text">email@nqd.edu.vn</p>
+                    <p id="user-display-class" class="user-class-badge">Học sinh trường NQD</p>
+                    <p id="user-display-bio" class="user-bio-text"></p>
+                    <span class="verified-badge">Đã xác thực học sinh trường NQD</span>
+                </div>
+                <button id="btn-logout" class="btn-logout">Đăng xuất tài khoản</button>
+            </div>
+        </div>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <script>
+        if (typeof emailjs !== "undefined") {
+            emailjs.init({ publicKey: "dViu70h7kpGKrNHN0" });
+        }
+    </script>
+    <script src="./profile-auth.js"></script>
+    <script src="./nav-profile.js" defer></script>
+</body>
+</html>

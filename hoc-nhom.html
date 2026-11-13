@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="theme-color" content="#1769aa">
+	<link rel="stylesheet" href="./style.css">
+	<link rel="icon" type="image/png" href="./DIEU.png?v=1">
+	<title>Học Nhóm - DIEUNW</title>
+</head>
+<body class="group-page">
+	<header class="navbar nav-scroll">
+		<div class="nav-left">
+			<a href="./index.html" class="brand-logo-link">
+				<img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo">
+			</a>
+		</div>
+		<nav class="nav-menu" aria-label="Điều hướng chính">
+			<a href="./index.html" class="nav-item">Trang chủ</a>
+			<a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
+			<a href="./hoc-nhom.html" class="nav-item active" aria-current="page">Học nhóm</a>
+			<a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
+			<a href="./friends.html" class="nav-item">Bạn bè</a>
+			<a href="./messages.html" class="nav-item">Tin nhắn</a>
+			<a href="./clubs.html" class="nav-item">CLB</a>
+			<a href="./announcements.html" class="nav-item">Thông báo</a>
+		</nav>
+		<div class="nav-right">
+			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
+				<img class="nav-user-avatar" src="./DIEU.png" alt="">
+			</a>
+		</div>
+	</header>
+
+	<main class="group-main page-enter">
+		<section class="group-intro">
+			<h1>Góc học tập</h1>
+		</section>
+
+		<nav class="group-tabs" aria-label="Các khu vực học nhóm" role="tablist">
+			<button class="group-tab active" id="tab-resources" type="button" role="tab" aria-selected="true" aria-controls="panel-resources" data-panel="panel-resources">Tài liệu các môn</button>
+			<button class="group-tab" id="tab-rooms" type="button" role="tab" aria-selected="false" aria-controls="panel-rooms" data-panel="panel-rooms" tabindex="-1">Phòng học trực tuyến</button>
+		</nav>
+
+		<section class="group-panel" id="panel-resources" role="tabpanel" aria-labelledby="tab-resources">
+			<div class="resource-layout">
+				<form id="resource-form" class="resource-composer">
+					<div class="section-heading">
+						<div>
+							<p class="group-eyebrow">ĐÓNG GÓP CHO CỘNG ĐỒNG</p>
+							<h2>Chia sẻ tài liệu</h2>
+						</div>
+						<span class="heading-mark" aria-hidden="true"></span>
+					</div>
+
+					<div class="school-selection-frame">
+						<fieldset class="choice-fieldset">
+							<legend>Khối</legend>
+							<div id="grade-choices" class="grade-grid"></div>
+						</fieldset>
+
+					</div>
+
+					<fieldset class="choice-fieldset">
+						<legend>Môn học</legend>
+						<button class="subject-picker-button" id="subject-picker-open" type="button" aria-haspopup="dialog" aria-controls="subject-picker-modal">Chọn môn</button>
+						<p id="selection-summary" class="selection-summary" aria-live="polite">Chọn khối và môn học</p>
+					</fieldset>
+
+					<label class="form-label" for="resource-title">Tên tài liệu</label>
+					<input class="group-input" id="resource-title" name="title" maxlength="120" placeholder="Ví dụ: Đề cương ôn tập học kỳ I" required>
+
+					<label class="form-label" for="resource-description">Mô tả</label>
+					<textarea class="group-input group-textarea" id="resource-description" name="description" maxlength="1500" placeholder="Chia sẻ nội dung hoặc lời nhắn cho mọi người..."></textarea>
+
+					<label class="form-label" for="resource-link">Liên kết tài liệu</label>
+					<input class="group-input" id="resource-link" name="link" type="url" placeholder="https://..." required>
+					<button class="group-submit" id="resource-submit" type="submit">Đăng tài liệu</button>
+					<p id="resource-message" class="form-message" role="status"></p>
+				</form>
+
+				<div class="subject-modal-overlay" id="subject-picker-modal" hidden>
+					<section class="subject-modal" role="dialog" aria-modal="true" aria-labelledby="subject-modal-title">
+						<header class="subject-modal-header">
+							<div>
+								<p class="group-eyebrow">CHỌN CHƯƠNG TRÌNH</p>
+								<h2 id="subject-modal-title">Chọn môn học</h2>
+							</div>
+							<button class="subject-modal-close" id="subject-modal-close" type="button" aria-label="Đóng">&times;</button>
+						</header>
+						<div class="subject-track-switch" role="group" aria-label="Chương trình học">
+							<button type="button" class="subject-track-button" data-track="Chuyên" aria-pressed="true">Chuyên</button>
+							<button type="button" class="subject-track-button" data-track="Thường" aria-pressed="false">Thường</button>
+						</div>
+						<div class="subject-options" id="subject-options" aria-label="Các môn học"></div>
+						<nav class="subject-pagination" aria-label="Chuyển trang môn học">
+							<button class="subject-page-button" id="subject-page-previous" type="button" aria-label="Trang trước">‹</button>
+							<span id="subject-page-label" aria-live="polite">Trang 1 / 1</span>
+							<button class="subject-page-button" id="subject-page-next" type="button" aria-label="Trang sau">›</button>
+						</nav>
+						<footer class="subject-modal-footer">
+							<button class="subject-cancel" id="subject-modal-cancel" type="button">Hủy</button>
+							<button class="group-submit" id="subject-modal-confirm" type="button">Xong</button>
+						</footer>
+					</section>
+				</div>
+
+				<section class="resource-feed" aria-labelledby="resource-feed-heading">
+					<div class="feed-heading">
+						<div>
+							<p class="group-eyebrow">GÓC CHIA SẺ</p>
+							<h1 id="resource-feed-heading">Tài liệu mới</h1>
+						</div>
+						<button id="resource-refresh" class="refresh-button" type="button" aria-label="Tải lại tài liệu" title="Tải lại">↻</button>
+					</div>
+					<div class="resource-filter-bar" aria-label="Lọc tài liệu">
+						<label class="resource-filter-control">
+							<span>Chương trình</span>
+							<select id="filter-track" class="group-input">
+								<option value="">Tất cả</option>
+								<option value="Chuyên">Chuyên</option>
+								<option value="Thường">Thường</option>
+							</select>
+						</label>
+						<label class="resource-filter-control">
+							<span>Môn học</span>
+							<select id="filter-subject" class="group-input">
+								<option value="">Tất cả môn</option>
+							</select>
+						</label>
+						<label class="resource-filter-control">
+							<span>Khối</span>
+							<select id="filter-grade" class="group-input">
+								<option value="">Tất cả khối</option>
+								<option value="10">Khối 10</option>
+								<option value="11">Khối 11</option>
+								<option value="12">Khối 12</option>
+							</select>
+						</label>
+					</div>
+					<div id="resource-list" class="resource-list" aria-live="polite">
+						<p class="feed-state">Đang tải tài liệu...</p>
+					</div>
+				</section>
+			</div>
+		</section>
+
+		<section class="group-panel" id="panel-rooms" role="tabpanel" aria-labelledby="tab-rooms" hidden>
+			<div class="room-layout">
+				<section class="room-controls">
+					<p class="group-eyebrow">HỌC CÙNG NHAU, Ở BẤT CỨ ĐÂU</p>
+					<h2>Tạo phòng học trực tuyến</h2>
+					<p class="room-description">Đặt tên phòng để bạn bè cùng tham gia, hoặc tạo một phòng mới.</p>
+					<form id="room-form" class="room-form">
+						<label class="form-label" for="room-name">Tên phòng</label>
+						<div class="room-input-row">
+							<input class="group-input" id="room-name" maxlength="80" autocomplete="off" placeholder="Ví dụ: on-tap-toan-12" required>
+							<button class="group-submit room-join-button" type="submit">Vào phòng</button>
+						</div>
+						<button id="room-generate" class="room-generate" type="button">Tạo tên phòng ngẫu nhiên</button>
+					</form>
+					<p id="room-message" class="form-message" role="status"></p>
+				</section>
+				<section id="meeting-container" class="meeting-container" aria-label="Cuộc họp Jitsi">
+					<div id="meeting-placeholder" class="meeting-placeholder">
+						<span class="meeting-symbol" aria-hidden="true">+</span>
+						<p>Phòng học sẽ mở tại đây</p>
+					</div>
+					<iframe id="meeting-frame" title="Phòng học nhóm Jitsi Meet" allow="camera; microphone; fullscreen; display-capture; autoplay" referrerpolicy="strict-origin-when-cross-origin" hidden></iframe>
+				</section>
+			</div>
+		</section>
+	</main>
+
+	<script src="./hoc-nhom.js" defer></script>
+	<script src="./nav-profile.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="theme-color" content="#1769aa">
+	<link rel="stylesheet" href="./style.css">
+	<link rel="icon" type="image/png" href="./DIEU.png?v=1">
+	<title>Thông báo CLB - DIEUNW</title>
+</head>
+<body class="clubs-page announcements-page">
+	<header class="navbar nav-scroll">
+		<div class="nav-left"><a href="./index.html" class="brand-logo-link"><img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo"></a></div>
+		<nav class="nav-menu" aria-label="Điều hướng chính">
+			<a href="./index.html" class="nav-item">Trang chủ</a>
+			<a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
+			<a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
+			<a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
+			<a href="./friends.html" class="nav-item">Bạn bè</a>
+			<a href="./messages.html" class="nav-item">Tin nhắn</a>
+			<a href="./clubs.html" class="nav-item">CLB</a>
+			<a href="./announcements.html" class="nav-item active" aria-current="page">Thông báo</a>
+		</nav>
+		<div class="nav-right"><a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân"><img class="nav-user-avatar" src="./DIEU.png" alt=""></a></div>
+	</header>
+
+	<main class="announcements-main page-enter">
+		<header class="clubs-heading announcements-heading">
+			<div><p class="clubs-eyebrow">TIẾNG NÓI CÁC CÂU LẠC BỘ</p><h1>Bảng tin cộng đồng</h1><p>Những cập nhật mới nhất từ các CLB NQD.</p></div>
+			<a class="clubs-heading-link" href="./clubs.html">Khám phá CLB <span aria-hidden="true">↗</span></a>
+		</header>
+		<section id="announcement-composer" class="announcement-composer" hidden>
+			<form id="announcement-form">
+				<label for="announcement-club">Đăng với tư cách</label>
+				<div class="announcement-composer-row"><select id="announcement-club" required></select><button class="clubs-button" type="submit">Đăng thông báo</button></div>
+				<textarea id="announcement-content" maxlength="10000" placeholder="Chia sẻ tin tức và hoạt động của CLB..." required></textarea>
+				<p id="announcement-status" class="clubs-form-status" role="status" aria-live="polite"></p>
+			</form>
+		</section>
+		<p id="announcement-feed-status" class="clubs-form-status" role="status" aria-live="polite"></p>
+		<section id="announcement-feed" class="announcement-feed" aria-live="polite"></section>
+	</main>
+	<script src="./announcements.js" defer></script>
+	<script src="./nav-profile.js" defer></script>
+</body>
+</html>
