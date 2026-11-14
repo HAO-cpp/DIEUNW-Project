@@ -952,8 +952,9 @@ const serverFile = fileURLToPath(import.meta.url);
 if (process.argv[1] && path.resolve(process.argv[1]) === serverFile) {
 	const server = createServer();
 	const port = Number(process.env.PORT || 4173);
-	server.listen(port, process.env.HOST || "127.0.0.1", () => {
-		console.log(`DIEUNW backend listening at http://${process.env.HOST || "127.0.0.1"}:${port}`);
+	const host = process.env.HOST || "0.0.0.0";
+	server.listen(port, host, () => {
+		console.log(`DIEUNW backend listening at http://${host}:${port}`);
 		console.log(`SQLite database: ${process.env.DATABASE_PATH || path.join(ROOT, "data", "dieunw.sqlite")}`);
 	});
 	for (const signal of ["SIGINT", "SIGTERM"]) {
