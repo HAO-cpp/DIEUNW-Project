@@ -287,19 +287,23 @@ function requireUser(db, request) {
 }
 
 function setSession(db, userId, response, secure) {
-	const token = randomBytes(32).toString("hex");
-	const expiresAt = Date.now() + SESSION_DURATION;
-	db.prepare("INSERT INTO sessions(token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)")
-		.run(hashValue(token), userId, expiresAt, new Date().toISOString());
-	const securePart = secure ? "; Secure" : "";
-	return `${SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_DURATION / 1000}${securePart}`;
+    const token = randomBytes(32).toString("hex");
+    const expiresAt = Date.now() + SESSION_DURATION;
+
+    db.prepare("INSERT INTO sessions(token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)")
+        .run(hashValue(token), userId, expiresAt, new Date().toISOString());
+
+    return `${SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=None; Path=/; Max-Age=${SESSION_DURATION / 1000}; Secure`;
 }
-2
+
 function clearSession(db, request, secure) {
-	const token = parseCookies(request)[SESSION_COOKIE];
-	if (token) db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hashValue(token));
-	const securePart = secure ? "; Secure" : "";
-	return `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${securePart}`;
+    const token = parseCookies(request)[SESSION_COOKIE];
+
+    if (token) {
+        db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hashValue(token));
+    }
+
+    return `${SESSION_COOKIE}=; HttpOnly; SameSite=None; Path=/; Max-Age=0; Secure`;
 }
 
 function relationship(db, viewerId, otherId) {
@@ -453,13 +457,25 @@ function createServer(options = {}) {
 async function handleApi({ request, response, url, db, env, secure }) {
 	const { pathname } = url;
 	const method = request.method || "GET";
-	if (method !== "GET" && request.headers.origin) {
-		const expected = `${secure ? "https" : "http"}://${request.headers.host}`;
-		if (request.headers.origin !== expected) throw makeError(403, "Nguồn yêu cầu không được phép.");
+
+	const allowedOrigin = "https://hao-cpp.github.io";
+	const origin = request.headers.origin;
+
+	if (origin && origin !== allowedOrigin) {
+		throw makeError(403, "Nguồn yêu cầu không được phép.");
 	}
 
-	if (method === "GET" && pathname === "/api/health") {
-		sendJson(response, 200, { ok: true });
+	if (origin === allowedOrigin) {
+		response.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+		response.setHeader("Access-Control-Allow-Credentials", "true");
+		response.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+		response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+		response.setHeader("Vary", "Origin");
+	}
+
+	if (method === "OPTIONS") {
+		response.writeHead(204);
+		response.end();
 		return;
 	}
 	if (method === "GET" && pathname === "/api/auth/me") {

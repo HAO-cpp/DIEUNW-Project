@@ -7,7 +7,10 @@ document.addEventListener("DOMContentLoaded", () => {
 	let currentUser = null;
 
 	async function api(url, options = {}) {
-		const response = await fetch(url, { credentials: "same-origin", ...options });
+		const response = await fetch(`https://dieunw.onrender.com${url}`, {
+    	credentials: "include",
+    	...options
+	});
 		const data = await response.json();
 		if (!response.ok) throw new Error(data.error || "Không thể hoàn tất yêu cầu.");
 		return data;

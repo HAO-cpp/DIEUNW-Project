@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	}
 
 	async function fetchUsers() {
-		const response = await fetch("/api/users", { credentials: "same-origin" });
+		const response = await fetch("https://dieunw.onrender.com/api/users", { credentials: "include" });
 		if (!response.ok) throw new Error("Không thể tải danh sách người dùng.");
 		const data = await response.json();
 		users = Array.isArray(data.users) ? data.users : [];
@@ -179,9 +179,9 @@ document.addEventListener("DOMContentLoaded", () => {
 		if (!currentUser) return;
 		setStatus("Đang gửi lời mời...");
 		try {
-			const response = await fetch("/api/friend-requests", {
+			const response = await fetch("https://dieunw.onrender.com/api/friend-requests", {
 				method: "POST",
-				credentials: "same-origin",
+				credentials: "include",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ userId: String(target.id) })
 			});
@@ -196,9 +196,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
 	async function acceptRequest(sender) {
 		try {
-			const response = await fetch(`/api/friend-requests/${encodeURIComponent(sender.id)}/accept`, {
+			const response = await fetch(`https://dieunw.onrender.com/api/friend-requests/${encodeURIComponent(sender.id)}/accept`, {
 				method: "POST",
-				credentials: "same-origin",
+				credentials: "include",
 				headers: { "Content-Type": "application/json" },
 				body: "{}"
 			});
@@ -213,9 +213,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
 	async function rejectRequest(sender) {
 		try {
-			const response = await fetch(`/api/friend-requests/${encodeURIComponent(sender.id)}/reject`, {
+			const response = await fetch(`https://dieunw.onrender.com/api/friend-requests/${encodeURIComponent(sender.id)}/reject`, {
 				method: "POST",
-				credentials: "same-origin",
+				credentials: "include",
 				headers: { "Content-Type": "application/json" },
 				body: "{}"
 			});
@@ -232,9 +232,9 @@ document.addEventListener("DOMContentLoaded", () => {
 		if (!window.confirm(`Hủy kết bạn với ${friend.name || friend.email}? Lịch sử tin nhắn riêng sẽ được giữ lại.`)) return;
 		setStatus("Đang cập nhật danh sách bạn bè...");
 		try {
-			const response = await fetch(`/api/friends/${encodeURIComponent(friend.id)}`, {
+			const response = await fetch(`https://dieunw.onrender.com/api/friends/${encodeURIComponent(friend.id)}`, {
 				method: "DELETE",
-				credentials: "same-origin"
+				credentials: "include"
 			});
 			const data = await response.json();
 			if (!response.ok) throw new Error(data.error || "Không thể hủy kết bạn.");

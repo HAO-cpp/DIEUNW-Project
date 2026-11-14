@@ -1,3 +1,4 @@
+const API_BASE = "https://dieunw.onrender.com";
 document.addEventListener("DOMContentLoaded", () => {
     const authContainer = document.getElementById("auth-container");
     const profileContainer = document.getElementById("profile-container");
@@ -25,7 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
         registerView.style.display = "block";
     }
 
-    fetch("/api/auth/me", { credentials: "same-origin" })
+    fetch("https://dieunw.onrender.com/api/auth/me", { credentials: "include" })
         .then(response => response.json())
         .then(data => {
             if (data.user) {
@@ -79,9 +80,9 @@ document.addEventListener("DOMContentLoaded", () => {
         btnLogin.disabled = true;
 
         try {
-            const response = await fetch("/api/auth/login", {
+            const response = await fetch("https://dieunw.onrender.com/api/auth/login", {
                 method: "POST",
-                credentials: "same-origin",
+                credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, password })
             });
@@ -124,9 +125,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             btnSend.innerText = "Đang gửi mã OTP...";
-            const response = await fetch("/api/auth/register/start", {
+            const response = await fetch("https://dieunw.onrender.com/api/auth/register/start", {
                 method: "POST",
-                credentials: "same-origin",
+                credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name, email, password })
             });
@@ -155,9 +156,9 @@ document.addEventListener("DOMContentLoaded", () => {
         btnVerify.disabled = true;
 
         try {
-            const response = await fetch("/api/auth/register/verify", {
+            const response = await fetch("https://dieunw.onrender.com/api/auth/register/verify", {
                 method: "POST",
-                credentials: "same-origin",
+                credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     name: document.getElementById("reg-name").value.trim(),
@@ -195,9 +196,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             btnSend.innerText = "Đang gửi mã khôi phục...";
-			const response = await fetch("/api/auth/password/start", {
+			const response = await fetch("https://dieunw.onrender.com/api/auth/password/start", {
 				method: "POST",
-				credentials: "same-origin",
+				credentials: "include",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ email })
             });
@@ -232,9 +233,9 @@ document.addEventListener("DOMContentLoaded", () => {
         btnReset.disabled = true;
 
         try {
-            const response = await fetch("/api/auth/password/verify", {
+            const response = await fetch("https://dieunw.onrender.com/api/auth/password/verify", {
                 method: "POST",
-                credentials: "same-origin",
+                credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     email: document.getElementById("forgot-email").value.trim().toLowerCase(),
@@ -258,7 +259,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // HIỂN THỊ & CHỈNH SỬA HỒ SƠ CÁ NHÂN
     // ==========================================
     document.getElementById("btn-logout")?.addEventListener("click", async () => {
-        await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
+        await fetch("https://dieunw.onrender.com/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
         localStorage.removeItem("dieuNwUser");
         location.reload();
     });
@@ -308,9 +309,9 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         try {
-            const response = await fetch("/api/users/me", {
+            const response = await fetch("https://dieunw.onrender.com/api/users/me", {
                 method: "PATCH",
-                credentials: "same-origin",
+                credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(updatedFields)
             });
@@ -354,7 +355,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!user.isAdmin) return;
         const list = document.getElementById("admin-list");
         try {
-            const response = await fetch("/api/admins", { credentials: "same-origin" });
+            const response = await fetch("https://dieunw.onrender.com/api/admins", { credentials: "include" });
             const data = await readApiResponse(response);
             if (!response.ok) throw new Error(data.error || "Không thể tải danh sách admin.");
             list.replaceChildren(...data.admins.map(email => {
@@ -375,9 +376,9 @@ document.addEventListener("DOMContentLoaded", () => {
         button.disabled = true;
         status.textContent = "Đang thêm admin...";
         try {
-            const response = await fetch("/api/admins", {
+            const response = await fetch("https://dieunw.onrender.com/api/admins", {
                 method: "POST",
-                credentials: "same-origin",
+                credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: emailInput.value.trim() })
             });
@@ -438,7 +439,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!myPostsContainer) return;
 
         try {
-            const response = await fetch("/api/posts", { credentials: "same-origin" });
+            const response = await fetch("https://dieunw.onrender.com/api/posts", { credentials: "include" });
             const data = await readApiResponse(response);
             if (!response.ok) throw new Error(data.error || "Không thể tải bài viết.");
             const myPosts = data.posts.filter(post => String(post.userId) === String(userId)).reverse();
@@ -492,9 +493,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (!window.confirm("Bạn có chắc muốn xóa bài viết này?")) return;
                     deleteButton.disabled = true;
                     try {
-                        const response = await fetch(`/api/posts/${encodeURIComponent(post.id)}`, {
+                        const response = await fetch(`https://dieunw.onrender.com/api/posts/${encodeURIComponent(post.id)}`, {
                             method: "DELETE",
-                            credentials: "same-origin"
+                            credentials: "include"
                         });
                         const data = await readApiResponse(response);
                         if (!response.ok) throw new Error(data.error || "Không thể xóa bài viết.");

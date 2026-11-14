@@ -1,4 +1,4 @@
-const POSTS_API = "/api/posts";
+const POSTS_API = "https://dieunw.onrender.com/api/posts";
 
 // DOM Các phần tử liên quan đến Bảng tin & Popup Box trên Trang chủ
 const modalOverlay = document.getElementById('post-modal-overlay');
@@ -97,7 +97,7 @@ async function loadPosts() {
     if (!homeAccessEnabled) return;
 
     try {
-        const response = await fetch(POSTS_API, { credentials: "same-origin" });
+        const response = await fetch(POSTS_API, { credentials: "include" });
         const data = await response.json();
         if (response.status === 401) {
             localStorage.removeItem("dieuNwUser");
@@ -242,7 +242,7 @@ function renderPosts(posts) {
                 try {
                     const response = await fetch(`${POSTS_API}/${encodeURIComponent(post.id)}`, {
                         method: "DELETE",
-                        credentials: "same-origin"
+                        credentials: "include"
                     });
                     const data = await response.json();
                     if (!response.ok) throw new Error(data.error || "Không thể xóa bài viết.");
@@ -297,7 +297,7 @@ if (btnSubmit) {
 
             const response = await fetch(POSTS_API, {
                 method: "POST",
-                credentials: "same-origin",
+                credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(newPost)
             });
@@ -327,7 +327,7 @@ async function handleLike(button, postId, currentLikes) {
     try {
         const response = await fetch(`${POSTS_API}/${encodeURIComponent(postId)}/like`, {
             method: "POST",
-            credentials: "same-origin",
+            credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ liked })
         });
@@ -358,7 +358,7 @@ async function submitComment(event, input, postId) {
         try {
             const response = await fetch(`${POSTS_API}/${encodeURIComponent(postId)}/comments`, {
                 method: "POST",
-                credentials: "same-origin",
+                credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ content })
             });
@@ -373,7 +373,7 @@ async function submitComment(event, input, postId) {
 }
 
 updateHomeAccess(null);
-fetch("/api/auth/me", { credentials: "same-origin" })
+fetch("https://dieunw.onrender.com/api/auth/me", { credentials: "include" })
     .then(response => response.json())
     .then(data => {
         if (data.user) {

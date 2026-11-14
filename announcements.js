@@ -6,9 +6,18 @@ document.addEventListener("DOMContentLoaded", () => {
 	let publishableClubs = [];
 
 	async function api(url, options = {}) {
-		const response = await fetch(url, { credentials: "same-origin", ...options });
+		const API_BASE = "https://dieunw.onrender.com";
+		const response = await fetch(`${API_BASE}${url}`, {
+			credentials: "include",
+			...options
+		});
+
 		const data = await response.json();
-		if (!response.ok) throw new Error(data.error || "Không thể hoàn tất yêu cầu.");
+
+		if (!response.ok) {
+			throw new Error(data.error || "Không thể hoàn tất yêu cầu.");
+		}
+
 		return data;
 	}
 

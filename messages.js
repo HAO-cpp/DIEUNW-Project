@@ -90,9 +90,9 @@ document.addEventListener("DOMContentLoaded", () => {
 			if (!window.confirm(`Xóa nhóm “${conversation.title}” và toàn bộ tin nhắn trong nhóm này?`)) return;
 			deleteButton.disabled = true;
 			try {
-				const response = await fetch(`/api/conversations/${encodeURIComponent(conversation.id)}`, {
+				const response = await fetch(`https://dieunw.onrender.com/api/conversations/${encodeURIComponent(conversation.id)}`, {
 					method: "DELETE",
-					credentials: "same-origin"
+					credentials: "include"
 				});
 				const data = await response.json();
 				if (!response.ok) throw new Error(data.error || "Không thể xóa nhóm.");
@@ -176,7 +176,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		loading.textContent = "Đang tải tin nhắn...";
 		messageLog.append(loading);
 		try {
-			const response = await fetch(`/api/conversations/${encodeURIComponent(conversation.id)}/messages`, { credentials: "same-origin" });
+			const response = await fetch(`https://dieunw.onrender.com/api/conversations/${encodeURIComponent(conversation.id)}/messages`, { credentials: "include" });
 			const data = await response.json();
 			if (!response.ok) throw new Error(data.error || "Không thể tải cuộc trò chuyện.");
 			conversation.messages = data.messages;
@@ -228,7 +228,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		loadingState.hidden = false;
 		authGate.hidden = true;
 		app.hidden = true;
-		const sessionResponse = await fetch("/api/auth/me", { credentials: "same-origin" });
+		const sessionResponse = await fetch("https://dieunw.onrender.com/api/auth/me", { credentials: "include" });
 		const sessionData = await sessionResponse.json();
 		currentUser = sessionData.user || null;
 
@@ -247,8 +247,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 		localStorage.setItem("dieuNwUser", JSON.stringify(currentUser));
 		const [conversationResponse, friendsResponse] = await Promise.all([
-			fetch("/api/conversations", { credentials: "same-origin" }),
-			fetch("/api/friends", { credentials: "same-origin" })
+			fetch("https://dieunw.onrender.com/api/conversations", { credentials: "include" }),
+			fetch("https://dieunw.onrender.com/api/friends", { credentials: "include" })
 		]);
 		const [conversationData, friendsData] = await Promise.all([conversationResponse.json(), friendsResponse.json()]);
 		if (!conversationResponse.ok || !friendsResponse.ok) throw new Error("Không thể tải danh sách tin nhắn.");
@@ -297,9 +297,9 @@ document.addEventListener("DOMContentLoaded", () => {
 		submit.disabled = true;
 		groupError.textContent = "Đang tạo nhóm...";
 		try {
-			const response = await fetch("/api/conversations", {
+			const response = await fetch("https://dieunw.onrender.com/api/conversations", {
 				method: "POST",
-				credentials: "same-origin",
+				credentials: "include",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ name, memberIds })
 			});
@@ -326,9 +326,9 @@ document.addEventListener("DOMContentLoaded", () => {
 		const submit = composer.querySelector("button[type='submit']");
 		submit.disabled = true;
 		try {
-			const response = await fetch(`/api/conversations/${encodeURIComponent(conversation.id)}/messages`, {
+			const response = await fetch(`https://dieunw.onrender.com/api/conversations/${encodeURIComponent(conversation.id)}/messages`, {
 				method: "POST",
-				credentials: "same-origin",
+				credentials: "include",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ content: text })
 			});
