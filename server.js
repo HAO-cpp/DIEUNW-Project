@@ -463,7 +463,7 @@ function serializeConversation(db, row, userId) {
 
 function createServer(options = {}) {
 	const env = options.env || process.env;
-	const dbPath = options.dbPath || env.DATABASE_PATH || path.join(ROOT, "data", "dieunw.sqlite");
+	const dbPath = options.dbPath || env.DATABASE_PATH || path.join(ROOT, "data", "dieunw-turso.sqlite");
 	const db = options.db || initializeDatabase(dbPath);
 	const server = createHttpServer(async (request, response) => {
 		const host = request.headers.host || "localhost";
