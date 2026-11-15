@@ -85,7 +85,6 @@
     width: 100%;
     max-width: 1200px; /* Căn vừa khung web, bạn có thể đổi thành 900px hoặc 1200px cho khớp với cột bên dưới */
     margin: 16px auto 0; /* Căn giữa trang và cách thanh nav một khoảng 16px */
-    padding: 0 16px; /* Tạo khoảng hở hai bên trên màn hình điện thoại */
     box-sizing: border-box;
 }
 
@@ -94,7 +93,6 @@
     height: 200px; /* Chiều cao gọn gàng (tự động co lại trên mobile bên dưới) */
     object-fit: cover;
     object-position: center;
-    border-radius: 16px 16px 0 0; /* Bo nhẹ 2 góc trên cho mềm mại */
     display: block;
 
     /* Hiệu ứng mờ dần (fade-out) ở cạnh dưới */
