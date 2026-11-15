@@ -41,25 +41,41 @@
             
             <!-- TAB 1: ĐĂNG NHẬP (Mặc định hiển thị - Không tốn lượt gửi mail) -->
             <div id="login-view">
-                <h2>Đăng Nhập DIEUNW</h2>
+                <h2>Chào mừng bạn đã trở lại DIEUNW</h2>
                 <p class="auth-subtitle">Nhập Email trường và mật khẩu để truy cập góc học tập.</p>
                 <div class="input-group">
                     <input type="email" id="login-email" placeholder="Email trường (@nqd.edu.vn)">
                 </div>
-                <div class="input-group">
-                    <input type="password" id="login-password" placeholder="Mật khẩu của bạn">
+                <div class="input-group" style="position: relative;">
+                    <input 
+                        type="password" 
+                        id="login-password" 
+                        placeholder="Mật khẩu của bạn" 
+                        style="padding-right: 40px;"
+                    >
+                    <button 
+                        type="button" 
+                        id="toggle-password" 
+                        aria-label="Hiện mật khẩu"
+                            style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #65676b; padding: 0; display: flex; align-items: center;"
+                        >
+                        <svg id="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </button>
                 </div>
+
                 <button id="btn-login" class="btn-auth">Đăng nhập</button>
-                
-                <div style="margin-top: 15px; display: flex; justify-content: space-between; font-size: 13.5px;">
+                <div style="margin-top: 15px; display: flex; flex-direction: column; justify-content: space-between; font-size: 13.5px;">
                     <a href="#" id="link-to-forgot" style="color: #65676b; text-decoration: none;">Quên mật khẩu?</a>
-                    <a href="#" id="link-to-register" style="color: #0078ff; font-weight: 600; text-decoration: none;">Chưa có tài khoản? Đăng ký</a>
+                    <p>Chưa có tài khoản? <a href="#" id="link-to-register" style="color: #0078ff; font-weight: 600; text-decoration: none;">Đăng ký</a></p>
                 </div>
             </div>
 
             <!-- TAB 2: ĐĂNG KÝ TÀI KHOẢN MỚI (Gửi OTP xác nhận 1 lần duy nhất) -->
             <div id="register-view" style="display: none;">
-                <h2>🎓 Đăng Ký Học Sinh NQD</h2>
+                <h2>Đăng Ký Học Sinh NQD</h2>
                 <p class="auth-subtitle">Xác thực email trường 1 lần duy nhất để tạo tài khoản.</p>
                 
                 <div id="reg-step-1">
