@@ -81,7 +81,7 @@
     box-shadow: 0 4px 10px rgba(0, 120, 255, 0.3);
 }
 
-.hero-banner {
+#hero-banner {
     width: 60%;
     max-width: 990px; /* Căn vừa khung web, bạn có thể đổi thành 900px hoặc 1200px cho khớp với cột bên dưới */
     margin: 16px auto 0; /* Căn giữa trang và cách thanh nav một khoảng 16px */
@@ -89,7 +89,7 @@
     box-sizing: border-box;
 }
 
-.hero-banner-img {
+#hero-banner-img {
     width: 100%;
     height: 200px; /* Chiều cao gọn gàng (tự động co lại trên mobile bên dưới) */
     object-fit: cover;
@@ -104,7 +104,7 @@
 
 /* Tự động thu nhỏ chiều cao khi xem trên điện thoại */
 @media (max-width: 768px) {
-    .hero-banner-img {
+    #hero-banner-img {
         height: 140px;
     }
 }
