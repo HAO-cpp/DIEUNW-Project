@@ -309,7 +309,7 @@ document.addEventListener("DOMContentLoaded", () => {
             name: newName,
             email: newEmail || currentUser.email,
             studentClass: newClass || "Học sinh NQD",
-            avatar: newAvatar || "./DIEU.png",
+            avatar: newAvatar,
             cover: newCover,
             bio: newBio || "Chào mừng đến với góc học tập của mình trên DIEUNW!"
         };

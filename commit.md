@@ -1,5 +1,5 @@
 Link gửi mail: https://dashboard.emailjs.com/admin
-Link API: https://mockapi.io/projects/6af30641d2377d6c370469d8
+Link API: https://mockapi.io/projects/6af30641d2377d6c370469d8 
 10/11/2026: Hoàn thành trang chủ và API. Còn đang fix bug lỗi không gửi OTP xác nhận tài khoản và chưa làm xong trang html "tài khoản".
 Mail mẫu: k18th.hao2802@nqd.edu.vn
 11/11/2026: Đã hoàn thành xong trang cá nhân, phòng tự học, học nhóm, trò chuyện. Còn đang fix bug lỗi không gửi OTP xác nhận tài khoản và có ý tưởng là thêm phần nhập xác nhận lại mật khẩu ở phần đăng kí tài khoản và ẩn hoặc hiển thị mật khẩu ở đăng nhập và đăng kí.
