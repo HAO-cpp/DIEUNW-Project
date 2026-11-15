@@ -249,15 +249,26 @@ function parseCookies(request) {
 }
 
 function getUserForRequest(db, request) {
-	const sessionToken = parseCookies(request)[SESSION_COOKIE];
+	const authHeader = request.headers.authorization || "";
+	let sessionToken = null;
+
+	if (authHeader.startsWith("Bearer ")) {
+		sessionToken = authHeader.slice(7).trim();
+	} else {
+		sessionToken = parseCookies(request)[SESSION_COOKIE];
+	}
+
 	if (!sessionToken) return null;
+
 	const row = db.prepare(`
 		SELECT users.* FROM sessions
 		JOIN users ON users.id = sessions.user_id
 		WHERE sessions.token_hash = ? AND sessions.expires_at > ?
 	`).get(hashValue(sessionToken), Date.now());
+
 	return profileUser(db, row);
 }
+
 
 function requireAdmin(user) {
 	if (!user.isAdmin) throw makeError(403, "Chỉ quản trị viên mới có thể thực hiện thao tác này.");
@@ -297,13 +308,15 @@ function setSession(db, userId, response, secure) {
 }
 
 function clearSession(db, request, secure) {
-    const token = parseCookies(request)[SESSION_COOKIE];
+	const authHeader = request.headers.authorization || "";
+	const sessionToken = authHeader.startsWith("Bearer ")
+		? authHeader.slice(7).trim()
+		: parseCookies(request)[SESSION_COOKIE];
 
-    if (token) {
-        db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hashValue(token));
-    }
-
-    return `${SESSION_COOKIE}=; HttpOnly; SameSite=None; Path=/; Max-Age=0; Secure`;
+	if (sessionToken) {
+		db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hashValue(sessionToken));
+	}
+	return serializeCookie(SESSION_COOKIE, "", { maxAge: 0, secure });
 }
 
 function relationship(db, viewerId, otherId) {
@@ -469,9 +482,10 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		response.setHeader("Access-Control-Allow-Origin", allowedOrigin);
 		response.setHeader("Access-Control-Allow-Credentials", "true");
 		response.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
-		response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+		response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 		response.setHeader("Vary", "Origin");
 	}
+
 
 	if (method === "OPTIONS") {
 		response.writeHead(204);
@@ -490,11 +504,17 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const body = await readJson(request);
 		const email = validateEmail(body.email);
 		const user = db.prepare("SELECT * FROM users WHERE email = ? COLLATE NOCASE").get(email);
-		if (!user || !verifyPassword(String(body.password || ""), user.password_salt, user.password_hash)) throw makeError(401, "Email hoặc mật khẩu không chính xác.");
+		if (!user || !verifyPassword(String(body.password || ""), user.password_salt, user.password_hash)) {
+			throw makeError(401, "Email hoặc mật khẩu không chính xác.");
+		}
 		const cookie = setSession(db, user.id, response, secure);
-		sendJson(response, 200, { user: profileUser(db, user) }, { "Set-Cookie": cookie });
+		// Trích xuất giá trị token từ chuỗi cookie (phần nằm sau dấu '=' và trước dấu ';')
+		const token = cookie.split(";")[0].split("=")[1]; 
+
+		sendJson(response, 200, { user: profileUser(db, user), token }, { "Set-Cookie": cookie });
 		return;
 	}
+
 	if (method === "POST" && pathname === "/api/auth/register/start") {
 		const body = await readJson(request);
 		const name = String(body.name || "").trim();
@@ -532,7 +552,9 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		`).run(userId, pending.name, email, pending.password_hash, pending.password_salt, email, now);
 		db.prepare("DELETE FROM email_challenges WHERE email = ? AND purpose = 'register'").run(email);
 		const user = db.prepare("SELECT * FROM users WHERE id = ?").get(userId);
-		sendJson(response, 201, { user: profileUser(db, user) }, { "Set-Cookie": setSession(db, userId, response, secure) });
+		const cookie = setSession(db, userId, response, secure);
+		const token = cookie.split(";")[0].split("=")[1];
+		sendJson(response, 201, { user: profileUser(db, user), token }, { "Set-Cookie": cookie });
 		return;
 	}
 	if (method === "POST" && pathname === "/api/auth/password/start") {

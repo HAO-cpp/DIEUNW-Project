@@ -18,7 +18,11 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!response.headers.get("content-type")?.includes("application/json")) {
             throw new Error("Không nhận được phản hồi API. Hãy chạy npm start và mở http://127.0.0.1:4173, không dùng Live Server.");
         }
-        return response.json();
+        const data = await response.json();
+        if (data && data.token) {
+            localStorage.setItem("session_token", data.token);
+        }
+        return data;
     }
 
     if (location.hash === "#register") {
@@ -34,12 +38,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 showProfile(data.user);
             } else {
                 localStorage.removeItem("dieuNwUser");
+                localStorage.removeItem("session_token");
                 window.updateNavAvatar?.(null);
                 window.updateHomeAccess?.(null);
             }
         })
         .catch(() => {});
-    // CHUYỂN ĐỔI GIỮA CÁC TAB ĐĂNG NHẬP / ĐĂNG KÝ / QUÊN MẬT KHẨU
+    // CHUfetchYỂN ĐỔI GIỮA CÁC TAB ĐĂNG NHẬP / ĐĂNG KÝ / QUÊN MẬT KHẨU
     document.getElementById("link-to-register")?.addEventListener("click", (e) => {
         e.preventDefault();
         loginView.style.display = "none";
@@ -261,6 +266,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("btn-logout")?.addEventListener("click", async () => {
         await fetch("https://dieunw.onrender.com/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
         localStorage.removeItem("dieuNwUser");
+        localStorage.removeItem("session_token");
         location.reload();
     });
 
