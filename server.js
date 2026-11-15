@@ -1,9 +1,9 @@
 import { createServer as createHttpServer } from "node:http";
 import { createReadStream, existsSync, mkdirSync, statSync } from "node:fs";
-import { DatabaseSync } from "node:sqlite";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import Database from "libsql";
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const SESSION_COOKIE = "dieu_session";
@@ -73,7 +73,18 @@ function profileUser(db, row) {
 
 function initializeDatabase(dbPath) {
 	if (dbPath !== ":memory:") mkdirSync(path.dirname(dbPath), { recursive: true });
-	const db = new DatabaseSync(dbPath);
+	
+	// Khởi tạo kết nối libsql (Turso)
+	const db = new Database(dbPath, {
+		syncUrl: process.env.TURSO_DATABASE_URL,
+		authToken: process.env.TURSO_AUTH_TOKEN,
+	});
+
+	// Kéo dữ liệu mới nhất từ Turso về trước khi chạy lệnh tạo bảng
+	if (process.env.TURSO_DATABASE_URL) {
+		db.sync();
+	}
+
 	db.exec("PRAGMA foreign_keys = ON;");
 	db.exec(`
 		CREATE TABLE IF NOT EXISTS users (
@@ -158,11 +169,11 @@ function initializeDatabase(dbPath) {
 		);
 		CREATE TABLE IF NOT EXISTS friend_requests (
 			id TEXT PRIMARY KEY,
-		sender_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-		receiver_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-		status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'accepted', 'rejected')),
-		created_at TEXT NOT NULL,
-		UNIQUE(sender_id, receiver_id)
+			sender_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			receiver_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'accepted', 'rejected')),
+			created_at TEXT NOT NULL,
+			UNIQUE(sender_id, receiver_id)
 		);
 		CREATE TABLE IF NOT EXISTS posts (
 			id TEXT PRIMARY KEY,
@@ -213,9 +224,15 @@ function initializeDatabase(dbPath) {
 	`);
 	const userColumns = db.prepare("PRAGMA table_info(users)").all().map(column => column.name);
 	if (!userColumns.includes("is_admin")) db.exec("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0");
+
+	// Đẩy toàn bộ bảng vừa tạo lên đám mây Turso
+	if (process.env.TURSO_DATABASE_URL) {
+		db.sync();
+	}
+
 	const now = new Date().toISOString();
-	db.prepare("INSERT OR IGNORE INTO admin_emails(email, created_at) VALUES (?, ?)").run("k18th.hao2802@nqd.edu.vn", now);
-	db.prepare("UPDATE users SET is_admin = 1 WHERE email IN (SELECT email FROM admin_emails)").run();
+	db.prepare("INSERT OR IGNORE INTO admin_emails(email, created_at) VALUES (?, ?)").run("k18th.hao2802@nqd.edu.vn", now); db.sync();
+	db.prepare("UPDATE users SET is_admin = 1 WHERE email IN (SELECT email FROM admin_emails)").run(); db.sync();
 	return db;
 }
 
@@ -302,7 +319,7 @@ function setSession(db, userId, response, secure) {
     const expiresAt = Date.now() + SESSION_DURATION;
 
     db.prepare("INSERT INTO sessions(token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)")
-        .run(hashValue(token), userId, expiresAt, new Date().toISOString());
+        .run(hashValue(token), userId, expiresAt, new Date().toISOString()); db.sync();
 
     return `${SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=None; Path=/; Max-Age=${SESSION_DURATION / 1000}; Secure`;
 }
@@ -314,7 +331,7 @@ function clearSession(db, request, secure) {
 		: parseCookies(request)[SESSION_COOKIE];
 
 	if (sessionToken) {
-		db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hashValue(sessionToken));
+		db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hashValue(sessionToken)); db.sync();
 	}
 	return serializeCookie(SESSION_COOKIE, "", { maxAge: 0, secure });
 }
@@ -338,10 +355,10 @@ function ensureConversation(db, userA, userB) {
 	const id = `direct-${pair[0]}-${pair[1]}`;
 	const now = new Date().toISOString();
 	db.prepare("INSERT OR IGNORE INTO conversations(id, type, name, created_by, created_at) VALUES (?, 'direct', '', ?, ?)")
-		.run(id, pair[0], now);
+		.run(id, pair[0], now); db.sync();
 	const addMember = db.prepare("INSERT OR IGNORE INTO conversation_members(conversation_id, user_id, joined_at) VALUES (?, ?, ?)");
-	addMember.run(id, pair[0], now);
-	addMember.run(id, pair[1], now);
+	addMember.run(id, pair[0], now); db.sync();
+	addMember.run(id, pair[1], now); db.sync();
 	return id;
 }
 
@@ -529,7 +546,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			INSERT INTO email_challenges(email, purpose, code_hash, payload, attempts, expires_at)
 			VALUES (?, 'register', ?, ?, 0, ?)
 			ON CONFLICT(email, purpose) DO UPDATE SET code_hash = excluded.code_hash, payload = excluded.payload, attempts = 0, expires_at = excluded.expires_at
-		`).run(email, hashValue(`${email}:${code}`), payload, Date.now() + OTP_DURATION);
+		`).run(email, hashValue(`${email}:${code}`), payload, Date.now() + OTP_DURATION); db.sync();
 		const delivery = await sendOtp(email, code, "Đăng ký", env);
 		sendJson(response, 200, { ok: true, email, expiresIn: OTP_DURATION / 1000, ...(delivery.devCode ? { devCode: delivery.devCode } : {}) });
 		return;
@@ -539,7 +556,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const email = validateEmail(body.email);
 		const challenge = db.prepare("SELECT * FROM email_challenges WHERE email = ? COLLATE NOCASE AND purpose = 'register'").get(email);
 		if (!challenge || challenge.expires_at < Date.now() || challenge.attempts >= 5 || challenge.code_hash !== hashValue(`${email}:${String(body.code || "")}`)) {
-			if (challenge) db.prepare("UPDATE email_challenges SET attempts = attempts + 1 WHERE email = ? AND purpose = 'register'").run(email);
+			if (challenge) {db.prepare("UPDATE email_challenges SET attempts = attempts + 1 WHERE email = ? AND purpose = 'register'").run(email); db.sync();}
 			throw makeError(400, "Mã xác nhận không hợp lệ hoặc đã hết hạn.");
 		}
 		const pending = JSON.parse(challenge.payload);
@@ -549,8 +566,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			INSERT INTO users(id, name, email, password_hash, password_salt, student_class, avatar, cover, bio, is_admin, created_at)
 			VALUES (?, ?, ?, ?, ?, 'Học sinh NQD', './DIEU.png', '', 'Chào mừng đến với góc học tập của mình trên DIEUNW!',
 				EXISTS(SELECT 1 FROM admin_emails WHERE email = ? COLLATE NOCASE), ?)
-		`).run(userId, pending.name, email, pending.password_hash, pending.password_salt, email, now);
-		db.prepare("DELETE FROM email_challenges WHERE email = ? AND purpose = 'register'").run(email);
+		`).run(userId, pending.name, email, pending.password_hash, pending.password_salt, email, now); db.sync();
+		db.prepare("DELETE FROM email_challenges WHERE email = ? AND purpose = 'register'").run(email); db.sync();
 		const user = db.prepare("SELECT * FROM users WHERE id = ?").get(userId);
 		const cookie = setSession(db, userId, response, secure);
 		const token = cookie.split(";")[0].split("=")[1];
@@ -570,7 +587,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			INSERT INTO email_challenges(email, purpose, code_hash, payload, attempts, expires_at)
 			VALUES (?, 'password', ?, ?, 0, ?)
 			ON CONFLICT(email, purpose) DO UPDATE SET code_hash = excluded.code_hash, payload = excluded.payload, attempts = 0, expires_at = excluded.expires_at
-		`).run(email, hashValue(`${email}:${code}`), JSON.stringify({ userId: user.id }), Date.now() + OTP_DURATION);
+		`).run(email, hashValue(`${email}:${code}`), JSON.stringify({ userId: user.id }), Date.now() + OTP_DURATION); db.sync();
 		const delivery = await sendOtp(email, code, "Khôi phục mật khẩu", env);
 		sendJson(response, 200, { ok: true, ...(delivery.devCode ? { devCode: delivery.devCode } : {}) });
 		return;
@@ -581,14 +598,14 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		validatePassword(body.password);
 		const challenge = db.prepare("SELECT * FROM email_challenges WHERE email = ? COLLATE NOCASE AND purpose = 'password'").get(email);
 		if (!challenge || challenge.expires_at < Date.now() || challenge.attempts >= 5 || challenge.code_hash !== hashValue(`${email}:${String(body.code || "")}`)) {
-			if (challenge) db.prepare("UPDATE email_challenges SET attempts = attempts + 1 WHERE email = ? AND purpose = 'password'").run(email);
+			if (challenge) db.prepare("UPDATE email_challenges SET attempts = attempts + 1 WHERE email = ? AND purpose = 'password'").run(email); db.sync();
 			throw makeError(400, "Mã xác nhận không hợp lệ hoặc đã hết hạn.");
 		}
 		const pending = JSON.parse(challenge.payload);
 		const password = hashPassword(body.password);
-		db.prepare("UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?").run(password.hash, password.salt, pending.userId);
-		db.prepare("DELETE FROM email_challenges WHERE email = ? AND purpose = 'password'").run(email);
-		db.prepare("DELETE FROM sessions WHERE user_id = ?").run(pending.userId);
+		db.prepare("UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?").run(password.hash, password.salt, pending.userId); db.sync();
+		db.prepare("DELETE FROM email_challenges WHERE email = ? AND purpose = 'password'").run(email); db.sync();
+		db.prepare("DELETE FROM sessions WHERE user_id = ?").run(pending.userId); db.sync();
 		sendJson(response, 200, { user: profileUser(db, db.prepare("SELECT * FROM users WHERE id = ?").get(pending.userId)) }, { "Set-Cookie": setSession(db, pending.userId, response, secure) });
 		return;
 	}
@@ -650,7 +667,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
 		const certificateImage = validateProfileImage(body.certificateImage);
-		db.prepare("INSERT INTO profile_achievements(id, user_id, title, certificate_image, created_at) VALUES (?, ?, ?, ?, ?)").run(id, user.id, title, certificateImage, createdAt);
+		db.prepare("INSERT INTO profile_achievements(id, user_id, title, certificate_image, created_at) VALUES (?, ?, ?, ?, ?)").run(id, user.id, title, certificateImage, createdAt); db.sync();
 		sendJson(response, 201, { achievement: { id, title, certificateImage, createdAt } });
 		return;
 	}
@@ -662,7 +679,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
 		try {
-			db.prepare("INSERT INTO profile_interests(id, user_id, name, created_at) VALUES (?, ?, ?, ?)").run(id, user.id, name, createdAt);
+			db.prepare("INSERT INTO profile_interests(id, user_id, name, created_at) VALUES (?, ?, ?, ?)").run(id, user.id, name, createdAt); db.sync();
 		} catch {
 			throw makeError(409, "Sở thích này đã có trong hồ sơ.");
 		}
@@ -677,7 +694,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		if (db.prepare("SELECT COUNT(*) AS count FROM profile_photos WHERE user_id = ?").get(user.id).count >= 50) throw makeError(409, "Album có thể lưu tối đa 50 ảnh.");
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
-		db.prepare("INSERT INTO profile_photos(id, user_id, image, caption, created_at) VALUES (?, ?, ?, ?, ?)").run(id, user.id, image, caption, createdAt);
+		db.prepare("INSERT INTO profile_photos(id, user_id, image, caption, created_at) VALUES (?, ?, ?, ?, ?)").run(id, user.id, image, caption, createdAt); db.sync();
 		sendJson(response, 201, { photo: { id, image, caption, createdAt } });
 		return;
 	}
@@ -685,7 +702,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	if (method === "DELETE" && profileItem) {
 		const table = { achievements: "profile_achievements", interests: "profile_interests", photos: "profile_photos" }[profileItem[1]];
 		const itemId = decodeURIComponent(profileItem[2]);
-		const result = db.prepare(`DELETE FROM ${table} WHERE id = ? AND user_id = ?`).run(itemId, user.id);
+		const result = db.prepare(`DELETE FROM ${table} WHERE id = ? AND user_id = ?`).run(itemId, user.id); db.sync();
 		if (!result.changes) throw makeError(404, "Không tìm thấy mục trong hồ sơ của bạn.");
 		sendJson(response, 200, { ok: true });
 		return;
@@ -706,7 +723,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
 		db.prepare("INSERT INTO clubs(id, name, manager_id, manager_email, logo, tag_color, requested_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-			.run(id, name, manager.id, managerEmail, logo, tagColor, user.id, createdAt);
+			.run(id, name, manager.id, managerEmail, logo, tagColor, user.id, createdAt); db.sync();
 		sendJson(response, 201, { club: clubForViewer(db, db.prepare("SELECT * FROM clubs WHERE id = ?").get(id)) });
 		return;
 	}
@@ -720,8 +737,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		requireAdmin(user);
 		const body = await readJson(request);
 		const email = validateEmail(body.email);
-		db.prepare("INSERT OR IGNORE INTO admin_emails(email, created_at) VALUES (?, ?)").run(email, new Date().toISOString());
-		db.prepare("UPDATE users SET is_admin = 1 WHERE email = ? COLLATE NOCASE").run(email);
+		db.prepare("INSERT OR IGNORE INTO admin_emails(email, created_at) VALUES (?, ?)").run(email, new Date().toISOString()); db.sync();
+		db.prepare("UPDATE users SET is_admin = 1 WHERE email = ? COLLATE NOCASE").run(email); db.sync();
 		sendJson(response, 200, { ok: true, email, accountExists: Boolean(db.prepare("SELECT 1 FROM users WHERE email = ? COLLATE NOCASE").get(email)) });
 		return;
 	}
@@ -732,7 +749,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		if (!["approved", "rejected"].includes(body.status)) throw makeError(400, "Trạng thái duyệt không hợp lệ.");
 		const clubId = decodeURIComponent(clubDecision[1]);
 		const result = db.prepare("UPDATE clubs SET status = ?, decided_by = ?, decided_at = ? WHERE id = ? AND status = 'pending'")
-			.run(body.status, user.id, new Date().toISOString(), clubId);
+			.run(body.status, user.id, new Date().toISOString(), clubId); db.sync();
 		if (!result.changes) throw makeError(404, "Không tìm thấy yêu cầu CLB đang chờ duyệt.");
 		sendJson(response, 200, { club: clubForViewer(db, db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId)) });
 		return;
@@ -748,7 +765,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		if (!content || content.length > 10000) throw makeError(400, "Nội dung thông báo không hợp lệ.");
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
-		db.prepare("INSERT INTO club_posts(id, club_id, author_id, content, created_at) VALUES (?, ?, ?, ?, ?)").run(id, clubId, user.id, content, createdAt);
+		db.prepare("INSERT INTO club_posts(id, club_id, author_id, content, created_at) VALUES (?, ?, ?, ?, ?)").run(id, clubId, user.id, content, createdAt); db.sync();
 		sendJson(response, 201, { ok: true, id, createdAt });
 		return;
 	}
@@ -765,7 +782,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		if (!fields.name) throw makeError(400, "Tên hiển thị không được để trống.");
 		try {
 			db.prepare("UPDATE users SET name = ?, email = ?, student_class = ?, avatar = ?, cover = ?, bio = ? WHERE id = ?")
-				.run(fields.name, fields.email, fields.student_class, fields.avatar, fields.cover, fields.bio, user.id);
+				.run(fields.name, fields.email, fields.student_class, fields.avatar, fields.cover, fields.bio, user.id); db.sync();
 		} catch {
 			throw makeError(409, "Email này đã được tài khoản khác sử dụng.");
 		}
@@ -785,7 +802,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
 		db.prepare("INSERT INTO posts(id, user_id, content, image, visibility, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-			.run(id, user.id, content, String(body.image || "").trim().slice(0, 3000), visibility, createdAt);
+			.run(id, user.id, content, String(body.image || "").trim().slice(0, 3000), visibility, createdAt); db.sync();
 		sendJson(response, 201, { post: postForViewer(db, db.prepare("SELECT * FROM posts WHERE id = ?").get(id), user.id) });
 		return;
 	}
@@ -794,7 +811,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const post = db.prepare("SELECT user_id FROM posts WHERE id = ?").get(decodeURIComponent(deletePost[1]));
 		if (!post) throw makeError(404, "Không tìm thấy bài viết.");
 		if (post.user_id !== user.id) throw makeError(403, "Chỉ người đăng mới có thể xóa bài viết này.");
-		db.prepare("DELETE FROM posts WHERE id = ?").run(decodeURIComponent(deletePost[1]));
+		db.prepare("DELETE FROM posts WHERE id = ?").run(decodeURIComponent(deletePost[1])); db.sync();
 		sendJson(response, 200, { ok: true });
 		return;
 	}
@@ -804,8 +821,14 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const post = db.prepare("SELECT * FROM posts WHERE id = ?").get(decodeURIComponent(likeMatch[1]));
 		if (!post || !canViewPost(db, post, user.id)) throw makeError(404, "Không tìm thấy bài viết.");
 		const body = await readJson(request);
-		if (body.liked) db.prepare("INSERT OR IGNORE INTO post_likes(post_id, user_id, created_at) VALUES (?, ?, ?)").run(post.id, user.id, new Date().toISOString());
-		else db.prepare("DELETE FROM post_likes WHERE post_id = ? AND user_id = ?").run(post.id, user.id);
+		if (body.liked) {
+			db.prepare("INSERT OR IGNORE INTO post_likes(post_id, user_id, created_at) VALUES (?, ?, ?)").run(post.id, user.id, new Date().toISOString()); 
+			db.sync();
+		}
+		else {
+			db.prepare("DELETE FROM post_likes WHERE post_id = ? AND user_id = ?").run(post.id, user.id);
+			db.sync();
+		} 
 		const likes = db.prepare("SELECT COUNT(*) AS count FROM post_likes WHERE post_id = ?").get(post.id).count;
 		sendJson(response, 200, { likes });
 		return;
@@ -819,7 +842,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		if (!content || content.length > 2000) throw makeError(400, "Bình luận không hợp lệ.");
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
-		db.prepare("INSERT INTO post_comments(id, post_id, user_id, content, created_at) VALUES (?, ?, ?, ?, ?)").run(id, post.id, user.id, content, createdAt);
+		db.prepare("INSERT INTO post_comments(id, post_id, user_id, content, created_at) VALUES (?, ?, ?, ?, ?)").run(id, post.id, user.id, content, createdAt); db.sync();
 		sendJson(response, 201, { comment: { id, text: content, name: user.name, avatar: user.avatar, createdAt } });
 		return;
 	}
@@ -841,10 +864,10 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const pair = [user.id, friendId].sort();
 		db.exec("BEGIN");
 		try {
-			const result = db.prepare("DELETE FROM friendships WHERE user_low = ? AND user_high = ?").run(pair[0], pair[1]);
+			const result = db.prepare("DELETE FROM friendships WHERE user_low = ? AND user_high = ?").run(pair[0], pair[1]); db.sync();
 			if (!result.changes) throw makeError(404, "Hai tài khoản hiện không phải bạn bè.");
 			db.prepare("DELETE FROM friend_requests WHERE status = 'accepted' AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))")
-				.run(user.id, friendId, friendId, user.id);
+				.run(user.id, friendId, friendId, user.id); db.sync();
 			db.exec("COMMIT");
 		} catch (error) {
 			db.exec("ROLLBACK");
@@ -862,7 +885,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		if (status === "incoming") throw makeError(409, "Người này đã gửi lời mời cho bạn.");
 		if (status === "outgoing") throw makeError(409, "Bạn đã gửi lời mời rồi.");
 		db.prepare("INSERT INTO friend_requests(id, sender_id, receiver_id, status, created_at) VALUES (?, ?, ?, 'pending', ?)")
-			.run(randomBytes(16).toString("hex"), user.id, targetId, new Date().toISOString());
+			.run(randomBytes(16).toString("hex"), user.id, targetId, new Date().toISOString()); db.sync();
 		sendJson(response, 201, { ok: true });
 		return;
 	}
@@ -872,15 +895,15 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const requestRow = db.prepare("SELECT * FROM friend_requests WHERE sender_id = ? AND receiver_id = ? AND status = 'pending'").get(senderId, user.id);
 		if (!requestRow) throw makeError(404, "Không tìm thấy lời mời.");
 		if (friendAction[2] === "reject") {
-			db.prepare("UPDATE friend_requests SET status = 'rejected' WHERE id = ?").run(requestRow.id);
+			db.prepare("UPDATE friend_requests SET status = 'rejected' WHERE id = ?").run(requestRow.id); db.sync();
 			sendJson(response, 200, { ok: true });
 			return;
 		}
 		const pair = [user.id, senderId].sort();
 		db.exec("BEGIN");
 		try {
-			db.prepare("UPDATE friend_requests SET status = 'accepted' WHERE id = ?").run(requestRow.id);
-			db.prepare("INSERT OR IGNORE INTO friendships(user_low, user_high, created_at) VALUES (?, ?, ?)").run(pair[0], pair[1], new Date().toISOString());
+			db.prepare("UPDATE friend_requests SET status = 'accepted' WHERE id = ?").run(requestRow.id); db.sync();
+			db.prepare("INSERT OR IGNORE INTO friendships(user_low, user_high, created_at) VALUES (?, ?, ?)").run(pair[0], pair[1], new Date().toISOString()); db.sync();
 			ensureConversation(db, pair[0], pair[1]);
 			db.exec("COMMIT");
 		} catch (error) {
@@ -913,9 +936,9 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const createdAt = new Date().toISOString();
 		db.exec("BEGIN");
 		try {
-			db.prepare("INSERT INTO conversations(id, type, name, created_by, created_at) VALUES (?, 'group', ?, ?, ?)").run(id, name, user.id, createdAt);
+			db.prepare("INSERT INTO conversations(id, type, name, created_by, created_at) VALUES (?, 'group', ?, ?, ?)").run(id, name, user.id, createdAt); db.sync();
 			const addMember = db.prepare("INSERT INTO conversation_members(conversation_id, user_id, joined_at) VALUES (?, ?, ?)");
-			[user.id, ...memberIds].forEach(memberId => addMember.run(id, memberId, createdAt));
+			[user.id, ...memberIds].forEach(memberId => addMember.run(id, memberId, createdAt)); db.sync();
 			db.exec("COMMIT");
 		} catch (error) {
 			db.exec("ROLLBACK");
@@ -930,7 +953,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const conversation = db.prepare("SELECT type, created_by FROM conversations WHERE id = ?").get(conversationId);
 		if (!conversation || conversation.type !== "group") throw makeError(404, "Không tìm thấy nhóm chat.");
 		if (conversation.created_by !== user.id) throw makeError(403, "Chỉ người tạo nhóm mới có thể xóa nhóm này.");
-		db.prepare("DELETE FROM conversations WHERE id = ?").run(conversationId);
+		db.prepare("DELETE FROM conversations WHERE id = ?").run(conversationId); db.sync();
 		sendJson(response, 200, { ok: true });
 		return;
 	}
@@ -952,7 +975,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		if (!content || content.length > 1000) throw makeError(400, "Tin nhắn không hợp lệ.");
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
-		db.prepare("INSERT INTO messages(id, conversation_id, sender_id, content, created_at) VALUES (?, ?, ?, ?, ?)").run(id, conversationId, user.id, content, createdAt);
+		db.prepare("INSERT INTO messages(id, conversation_id, sender_id, content, created_at) VALUES (?, ?, ?, ?, ?)").run(id, conversationId, user.id, content, createdAt); db.sync();
 		sendJson(response, 201, { message: { id, text: content, fromId: user.id, name: user.name, avatar: user.avatar, createdAt } });
 		return;
 	}

@@ -307,8 +307,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const updatedFields = {
             name: newName,
-            email: newEmail || currentUser.email,
-            studentClass: newClass || "Học sinh NQD",
+            email: newEmail,
+            studentClass: newClass,
             avatar: newAvatar,
             cover: newCover,
             bio: newBio || "Chào mừng đến với góc học tập của mình trên DIEUNW!"
@@ -328,7 +328,7 @@ document.addEventListener("DOMContentLoaded", () => {
             editProfileForm.style.display = "none";
             btnEditProfile.style.display = "inline-block";
             
-            alert("Cập nhật hồ sơ thành công! 🎉");
+            alert("Cập nhật hồ sơ thành công!");
             showProfile(data.user);
         } catch (error) {
             alert(requestErrorMessage(error, "Lỗi khi lưu thông tin hồ sơ!"));
