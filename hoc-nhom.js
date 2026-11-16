@@ -1,5 +1,22 @@
 document.addEventListener("DOMContentLoaded", () => {
-	const POSTS_API = "/api/posts";
+	const API_BASE = "https://dieunw.onrender.com";
+	const POSTS_API = `${API_BASE}/api/posts`;
+	const groupTabs = [...document.querySelectorAll(".group-tab")];
+	const groupPanels = [...document.querySelectorAll(".group-panel")];
+	groupTabs.forEach(tab => {
+		tab.addEventListener("click", () => {
+			const targetId = tab.dataset.panel;
+			groupTabs.forEach(item => {
+				const active = item === tab;
+				item.classList.toggle("active", active);
+				item.setAttribute("aria-selected", String(active));
+				item.tabIndex = active ? 0 : -1;
+			});
+			groupPanels.forEach(panel => {
+				panel.hidden = panel.id !== targetId;
+			});
+		});
+	});
 	const tracks = {
 		"Chuyên": ["Toán", "Văn", "Anh", "Tin", "Hóa", "Lý", "Sinh", "Địa", "Sử"],
 		"Thường": ["Toán", "Văn", "Anh", "Tin", "Hóa", "Lý", "Sinh", "Địa", "Công nghệ", "Kinh tế và pháp luật", "Quốc phòng", "Thể chất"]
@@ -176,7 +193,26 @@ function orderKey(track, subject) {
 	const subIndex = list.indexOf(subject);
 	return trackOrder * 100 + (subIndex >= 0 ? subIndex : 99);
 }
+function escapeHtml(value) {
+		return String(value ?? "").replace(/[&<>"']/g, ch => ({
+			"&": "&amp;",
+			"<": "&lt;",
+			">": "&gt;",
+			'"': "&quot;",
+			"'": "&#39;"
+		})[ch]);
+}
+
+function safeResourceUrl(url) {
+	const raw = String(url || "").trim();
+	if (!raw) return "";
+	if (raw.startsWith("/uploads/")) return `${API_BASE}${raw}`;
+	if (/^https?:\/\//i.test(raw)) return raw;
+	return "";
+}
+
 function makeBook(post) {
+	
 	const book = document.createElement("article");
 	book.className = "book";
 	book.dataset.subject = post.resource_subject || "";
@@ -210,13 +246,29 @@ function makeBook(post) {
 	const pages = document.createElement("div");
 	pages.className = "book-pages";
 
+	const safeFileUrl = safeResourceUrl(fileUrl);
+	const safeLink = safeResourceUrl(link);
+
 	const leftPage = document.createElement("div");
 	leftPage.className = "book-page book-page-left";
-	leftPage.innerHTML = `<div class="page-content"><h2>${post.resource_title || "Tài liệu"}</h2><p class="page-meta">Khối ${post.resource_grade || "?"} · ${post.resource_track || ""} · ${post.resource_subject || ""}</p><p class="page-desc">${post.resource_description || post.description || ""}</p></div>`;
+	leftPage.innerHTML = `<div class="page-content">
+		<h2>${escapeHtml(post.resource_title || "Tài liệu")}</h2>
+		<p class="page-meta">Khối ${escapeHtml(post.resource_grade || "?")} · ${escapeHtml(post.resource_track || "")} · ${escapeHtml(post.resource_subject || "")}</p>
+		<p class="page-desc">${escapeHtml(post.resource_description || post.description || "")}</p>
+	</div>`;
 
 	const rightPage = document.createElement("div");
 	rightPage.className = "book-page book-page-right";
-	rightPage.innerHTML = `<div class="page-content"><h2>Tệp & Liên kết</h2>${fileName ? `<p><strong>Tệp:</strong> ${fileName} (${fileType || ""})</p><a href="${fileUrl}" class="page-link" target="_blank" rel="noopener noreferrer">Tải tệp tài liệu ↓</a>` : `<p class="text-muted">Chưa có tệp đính kèm.</p>`}${link ? `<p><strong>Liên kết:</strong> <a href="${link}" class="page-link" target="_blank" rel="noopener noreferrer">Mở liên kết ↗</a></p>` : ""}<p class="page-info">Đăng bởi: ${post.name || "Dieuer Ẩn Danh"} · ${displayDate(post.createdAt)}</p></div>`;
+	rightPage.innerHTML = `<div class="page-content">
+		<h2>Tệp &amp; Liên kết</h2>
+		${fileName && safeFileUrl
+			? `<p><strong>Tệp:</strong> ${escapeHtml(fileName)}${fileType ? ` (${escapeHtml(fileType)})` : ""}</p><a href="${escapeHtml(safeFileUrl)}" class="page-link" target="_blank" rel="noopener noreferrer">Tải tệp tài liệu ↓</a>`
+			: `<p class="text-muted">Chưa có tệp đính kèm.</p>`}
+		${safeLink
+			? `<p><strong>Liên kết:</strong> <a href="${escapeHtml(safeLink)}" class="page-link" target="_blank" rel="noopener noreferrer">Mở liên kết ↗</a></p>`
+			: ""}
+		<p class="page-info">Đăng bởi: ${escapeHtml(post.name || "Dieuer Ẩn Danh")} · ${escapeHtml(displayDate(post.createdAt))}</p>
+	</div>`;
 
 	pages.appendChild(leftPage);
 	pages.appendChild(rightPage);
@@ -306,20 +358,29 @@ function renderResources() {
 }
 async function loadResources() {
 	resourceList.innerHTML = "<p class=\"feed-state\">Đang tải kệ sách...</p>";
+	resources = posts
+			.filter(post => post.type === "study-resource")
+			.sort((first, second) => new Date(second.createdAt) - new Date(first.createdAt));
+	const coverColorInput = document.getElementById("resource-cover-color");
+	const coverColorLabel = document.querySelector(".color-picker-label");
+	coverColorInput.addEventListener("input", () => {
+		if (coverColorLabel) coverColorLabel.textContent = coverColorInput.value.toUpperCase();
+	});
 	try {
 		const response = await fetch(POSTS_API, { credentials: "include" });
 		if (!response.ok) throw new Error("Không tải được kệ sách.");
 		const data = await response.json();
 		const posts = data.posts || data || [];
 		resources = posts
-			.filter(post => post.type === "study-resource" || post.resource_title)
-			.sort((first, second) => new Date(second.createdAt) - new Date(first.createdAt));
+    	.filter(post => post.type === "study-resource")
+    	.sort((first, second) => new Date(second.createdAt) - new Date(first.createdAt));
 		renderResources();
 	} catch (error) {
 		resourceList.innerHTML = "<p class=\"feed-state error\">Không tải được tài liệu. Kiểm tra kết nối rồi thử lại.</p>";
 	}
 }
 resourceForm.addEventListener("submit", async event => {
+	formData.append("type", "study-resource");
 	event.preventDefault();
 	if (!selection.grade || !selection.subject) {
 		resourceMessage.textContent = "Hãy chọn khối và môn học trước khi đăng.";
@@ -345,10 +406,16 @@ resourceForm.addEventListener("submit", async event => {
 	resourceSubmit.textContent = "Đăng tài liệu...";
 	resourceMessage.textContent = "";
 	resourceMessage.classList.remove("error");
+	formData.append("type", "study-resource");
 	try {
 		const response = await fetch(POSTS_API, { method: "POST", body: formData, credentials: "include" });
-		if (!response.ok) throw new Error("Không thể đăng tài liệu.");
+		const data = await response.json().catch(() => ({}));
+		if (!response.ok) throw new Error(data.error || "Không thể đăng tài liệu.");
 		resourceForm.reset();
+		selection.grade = "";
+		selection.subject = "";
+		renderChoices();
+		if (coverColorLabel) coverColorLabel.textContent = "#6aa68d";
 		filterTrack.value = "";
 		filterSubject.value = "";
 		filterGrade.value = "";
@@ -356,7 +423,7 @@ resourceForm.addEventListener("submit", async event => {
 		resourceMessage.textContent = "Đã đăng tài liệu thành công.";
 		await loadResources();
 	} catch (error) {
-		resourceMessage.textContent = "Đăng chưa thành công. Hãy thử lại sau.";
+		resourceMessage.textContent = error.message || "Đăng chưa thành công. Hãy thử lại sau.";
 		resourceMessage.classList.add("error");
 	} finally {
 		resourceSubmit.disabled = false;

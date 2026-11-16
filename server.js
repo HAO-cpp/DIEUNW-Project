@@ -29,6 +29,68 @@ const MIME_TYPES = {
 	".txt": "text/plain; charset=utf-8",
 	".webp": "image/webp"
 };
+async function parseMultipart(request) {
+	const contentType = request.headers["content-type"] || "";
+	const boundary = parseBoundary(contentType);
+	if (!boundary) throw makeError(400, "Thiếu boundary multipart.");
+	const chunks = [];
+	let size = 0;
+	for await (const chunk of request) {
+		size += chunk.length;
+		if (size > MAX_UPLOAD_BYTES) throw makeError(413, "Tệp tải lên quá lớn (tối đa 10 MB).");
+		chunks.push(chunk);
+	}
+
+	const raw = Buffer.concat(chunks);
+	const boundaryBuf = Buffer.from(`--${boundary}`);
+	const parts = [];
+	let pos = raw.indexOf(boundaryBuf);
+	while (pos !== -1) {
+		const start = pos + boundaryBuf.length;
+		if (raw.subarray(start, start + 2).equals(Buffer.from("--"))) break;
+		const headerStart = raw.subarray(start, start + 2).equals(Buffer.from("\r\n")) ? start + 2 : start;
+		const headerEnd = raw.indexOf(Buffer.from("\r\n\r\n"), headerStart);
+		if (headerEnd === -1) break;
+		const nextBoundary = raw.indexOf(boundaryBuf, headerEnd + 4);
+		if (nextBoundary === -1) break;
+
+		const headersText = raw.subarray(headerStart, headerEnd).toString("utf8");
+		let body = raw.subarray(headerEnd + 4, nextBoundary);
+		if (body.subarray(-2).equals(Buffer.from("\r\n"))) body = body.subarray(0, -2);
+
+		const nameMatch = /name="([^"]+)"/i.exec(headersText);
+		const fileMatch = /filename="([^"]*)"/i.exec(headersText);
+		const typeMatch = /Content-Type:\s*([^\r\n;]+)/i.exec(headersText);
+		if (nameMatch) {
+			parts.push({
+				name: nameMatch[1],
+				fileName: fileMatch ? path.basename(fileMatch[1]) : "",
+				contentType: typeMatch ? typeMatch[1].trim() : "",
+				body
+			});
+		}
+		pos = nextBoundary;
+	}
+	return parts;
+}
+
+function saveUploadedFile(filePart) {
+	if (!filePart || !filePart.fileName || !filePart.body.length) return null;
+	const ext = path.extname(filePart.fileName).toLowerCase();
+	const allowedExts = new Set([".pdf", ".doc", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".webp"]);
+	if (!allowedExts.has(ext)) {
+		throw makeError(400, "Chỉ hỗ trợ tệp PDF, DOC, DOCX, TXT hoặc ảnh.");
+	}
+	mkdirSync(UPLOAD_DIR, { recursive: true });
+	const storedName = `${randomBytes(16).toString("hex")}${ext}`;
+	writeFileSync(path.join(UPLOAD_DIR, storedName), filePart.body);
+	return {
+		fileUrl: `/uploads/${storedName}`,
+		fileName: filePart.fileName,
+		fileType: filePart.contentType || ext.slice(1).toUpperCase(),
+		fileSize: filePart.body.length
+	};
+}
 
 function makeError(statusCode, message) {
 	const error = new Error(message);
@@ -65,6 +127,14 @@ function cleanUser(row) {
 	};
 }
 
+function serializeCookie(name, value, { maxAge, secure }) {
+	const parts = [`${name}=${encodeURIComponent(value)}`, "HttpOnly", "Path=/"];
+	if (maxAge !== undefined) parts.push(`Max-Age=${maxAge}`);
+	if (secure) parts.push("SameSite=None", "Secure");
+	else parts.push("SameSite=Lax");
+	return parts.join("; ");
+}
+
 function profileUser(db, row) {
 	if (!row) return null;
 	return {
@@ -77,6 +147,8 @@ function profileUser(db, row) {
 	};
 }
 
+function syncDb(db) { if (process.env.TURSO_DATABASE_URL) db.sync(); }
+
 function initializeDatabase(dbPath) {
 	if (dbPath !== ":memory:") mkdirSync(path.dirname(dbPath), { recursive: true });
 	
@@ -88,7 +160,7 @@ function initializeDatabase(dbPath) {
 
 	// Kéo dữ liệu mới nhất từ Turso về trước khi chạy lệnh tạo bảng
 	if (process.env.TURSO_DATABASE_URL) {
-		db.sync();
+		syncDb(db);
 	}
 
 	db.exec("PRAGMA foreign_keys = ON;");
@@ -233,6 +305,7 @@ function initializeDatabase(dbPath) {
 
 	const postColumns = db.prepare("PRAGMA table_info(posts)").all().map(column => column.name);
 	const postAlters = [];
+	if (!postColumns.includes("type")) postAlters.push("ADD COLUMN type TEXT NOT NULL DEFAULT \"post\"");
 	if (!postColumns.includes("resource_title")) postAlters.push("ADD COLUMN resource_title TEXT NOT NULL DEFAULT \"\"");
 	if (!postColumns.includes("resource_description")) postAlters.push("ADD COLUMN resource_description TEXT NOT NULL DEFAULT \"\"");
 	if (!postColumns.includes("resource_link")) postAlters.push("ADD COLUMN resource_link TEXT NOT NULL DEFAULT \"\"");
@@ -251,12 +324,12 @@ function initializeDatabase(dbPath) {
 
 	// Đẩy toàn bộ bảng vừa tạo lên đám mây Turso
 	if (process.env.TURSO_DATABASE_URL) {
-		db.sync();
+		syncDb(db);
 	}
 
 	const now = new Date().toISOString();
-	db.prepare("INSERT OR IGNORE INTO admin_emails(email, created_at) VALUES (?, ?)").run("k18th.hao2802@nqd.edu.vn", now); db.sync();
-	db.prepare("UPDATE users SET is_admin = 1 WHERE email IN (SELECT email FROM admin_emails)").run(); db.sync();
+	db.prepare("INSERT OR IGNORE INTO admin_emails(email, created_at) VALUES (?, ?)").run("k18th.hao2802@nqd.edu.vn", now); syncDb(db);
+	db.prepare("UPDATE users SET is_admin = 1 WHERE email IN (SELECT email FROM admin_emails)").run(); syncDb(db);
 	return db;
 }
 
@@ -296,7 +369,7 @@ async function parseMultipart(request) {
 		if (size > MAX_UPLOAD_BYTES) throw makeError(413, "Yeucau qua lon.");
 		chunks.push(chunk);
 	}
-
+}
 
 function parseCookies(request) {
 	const cookieHeader = request.headers.cookie || "";
@@ -360,7 +433,7 @@ function setSession(db, userId, response, secure) {
     const expiresAt = Date.now() + SESSION_DURATION;
 
     db.prepare("INSERT INTO sessions(token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)")
-        .run(hashValue(token), userId, expiresAt, new Date().toISOString()); db.sync();
+        .run(hashValue(token), userId, expiresAt, new Date().toISOString()); syncDb(db);
 
     return `${SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=None; Path=/; Max-Age=${SESSION_DURATION / 1000}; Secure`;
 }
@@ -372,7 +445,7 @@ function clearSession(db, request, secure) {
 		: parseCookies(request)[SESSION_COOKIE];
 
 	if (sessionToken) {
-		db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hashValue(sessionToken)); db.sync();
+		db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hashValue(sessionToken)); syncDb(db);
 	}
 	return serializeCookie(SESSION_COOKIE, "", { maxAge: 0, secure });
 }
@@ -396,10 +469,10 @@ function ensureConversation(db, userA, userB) {
 	const id = `direct-${pair[0]}-${pair[1]}`;
 	const now = new Date().toISOString();
 	db.prepare("INSERT OR IGNORE INTO conversations(id, type, name, created_by, created_at) VALUES (?, 'direct', '', ?, ?)")
-		.run(id, pair[0], now); db.sync();
+		.run(id, pair[0], now); syncDb(db);
 	const addMember = db.prepare("INSERT OR IGNORE INTO conversation_members(conversation_id, user_id, joined_at) VALUES (?, ?, ?)");
-	addMember.run(id, pair[0], now); db.sync();
-	addMember.run(id, pair[1], now); db.sync();
+	addMember.run(id, pair[0], now); syncDb(db);
+	addMember.run(id, pair[1], now); syncDb(db);
 	return id;
 }
 
@@ -424,6 +497,7 @@ function postForViewer(db, row, viewerId) {
 	return {
 		id: row.id,
 		userId: row.user_id,
+		type: row.type || "post",
 		name: author?.name || author?.email || "Thành viên",
 		authorEmail: author?.email || "",
 		avatar: author?.avatar || "./DIEU.png",
@@ -441,10 +515,11 @@ function postForViewer(db, row, viewerId) {
 		resource_track: row.resource_track,
 		resource_subject: row.resource_subject,
 		resource_file_url: row.resource_file_url,
-		resource_file_name: row.resource_file_name
-	}
+		resource_file_name: row.resource_file_name,
+		resource_file_type: row.resource_file_type,
+		resource_cover_color: row.resource_cover_color
 	};
-}
+};
 
 async function sendOtp(email, code, purpose, env) {
 	if (env.EMAILJS_ENABLED === "0") return { sent: false, devCode: env.NODE_ENV === "production" ? undefined : code };
@@ -599,7 +674,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			INSERT INTO email_challenges(email, purpose, code_hash, payload, attempts, expires_at)
 			VALUES (?, 'register', ?, ?, 0, ?)
 			ON CONFLICT(email, purpose) DO UPDATE SET code_hash = excluded.code_hash, payload = excluded.payload, attempts = 0, expires_at = excluded.expires_at
-		`).run(email, hashValue(`${email}:${code}`), payload, Date.now() + OTP_DURATION); db.sync();
+		`).run(email, hashValue(`${email}:${code}`), payload, Date.now() + OTP_DURATION); syncDb(db);
 		const delivery = await sendOtp(email, code, "Đăng ký", env);
 		sendJson(response, 200, { ok: true, email, expiresIn: OTP_DURATION / 1000, ...(delivery.devCode ? { devCode: delivery.devCode } : {}) });
 		return;
@@ -609,7 +684,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const email = validateEmail(body.email);
 		const challenge = db.prepare("SELECT * FROM email_challenges WHERE email = ? COLLATE NOCASE AND purpose = 'register'").get(email);
 		if (!challenge || challenge.expires_at < Date.now() || challenge.attempts >= 5 || challenge.code_hash !== hashValue(`${email}:${String(body.code || "")}`)) {
-			if (challenge) {db.prepare("UPDATE email_challenges SET attempts = attempts + 1 WHERE email = ? AND purpose = 'register'").run(email); db.sync();}
+			if (challenge) {db.prepare("UPDATE email_challenges SET attempts = attempts + 1 WHERE email = ? AND purpose = 'register'").run(email); syncDb(db);}
 			throw makeError(400, "Mã xác nhận không hợp lệ hoặc đã hết hạn.");
 		}
 		const pending = JSON.parse(challenge.payload);
@@ -619,8 +694,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			INSERT INTO users(id, name, email, password_hash, password_salt, student_class, avatar, cover, bio, is_admin, created_at)
 			VALUES (?, ?, ?, ?, ?, 'Học sinh NQD', './DIEU.png', '', 'Chào mừng đến với góc học tập của mình trên DIEUNW!',
 				EXISTS(SELECT 1 FROM admin_emails WHERE email = ? COLLATE NOCASE), ?)
-		`).run(userId, pending.name, email, pending.password_hash, pending.password_salt, email, now); db.sync();
-		db.prepare("DELETE FROM email_challenges WHERE email = ? AND purpose = 'register'").run(email); db.sync();
+		`).run(userId, pending.name, email, pending.password_hash, pending.password_salt, email, now); syncDb(db);
+		db.prepare("DELETE FROM email_challenges WHERE email = ? AND purpose = 'register'").run(email); syncDb(db);
 		const user = db.prepare("SELECT * FROM users WHERE id = ?").get(userId);
 		const cookie = setSession(db, userId, response, secure);
 		const token = cookie.split(";")[0].split("=")[1];
@@ -640,7 +715,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			INSERT INTO email_challenges(email, purpose, code_hash, payload, attempts, expires_at)
 			VALUES (?, 'password', ?, ?, 0, ?)
 			ON CONFLICT(email, purpose) DO UPDATE SET code_hash = excluded.code_hash, payload = excluded.payload, attempts = 0, expires_at = excluded.expires_at
-		`).run(email, hashValue(`${email}:${code}`), JSON.stringify({ userId: user.id }), Date.now() + OTP_DURATION); db.sync();
+		`).run(email, hashValue(`${email}:${code}`), JSON.stringify({ userId: user.id }), Date.now() + OTP_DURATION); syncDb(db);
 		const delivery = await sendOtp(email, code, "Khôi phục mật khẩu", env);
 		sendJson(response, 200, { ok: true, ...(delivery.devCode ? { devCode: delivery.devCode } : {}) });
 		return;
@@ -651,14 +726,14 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		validatePassword(body.password);
 		const challenge = db.prepare("SELECT * FROM email_challenges WHERE email = ? COLLATE NOCASE AND purpose = 'password'").get(email);
 		if (!challenge || challenge.expires_at < Date.now() || challenge.attempts >= 5 || challenge.code_hash !== hashValue(`${email}:${String(body.code || "")}`)) {
-			if (challenge) db.prepare("UPDATE email_challenges SET attempts = attempts + 1 WHERE email = ? AND purpose = 'password'").run(email); db.sync();
+			if (challenge) db.prepare("UPDATE email_challenges SET attempts = attempts + 1 WHERE email = ? AND purpose = 'password'").run(email); syncDb(db);
 			throw makeError(400, "Mã xác nhận không hợp lệ hoặc đã hết hạn.");
 		}
 		const pending = JSON.parse(challenge.payload);
 		const password = hashPassword(body.password);
-		db.prepare("UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?").run(password.hash, password.salt, pending.userId); db.sync();
-		db.prepare("DELETE FROM email_challenges WHERE email = ? AND purpose = 'password'").run(email); db.sync();
-		db.prepare("DELETE FROM sessions WHERE user_id = ?").run(pending.userId); db.sync();
+		db.prepare("UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?").run(password.hash, password.salt, pending.userId); syncDb(db);
+		db.prepare("DELETE FROM email_challenges WHERE email = ? AND purpose = 'password'").run(email); syncDb(db);
+		db.prepare("DELETE FROM sessions WHERE user_id = ?").run(pending.userId); syncDb(db);
 		sendJson(response, 200, { user: profileUser(db, db.prepare("SELECT * FROM users WHERE id = ?").get(pending.userId)) }, { "Set-Cookie": setSession(db, pending.userId, response, secure) });
 		return;
 	}
@@ -720,7 +795,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
 		const certificateImage = validateProfileImage(body.certificateImage);
-		db.prepare("INSERT INTO profile_achievements(id, user_id, title, certificate_image, created_at) VALUES (?, ?, ?, ?, ?)").run(id, user.id, title, certificateImage, createdAt); db.sync();
+		db.prepare("INSERT INTO profile_achievements(id, user_id, title, certificate_image, created_at) VALUES (?, ?, ?, ?, ?)").run(id, user.id, title, certificateImage, createdAt); syncDb(db);
 		sendJson(response, 201, { achievement: { id, title, certificateImage, createdAt } });
 		return;
 	}
@@ -732,7 +807,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
 		try {
-			db.prepare("INSERT INTO profile_interests(id, user_id, name, created_at) VALUES (?, ?, ?, ?)").run(id, user.id, name, createdAt); db.sync();
+			db.prepare("INSERT INTO profile_interests(id, user_id, name, created_at) VALUES (?, ?, ?, ?)").run(id, user.id, name, createdAt); syncDb(db);
 		} catch {
 			throw makeError(409, "Sở thích này đã có trong hồ sơ.");
 		}
@@ -747,7 +822,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		if (db.prepare("SELECT COUNT(*) AS count FROM profile_photos WHERE user_id = ?").get(user.id).count >= 50) throw makeError(409, "Album có thể lưu tối đa 50 ảnh.");
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
-		db.prepare("INSERT INTO profile_photos(id, user_id, image, caption, created_at) VALUES (?, ?, ?, ?, ?)").run(id, user.id, image, caption, createdAt); db.sync();
+		db.prepare("INSERT INTO profile_photos(id, user_id, image, caption, created_at) VALUES (?, ?, ?, ?, ?)").run(id, user.id, image, caption, createdAt); syncDb(db);
 		sendJson(response, 201, { photo: { id, image, caption, createdAt } });
 		return;
 	}
@@ -755,7 +830,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	if (method === "DELETE" && profileItem) {
 		const table = { achievements: "profile_achievements", interests: "profile_interests", photos: "profile_photos" }[profileItem[1]];
 		const itemId = decodeURIComponent(profileItem[2]);
-		const result = db.prepare(`DELETE FROM ${table} WHERE id = ? AND user_id = ?`).run(itemId, user.id); db.sync();
+		const result = db.prepare(`DELETE FROM ${table} WHERE id = ? AND user_id = ?`).run(itemId, user.id); syncDb(db);
 		if (!result.changes) throw makeError(404, "Không tìm thấy mục trong hồ sơ của bạn.");
 		sendJson(response, 200, { ok: true });
 		return;
@@ -776,7 +851,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
 		db.prepare("INSERT INTO clubs(id, name, manager_id, manager_email, logo, tag_color, requested_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-			.run(id, name, manager.id, managerEmail, logo, tagColor, user.id, createdAt); db.sync();
+			.run(id, name, manager.id, managerEmail, logo, tagColor, user.id, createdAt); syncDb(db);
 		sendJson(response, 201, { club: clubForViewer(db, db.prepare("SELECT * FROM clubs WHERE id = ?").get(id)) });
 		return;
 	}
@@ -790,8 +865,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		requireAdmin(user);
 		const body = await readJson(request);
 		const email = validateEmail(body.email);
-		db.prepare("INSERT OR IGNORE INTO admin_emails(email, created_at) VALUES (?, ?)").run(email, new Date().toISOString()); db.sync();
-		db.prepare("UPDATE users SET is_admin = 1 WHERE email = ? COLLATE NOCASE").run(email); db.sync();
+		db.prepare("INSERT OR IGNORE INTO admin_emails(email, created_at) VALUES (?, ?)").run(email, new Date().toISOString()); syncDb(db);
+		db.prepare("UPDATE users SET is_admin = 1 WHERE email = ? COLLATE NOCASE").run(email); syncDb(db);
 		sendJson(response, 200, { ok: true, email, accountExists: Boolean(db.prepare("SELECT 1 FROM users WHERE email = ? COLLATE NOCASE").get(email)) });
 		return;
 	}
@@ -802,7 +877,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		if (!["approved", "rejected"].includes(body.status)) throw makeError(400, "Trạng thái duyệt không hợp lệ.");
 		const clubId = decodeURIComponent(clubDecision[1]);
 		const result = db.prepare("UPDATE clubs SET status = ?, decided_by = ?, decided_at = ? WHERE id = ? AND status = 'pending'")
-			.run(body.status, user.id, new Date().toISOString(), clubId); db.sync();
+			.run(body.status, user.id, new Date().toISOString(), clubId); syncDb(db);
 		if (!result.changes) throw makeError(404, "Không tìm thấy yêu cầu CLB đang chờ duyệt.");
 		sendJson(response, 200, { club: clubForViewer(db, db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId)) });
 		return;
@@ -818,7 +893,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		if (!content || content.length > 10000) throw makeError(400, "Nội dung thông báo không hợp lệ.");
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
-		db.prepare("INSERT INTO club_posts(id, club_id, author_id, content, created_at) VALUES (?, ?, ?, ?, ?)").run(id, clubId, user.id, content, createdAt); db.sync();
+		db.prepare("INSERT INTO club_posts(id, club_id, author_id, content, created_at) VALUES (?, ?, ?, ?, ?)").run(id, clubId, user.id, content, createdAt); syncDb(db);
 		sendJson(response, 201, { ok: true, id, createdAt });
 		return;
 	}
@@ -835,7 +910,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		if (!fields.name) throw makeError(400, "Tên hiển thị không được để trống.");
 		try {
 			db.prepare("UPDATE users SET name = ?, email = ?, student_class = ?, avatar = ?, cover = ?, bio = ? WHERE id = ?")
-				.run(fields.name, fields.email, fields.student_class, fields.avatar, fields.cover, fields.bio, user.id); db.sync();
+				.run(fields.name, fields.email, fields.student_class, fields.avatar, fields.cover, fields.bio, user.id); syncDb(db);
 		} catch {
 			throw makeError(409, "Email này đã được tài khoản khác sử dụng.");
 		}
@@ -847,10 +922,11 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		sendJson(response, 200, { posts: posts.map(post => postForViewer(db, post, user.id)) });
 		return;
 	}
-	if (method === "POST" && pathname === "/api/posts" ) {
+	if (method === "POST" && pathname === "/api/posts") {
 		const contentType = request.headers["content-type"] || "";
 		let fields = {};
 		let filePart = null;
+
 		if (contentType.startsWith("multipart/form-data")) {
 			const parts = await parseMultipart(request);
 			for (const part of parts) {
@@ -858,28 +934,66 @@ async function handleApi({ request, response, url, db, env, secure }) {
 				else fields[part.name] = part.body.toString("utf8");
 			}
 		} else {
-			const body = await readJson(request);
-			fields = body;
+			fields = await readJson(request);
 		}
-		const title = String(fields.resource_title || fields.title || fields.content || "").trim().slice(0, 200);
-		const description = String(fields.resource_description || fields.description || "").trim().slice(0, 1500);
-		const link = String(fields.resource_link || fields.link || "").trim().slice(0, 1000);
-		const grade = String(fields.resource_grade || fields.grade || "").trim();
-		const track = String(fields.resource_track || fields.track || "").trim();
-		const subject = String(fields.resource_subject || fields.subject || "").trim();
-		const coverColor = String(fields.resource_cover_color || fields.coverColor || "#").trim().slice(0, 20);
+
+		const isResource = contentType.startsWith("multipart/form-data")
+			|| fields.type === "study-resource"
+			|| Boolean(fields.resource_title);
 		const visibility = fields.visibility === "private" ? "private" : "public";
-		if (!title) throw makeError(400, "Tieu de tai lieu khong duoc de trong.");
-		const content = title + (description ? " - " + description : "");
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
-		let fUrl = "", fName = "", fType = "", fSize = 0;
-		if (filePart) {
-			const saved = saveUploadedFile(filePart);
-			if (saved) { fUrl = saved.fileUrl; fName = saved.fileName; fType = saved.fileType; fSize = saved.fileSize; }
+
+		if (isResource) {
+			const title = String(fields.resource_title || fields.title || "").trim().slice(0, 200);
+			const description = String(fields.resource_description || fields.description || "").trim().slice(0, 1500);
+			const link = String(fields.resource_link || fields.link || "").trim().slice(0, 1000);
+			const grade = String(fields.resource_grade || fields.grade || "").trim();
+			const track = String(fields.resource_track || fields.track || "").trim();
+			const subject = String(fields.resource_subject || fields.subject || "").trim();
+			const rawColor = String(fields.resource_cover_color || fields.coverColor || "").trim();
+			const coverColor = /^#[0-9a-f]{6}$/i.test(rawColor) ? rawColor : "#6aa68d";
+
+			if (!title) throw makeError(400, "Tiêu đề tài liệu không được để trống.");
+
+			let fUrl = "", fName = "", fType = "", fSize = 0;
+			if (filePart) {
+				const saved = saveUploadedFile(filePart);
+				if (saved) {
+					fUrl = saved.fileUrl;
+					fName = saved.fileName;
+					fType = saved.fileType;
+					fSize = saved.fileSize;
+				}
+			}
+
+			const content = title + (description ? " - " + description : "");
+			db.prepare(`
+				INSERT INTO posts(
+					id, user_id, type, content, image, visibility, created_at,
+					resource_title, resource_description, resource_link,
+					resource_grade, resource_track, resource_subject,
+					resource_file_url, resource_file_name, resource_file_type, resource_file_size, resource_cover_color
+				) VALUES (?, ?, 'study-resource', ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`).run(
+				id, user.id, content, visibility, createdAt,
+				title, description, link, grade, track, subject,
+				fUrl, fName, fType, fSize, coverColor
+			);
+			syncDb(db);
+		} else {
+			const content = String(fields.content || "").trim();
+			const image = String(fields.image || "").trim().slice(0, 2000);
+			if (!content || content.length > 5000) {
+				throw makeError(400, "Nội dung bài viết không hợp lệ.");
+			}
+
+			db.prepare(`
+				INSERT INTO posts(id, user_id, type, content, image, visibility, created_at)
+				VALUES (?, ?, 'post', ?, ?, ?, ?)
+			`).run(id, user.id, content, image, visibility, createdAt);
+			syncDb(db);
 		}
-		db.prepare("INSERT INTO posts(id, user_id, content, image, visibility, created_at, resource_title, resource_description, resource_link, resource_grade, resource_track, resource_subject, resource_file_url, resource_file_name, resource_file_type, resource_file_size, resource_cover_color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-			.run(id, user.id, content, coverColor, visibility, createdAt, title, description, link, grade, track, subject, fUrl, fName, fType, fSize, coverColor); db.sync();
 
 		sendJson(response, 201, { post: postForViewer(db, db.prepare("SELECT * FROM posts WHERE id = ?").get(id), user.id) });
 		return;
@@ -889,7 +1003,7 @@ const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 		const post = db.prepare("SELECT user_id FROM posts WHERE id = ?").get(decodeURIComponent(deletePost[1]));
 		if (!post) throw makeError(404, "Không tìm thấy bài viết.");
 		if (post.user_id !== user.id) throw makeError(403, "Chỉ người đăng mới có thể xóa bài viết này.");
-		db.prepare("DELETE FROM posts WHERE id = ?").run(decodeURIComponent(deletePost[1])); db.sync();
+		db.prepare("DELETE FROM posts WHERE id = ?").run(decodeURIComponent(deletePost[1])); syncDb(db);
 		sendJson(response, 200, { ok: true });
 		return;
 	}
@@ -901,11 +1015,11 @@ const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 		const body = await readJson(request);
 		if (body.liked) {
 			db.prepare("INSERT OR IGNORE INTO post_likes(post_id, user_id, created_at) VALUES (?, ?, ?)").run(post.id, user.id, new Date().toISOString()); 
-			db.sync();
+			syncDb(db);
 		}
 		else {
 			db.prepare("DELETE FROM post_likes WHERE post_id = ? AND user_id = ?").run(post.id, user.id);
-			db.sync();
+			syncDb(db);
 		} 
 		const likes = db.prepare("SELECT COUNT(*) AS count FROM post_likes WHERE post_id = ?").get(post.id).count;
 		sendJson(response, 200, { likes });
@@ -920,7 +1034,7 @@ const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 		if (!content || content.length > 2000) throw makeError(400, "Bình luận không hợp lệ.");
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
-		db.prepare("INSERT INTO post_comments(id, post_id, user_id, content, created_at) VALUES (?, ?, ?, ?, ?)").run(id, post.id, user.id, content, createdAt); db.sync();
+		db.prepare("INSERT INTO post_comments(id, post_id, user_id, content, created_at) VALUES (?, ?, ?, ?, ?)").run(id, post.id, user.id, content, createdAt); syncDb(db);
 		sendJson(response, 201, { comment: { id, text: content, name: user.name, avatar: user.avatar, createdAt } });
 		return;
 	}
@@ -942,10 +1056,10 @@ const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 		const pair = [user.id, friendId].sort();
 		db.exec("BEGIN");
 		try {
-			const result = db.prepare("DELETE FROM friendships WHERE user_low = ? AND user_high = ?").run(pair[0], pair[1]); db.sync();
+			const result = db.prepare("DELETE FROM friendships WHERE user_low = ? AND user_high = ?").run(pair[0], pair[1]); syncDb(db);
 			if (!result.changes) throw makeError(404, "Hai tài khoản hiện không phải bạn bè.");
 			db.prepare("DELETE FROM friend_requests WHERE status = 'accepted' AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))")
-				.run(user.id, friendId, friendId, user.id); db.sync();
+				.run(user.id, friendId, friendId, user.id); syncDb(db);
 			db.exec("COMMIT");
 		} catch (error) {
 			db.exec("ROLLBACK");
@@ -963,7 +1077,7 @@ const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 		if (status === "incoming") throw makeError(409, "Người này đã gửi lời mời cho bạn.");
 		if (status === "outgoing") throw makeError(409, "Bạn đã gửi lời mời rồi.");
 		db.prepare("INSERT INTO friend_requests(id, sender_id, receiver_id, status, created_at) VALUES (?, ?, ?, 'pending', ?)")
-			.run(randomBytes(16).toString("hex"), user.id, targetId, new Date().toISOString()); db.sync();
+			.run(randomBytes(16).toString("hex"), user.id, targetId, new Date().toISOString()); syncDb(db);
 		sendJson(response, 201, { ok: true });
 		return;
 	}
@@ -973,15 +1087,15 @@ const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 		const requestRow = db.prepare("SELECT * FROM friend_requests WHERE sender_id = ? AND receiver_id = ? AND status = 'pending'").get(senderId, user.id);
 		if (!requestRow) throw makeError(404, "Không tìm thấy lời mời.");
 		if (friendAction[2] === "reject") {
-			db.prepare("UPDATE friend_requests SET status = 'rejected' WHERE id = ?").run(requestRow.id); db.sync();
+			db.prepare("UPDATE friend_requests SET status = 'rejected' WHERE id = ?").run(requestRow.id); syncDb(db);
 			sendJson(response, 200, { ok: true });
 			return;
 		}
 		const pair = [user.id, senderId].sort();
 		db.exec("BEGIN");
 		try {
-			db.prepare("UPDATE friend_requests SET status = 'accepted' WHERE id = ?").run(requestRow.id); db.sync();
-			db.prepare("INSERT OR IGNORE INTO friendships(user_low, user_high, created_at) VALUES (?, ?, ?)").run(pair[0], pair[1], new Date().toISOString()); db.sync();
+			db.prepare("UPDATE friend_requests SET status = 'accepted' WHERE id = ?").run(requestRow.id); syncDb(db);
+			db.prepare("INSERT OR IGNORE INTO friendships(user_low, user_high, created_at) VALUES (?, ?, ?)").run(pair[0], pair[1], new Date().toISOString()); syncDb(db);
 			ensureConversation(db, pair[0], pair[1]);
 			db.exec("COMMIT");
 		} catch (error) {
@@ -1014,9 +1128,9 @@ const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 		const createdAt = new Date().toISOString();
 		db.exec("BEGIN");
 		try {
-			db.prepare("INSERT INTO conversations(id, type, name, created_by, created_at) VALUES (?, 'group', ?, ?, ?)").run(id, name, user.id, createdAt); db.sync();
+			db.prepare("INSERT INTO conversations(id, type, name, created_by, created_at) VALUES (?, 'group', ?, ?, ?)").run(id, name, user.id, createdAt); syncDb(db);
 			const addMember = db.prepare("INSERT INTO conversation_members(conversation_id, user_id, joined_at) VALUES (?, ?, ?)");
-			[user.id, ...memberIds].forEach(memberId => addMember.run(id, memberId, createdAt)); db.sync();
+			[user.id, ...memberIds].forEach(memberId => addMember.run(id, memberId, createdAt)); syncDb(db);
 			db.exec("COMMIT");
 		} catch (error) {
 			db.exec("ROLLBACK");
@@ -1031,7 +1145,7 @@ const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 		const conversation = db.prepare("SELECT type, created_by FROM conversations WHERE id = ?").get(conversationId);
 		if (!conversation || conversation.type !== "group") throw makeError(404, "Không tìm thấy nhóm chat.");
 		if (conversation.created_by !== user.id) throw makeError(403, "Chỉ người tạo nhóm mới có thể xóa nhóm này.");
-		db.prepare("DELETE FROM conversations WHERE id = ?").run(conversationId); db.sync();
+		db.prepare("DELETE FROM conversations WHERE id = ?").run(conversationId); syncDb(db);
 		sendJson(response, 200, { ok: true });
 		return;
 	}
@@ -1053,7 +1167,7 @@ const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 		if (!content || content.length > 1000) throw makeError(400, "Tin nhắn không hợp lệ.");
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
-		db.prepare("INSERT INTO messages(id, conversation_id, sender_id, content, created_at) VALUES (?, ?, ?, ?, ?)").run(id, conversationId, user.id, content, createdAt); db.sync();
+		db.prepare("INSERT INTO messages(id, conversation_id, sender_id, content, created_at) VALUES (?, ?, ?, ?, ?)").run(id, conversationId, user.id, content, createdAt); syncDb(db);
 		sendJson(response, 201, { message: { id, text: content, fromId: user.id, name: user.name, avatar: user.avatar, createdAt } });
 		return;
 	}
