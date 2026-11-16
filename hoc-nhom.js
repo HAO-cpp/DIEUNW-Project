@@ -1,6 +1,13 @@
 document.addEventListener("DOMContentLoaded", () => {
 	const API_BASE = "https://dieunw.onrender.com";
 	const POSTS_API = `${API_BASE}/api/posts`;
+	function getAuthHeaders() {
+		const token = localStorage.getItem("dieuNwToken") 
+			|| JSON.parse(localStorage.getItem("dieuNwUser") || "{}").token 
+			|| "";
+		return token ? { "Authorization": `Bearer ${token}` } : {};
+	}
+
 	const tracks = {
 		"Chuyên": ["Toán", "Văn", "Anh", "Tin", "Hóa", "Lý", "Sinh", "Địa", "Sử"],
 		"Thường": ["Toán", "Văn", "Anh", "Tin", "Hóa", "Lý", "Sinh", "Địa", "Công nghệ", "Kinh tế và pháp luật", "Quốc phòng", "Thể chất"]
@@ -363,7 +370,10 @@ document.addEventListener("DOMContentLoaded", () => {
 	async function loadResources() {
 		resourceList.innerHTML = "<p class=\"feed-state\">Đang tải kệ sách...</p>";
 		try {
-			const response = await fetch(POSTS_API, { credentials: "include" });
+			const response = await fetch(POSTS_API, {
+				credentials: "include",
+				headers: getAuthHeaders()
+			});
 			const data = await response.json().catch(() => ({}));
 			if (response.status === 401) {
 				resourceList.innerHTML = "<p class=\"feed-state\">Hãy <a href=\"./profile.html\">đăng nhập</a> để xem và chia sẻ tài liệu.</p>";
@@ -408,10 +418,25 @@ document.addEventListener("DOMContentLoaded", () => {
 		resourceSubmit.textContent = "Đang đăng...";
 		resourceMessage.textContent = "";
 		resourceMessage.classList.remove("error");
+				const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), 45000); // Tự ngắt sau 45s nếu server treo
+
 		try {
-			const response = await fetch(POSTS_API, { method: "POST", body: formData, credentials: "include" });
+			const response = await fetch(POSTS_API, {
+				method: "POST",
+				body: formData,
+				credentials: "include",
+				headers: getAuthHeaders(), // Không set Content-Type vì trình duyệt tự set boundary cho FormData
+				signal: controller.signal
+			});
+			clearTimeout(timeoutId);
+
 			const data = await response.json().catch(() => ({}));
+			if (response.status === 401) {
+				throw new Error("Phiên đăng nhập hết hạn. Hãy đăng nhập lại rồi thử đăng tài liệu.");
+			}
 			if (!response.ok) throw new Error(data.error || "Không thể đăng tài liệu.");
+
 			resourceForm.reset();
 			selection.grade = "";
 			selection.subject = "";
@@ -424,7 +449,12 @@ document.addEventListener("DOMContentLoaded", () => {
 			resourceMessage.textContent = "Đã đăng tài liệu thành công.";
 			await loadResources();
 		} catch (error) {
-			resourceMessage.textContent = error.message || "Đăng chưa thành công. Hãy thử lại sau.";
+			clearTimeout(timeoutId);
+			if (error.name === "AbortError") {
+				resourceMessage.textContent = "Máy chủ phản hồi quá lâu (đang khởi động). Hãy bấm Đăng lại nhé!";
+			} else {
+				resourceMessage.textContent = error.message || "Đăng chưa thành công. Hãy thử lại sau.";
+			}
 			resourceMessage.classList.add("error");
 		} finally {
 			resourceSubmit.disabled = false;
