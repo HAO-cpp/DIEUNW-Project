@@ -478,7 +478,7 @@
     border-bottom: 1px solid #e4e6eb;
 }
 
-.chat-primary-button>button[type="submit"]{
+.create-private-group {
     display: inline-flex;
     min-height: 40px;
     align-items: center;
@@ -496,8 +496,9 @@
     transition: background 0.16s ease, border-color 0.16s ease;
 }
 
-.chat-primary-button>button[type="submit"]:hover{
+.create-private-group:hover {
     background: #124d7b;
+    border-color: #124d7b;
 }
 
 .post-card-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
