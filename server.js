@@ -244,7 +244,10 @@ function initializeDatabase(dbPath) {
 	if (!postColumns.includes("resource_file_type")) postAlters.push("ADD COLUMN resource_file_type TEXT NOT NULL DEFAULT \"\"");
 	if (!postColumns.includes("resource_file_size")) postAlters.push("ADD COLUMN resource_file_size INTEGER NOT NULL DEFAULT 0");
 	if (!postColumns.includes("resource_cover_color")) postAlters.push("ADD COLUMN resource_cover_color TEXT NOT NULL DEFAULT \"\"");
-	if (postAlters.length) db.exec("ALTER TABLE posts " + postAlters.join(", "));
+	for (const alter of postAlters) {
+		db.exec(`ALTER TABLE posts ${alter}`);
+	}
+
 
 	// Đẩy toàn bộ bảng vừa tạo lên đám mây Turso
 	if (process.env.TURSO_DATABASE_URL) {
