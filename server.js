@@ -526,7 +526,10 @@ function createServer(options = {}) {
 			}
 			serveStatic(request, response, url);
 		} catch (error) {
-			if (!response.headersSent) sendJson(response, error.statusCode || 500, { error: error.statusCode ? error.message : "Lỗi máy chủ." });
+			if (!response.headersSent){ 
+				console.error("Chi tiết lỗi đăng nhập:", error);
+				sendJson(response, error.statusCode || 500, { error: error.statusCode ? error.message : "Lỗi máy chủ." });
+			}
 			else response.destroy();
 		}
 	});
