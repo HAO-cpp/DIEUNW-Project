@@ -75,6 +75,16 @@
 
 					<label class="form-label" for="resource-link">Liên kết tài liệu</label>
 					<input class="group-input" id="resource-link" name="link" type="url" placeholder="https://..." required>
+
+					<label class="form-label" for="resource-file">Tệp tài liệu (PDF, Word, ...)</label>
+					<input class="group-input" id="resource-file" name="resource_file" type="file" accept=".pdf,.doc,.docx,.txt">
+
+					<label class="form-label" for="resource-cover-color">Màu bìa sách</label>
+					<div class="cover-color-row">
+						<input class="color-picker" id="resource-cover-color" name="resource_cover_color" type="color" value="#6aa68d">
+						<span class="color-picker-label">#6aa68d</span>
+					</div>
+
 					<button class="group-submit" id="resource-submit" type="submit">Đăng tài liệu</button>
 					<p id="resource-message" class="form-message" role="status"></p>
 				</form>
@@ -138,7 +148,7 @@
 							</select>
 						</label>
 					</div>
-					<div id="resource-list" class="resource-list" aria-live="polite">
+					<div id="resource-list" class="resource-list book-shelf" aria-live="polite">
 						<p class="feed-state">Đang tải tài liệu...</p>
 					</div>
 				</section>

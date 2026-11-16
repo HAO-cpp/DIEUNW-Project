@@ -1,5 +1,5 @@
 import { createServer as createHttpServer } from "node:http";
-import { createReadStream, existsSync, mkdirSync, statSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,7 +10,9 @@ const SESSION_COOKIE = "dieu_session";
 const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000;
 const OTP_DURATION = 10 * 60 * 1000;
 const MAX_BODY_BYTES = 1024 * 1024;
-const STATIC_EXTENSIONS = new Set([".html", ".js", ".css", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".ico", ".svg"]);
+const MAX_UPLOAD_BYTES = 10485760;
+const UPLOAD_DIR = path.join(ROOT, "uploads");
+const STATIC_EXTENSIONS = new Set([".html", ".js", ".css", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".ico", ".svg", ".pdf", ".doc", ".docx", ".txt"]);
 const MIME_TYPES = {
 	".css": "text/css; charset=utf-8",
 	".gif": "image/gif",
@@ -20,7 +22,11 @@ const MIME_TYPES = {
 	".jpg": "image/jpeg",
 	".js": "text/javascript; charset=utf-8",
 	".png": "image/png",
+	".pdf": "application/pdf",
+	".doc": "application/msword",
+	".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 	".svg": "image/svg+xml",
+	".txt": "text/plain; charset=utf-8",
 	".webp": "image/webp"
 };
 
@@ -225,6 +231,21 @@ function initializeDatabase(dbPath) {
 	const userColumns = db.prepare("PRAGMA table_info(users)").all().map(column => column.name);
 	if (!userColumns.includes("is_admin")) db.exec("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0");
 
+	const postColumns = db.prepare("PRAGMA table_info(posts)").all().map(column => column.name);
+	const postAlters = [];
+	if (!postColumns.includes("resource_title")) postAlters.push("ADD COLUMN resource_title TEXT NOT NULL DEFAULT \"\"");
+	if (!postColumns.includes("resource_description")) postAlters.push("ADD COLUMN resource_description TEXT NOT NULL DEFAULT \"\"");
+	if (!postColumns.includes("resource_link")) postAlters.push("ADD COLUMN resource_link TEXT NOT NULL DEFAULT \"\"");
+	if (!postColumns.includes("resource_grade")) postAlters.push("ADD COLUMN resource_grade TEXT NOT NULL DEFAULT \"\"");
+	if (!postColumns.includes("resource_track")) postAlters.push("ADD COLUMN resource_track TEXT NOT NULL DEFAULT \"\"");
+	if (!postColumns.includes("resource_subject")) postAlters.push("ADD COLUMN resource_subject TEXT NOT NULL DEFAULT \"\"");
+	if (!postColumns.includes("resource_file_url")) postAlters.push("ADD COLUMN resource_file_url TEXT NOT NULL DEFAULT \"\"");
+	if (!postColumns.includes("resource_file_name")) postAlters.push("ADD COLUMN resource_file_name TEXT NOT NULL DEFAULT \"\"");
+	if (!postColumns.includes("resource_file_type")) postAlters.push("ADD COLUMN resource_file_type TEXT NOT NULL DEFAULT \"\"");
+	if (!postColumns.includes("resource_file_size")) postAlters.push("ADD COLUMN resource_file_size INTEGER NOT NULL DEFAULT 0");
+	if (!postColumns.includes("resource_cover_color")) postAlters.push("ADD COLUMN resource_cover_color TEXT NOT NULL DEFAULT \"\"");
+	if (postAlters.length) db.exec("ALTER TABLE posts " + postAlters.join(", "));
+
 	// Đẩy toàn bộ bảng vừa tạo lên đám mây Turso
 	if (process.env.TURSO_DATABASE_URL) {
 		db.sync();
@@ -256,6 +277,23 @@ function sendJson(response, statusCode, payload, headers = {}) {
 	response.writeHead(statusCode, { "Cache-Control": "no-store", "Content-Type": "application/json; charset=utf-8", ...headers });
 	response.end(JSON.stringify(payload));
 }
+function parseBoundary(contentType) {
+	const match = /boundary=([^;]+)/i.exec(contentType || "");
+	return match ? match[1].trim() : null;
+}
+
+async function parseMultipart(request) {
+	const contentType = request.headers["content-type"] || "";
+	const boundary = parseBoundary(contentType);
+	if (!boundary) throw makeError(400, "Thieu boundary multipart.");
+	const chunks = [];
+	let size = 0;
+	for await (const chunk of request) {
+		size += chunk.length;
+		if (size > MAX_UPLOAD_BYTES) throw makeError(413, "Yeucau qua lon.");
+		chunks.push(chunk);
+	}
+
 
 function parseCookies(request) {
 	const cookieHeader = request.headers.cookie || "";
@@ -392,7 +430,16 @@ function postForViewer(db, row, viewerId) {
 		createdAt: row.created_at,
 		likes,
 		likedByMe,
-		comments
+		comments,
+		resource_title: row.resource_title,
+		resource_description: row.resource_description,
+		resource_link: row.resource_link,
+		resource_grade: row.resource_grade,
+		resource_track: row.resource_track,
+		resource_subject: row.resource_subject,
+		resource_file_url: row.resource_file_url,
+		resource_file_name: row.resource_file_name
+	}
 	};
 }
 
@@ -794,19 +841,44 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		sendJson(response, 200, { posts: posts.map(post => postForViewer(db, post, user.id)) });
 		return;
 	}
-	if (method === "POST" && pathname === "/api/posts") {
-		const body = await readJson(request);
-		const content = String(body.content || "").trim();
-		const visibility = body.visibility === "private" ? "private" : "public";
-		if (!content || content.length > 10000) throw makeError(400, "Nội dung bài viết không hợp lệ.");
+	if (method === "POST" && pathname === "/api/posts" ) {
+		const contentType = request.headers["content-type"] || "";
+		let fields = {};
+		let filePart = null;
+		if (contentType.startsWith("multipart/form-data")) {
+			const parts = await parseMultipart(request);
+			for (const part of parts) {
+				if (part.fileName) filePart = part;
+				else fields[part.name] = part.body.toString("utf8");
+			}
+		} else {
+			const body = await readJson(request);
+			fields = body;
+		}
+		const title = String(fields.resource_title || fields.title || fields.content || "").trim().slice(0, 200);
+		const description = String(fields.resource_description || fields.description || "").trim().slice(0, 1500);
+		const link = String(fields.resource_link || fields.link || "").trim().slice(0, 1000);
+		const grade = String(fields.resource_grade || fields.grade || "").trim();
+		const track = String(fields.resource_track || fields.track || "").trim();
+		const subject = String(fields.resource_subject || fields.subject || "").trim();
+		const coverColor = String(fields.resource_cover_color || fields.coverColor || "#").trim().slice(0, 20);
+		const visibility = fields.visibility === "private" ? "private" : "public";
+		if (!title) throw makeError(400, "Tieu de tai lieu khong duoc de trong.");
+		const content = title + (description ? " - " + description : "");
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
-		db.prepare("INSERT INTO posts(id, user_id, content, image, visibility, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-			.run(id, user.id, content, String(body.image || "").trim().slice(0, 3000), visibility, createdAt); db.sync();
+		let fUrl = "", fName = "", fType = "", fSize = 0;
+		if (filePart) {
+			const saved = saveUploadedFile(filePart);
+			if (saved) { fUrl = saved.fileUrl; fName = saved.fileName; fType = saved.fileType; fSize = saved.fileSize; }
+		}
+		db.prepare("INSERT INTO posts(id, user_id, content, image, visibility, created_at, resource_title, resource_description, resource_link, resource_grade, resource_track, resource_subject, resource_file_url, resource_file_name, resource_file_type, resource_file_size, resource_cover_color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+			.run(id, user.id, content, coverColor, visibility, createdAt, title, description, link, grade, track, subject, fUrl, fName, fType, fSize, coverColor); db.sync();
+
 		sendJson(response, 201, { post: postForViewer(db, db.prepare("SELECT * FROM posts WHERE id = ?").get(id), user.id) });
 		return;
 	}
-	const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
+const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 	if (method === "DELETE" && deletePost) {
 		const post = db.prepare("SELECT user_id FROM posts WHERE id = ?").get(decodeURIComponent(deletePost[1]));
 		if (!post) throw makeError(404, "Không tìm thấy bài viết.");
@@ -979,7 +1051,15 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		sendJson(response, 201, { message: { id, text: content, fromId: user.id, name: user.name, avatar: user.avatar, createdAt } });
 		return;
 	}
-	throw makeError(404, "Không tìm thấy API.");
+	if (method === "GET" && pathname.startsWith("/uploads/")) {
+	const fileName = decodeURIComponent(pathname.slice("/uploads/".length));
+	const filePath = path.join(UPLOAD_DIR, fileName);
+	if (!existsSync(filePath) || !statSync(filePath).isFile()) throw makeError(404, "Không tìm thấy tệp.");
+	response.writeHead(200, { "Content-Type": MIME_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream" });
+	createReadStream(filePath).pipe(response);
+	return;
+}
+throw makeError(404, "Không tìm thấy API.");
 }
 
 function serveStatic(request, response, url) {
