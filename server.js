@@ -29,6 +29,14 @@ const MIME_TYPES = {
 	".txt": "text/plain; charset=utf-8",
 	".webp": "image/webp"
 };
+function serializeCookie(name, value, { maxAge, secure }) {
+	const parts = [`${name}=${encodeURIComponent(value)}`, "HttpOnly", "Path=/"];
+	if (maxAge !== undefined) parts.push(`Max-Age=${maxAge}`);
+	if (secure) parts.push("SameSite=None", "Secure");
+	else parts.push("SameSite=Lax");
+	return parts.join("; ");
+}
+
 async function parseMultipart(request) {
 	const contentType = request.headers["content-type"] || "";
 	const boundary = parseBoundary(contentType);
@@ -37,7 +45,7 @@ async function parseMultipart(request) {
 	let size = 0;
 	for await (const chunk of request) {
 		size += chunk.length;
-		if (size > MAX_UPLOAD_BYTES) throw makeError(413, "Tệp tải lên quá lớn (tối đa 10 MB).");
+		if (size > MAX_UPLOAD_BYTES) throw makeError(413, "Tệp tải lên quá lớn.");
 		chunks.push(chunk);
 	}
 
@@ -125,14 +133,6 @@ function cleanUser(row) {
 		isAdmin: Boolean(row.is_admin),
 		createdAt: row.created_at
 	};
-}
-
-function serializeCookie(name, value, { maxAge, secure }) {
-	const parts = [`${name}=${encodeURIComponent(value)}`, "HttpOnly", "Path=/"];
-	if (maxAge !== undefined) parts.push(`Max-Age=${maxAge}`);
-	if (secure) parts.push("SameSite=None", "Secure");
-	else parts.push("SameSite=Lax");
-	return parts.join("; ");
 }
 
 function profileUser(db, row) {
@@ -358,19 +358,6 @@ function parseBoundary(contentType) {
 	return match ? match[1].trim() : null;
 }
 
-async function parseMultipart(request) {
-	const contentType = request.headers["content-type"] || "";
-	const boundary = parseBoundary(contentType);
-	if (!boundary) throw makeError(400, "Thieu boundary multipart.");
-	const chunks = [];
-	let size = 0;
-	for await (const chunk of request) {
-		size += chunk.length;
-		if (size > MAX_UPLOAD_BYTES) throw makeError(413, "Yeucau qua lon.");
-		chunks.push(chunk);
-	}
-}
-
 function parseCookies(request) {
 	const cookieHeader = request.headers.cookie || "";
 	return Object.fromEntries(cookieHeader.split(";").map(part => {
@@ -519,7 +506,7 @@ function postForViewer(db, row, viewerId) {
 		resource_file_type: row.resource_file_type,
 		resource_cover_color: row.resource_cover_color
 	};
-};
+}
 
 async function sendOtp(email, code, purpose, env) {
 	if (env.EMAILJS_ENABLED === "0") return { sent: false, devCode: env.NODE_ENV === "production" ? undefined : code };
