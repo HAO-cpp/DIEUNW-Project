@@ -1,22 +1,30 @@
 document.addEventListener("DOMContentLoaded", () => {
+	const API_BASE = "https://dieunw.onrender.com";
 	const list = document.getElementById("friends-list");
 	const searchInput = document.getElementById("friends-search-input");
 	const status = document.getElementById("friends-status");
 	const filterButtons = [...document.querySelectorAll("[data-friends-filter]")];
-	const emptyState = document.getElementById("friends-empty");
-	const profilePanel = document.getElementById("friends-profile");
-	const profileMessageButton = document.getElementById("friend-profile-message");
-	const profileMeetingButton = document.getElementById("friend-profile-meeting");
-	const meeting = document.getElementById("friends-meeting");
-	const meetingFrame = document.getElementById("friends-meeting-frame");
 	const authModal = document.getElementById("friends-auth-modal");
 	const authMessage = document.getElementById("friends-auth-message");
 	const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 	let users = [];
 	let currentUser = null;
-	let selectedFriend = null;
 	let lastAuthTrigger = null;
 	let activeFilter = location.hash === "#messages" ? "friends" : "discover";
+
+	function getAuthHeaders(extra = {}) {
+		let token = "";
+		try {
+			token = localStorage.getItem("session_token")
+				|| localStorage.getItem("dieuNwToken")
+				|| JSON.parse(localStorage.getItem("dieuNwUser") || "{}").token
+				|| "";
+		} catch {
+			token = localStorage.getItem("session_token") || localStorage.getItem("dieuNwToken") || "";
+		}
+		return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra };
+	}
 
 	function setStatus(message, isError = false) {
 		status.textContent = message;
@@ -38,19 +46,23 @@ document.addEventListener("DOMContentLoaded", () => {
 		lastAuthTrigger = null;
 	}
 
-	function escapeRoomPart(value) {
-		return String(value || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 24);
-	}
-
 	async function fetchUsers() {
-		const response = await fetch("https://dieunw.onrender.com/api/users", { credentials: "include" });
+		const response = await fetch(`${API_BASE}/api/users`, {
+			credentials: "include",
+			headers: getAuthHeaders()
+		});
 		if (!response.ok) throw new Error("Không thể tải danh sách người dùng.");
 		const data = await response.json();
 		users = Array.isArray(data.users) ? data.users : [];
 		currentUser = data.currentUser || null;
-		if (currentUser) localStorage.setItem("dieuNwUser", JSON.stringify(currentUser));
-		else localStorage.removeItem("dieuNwUser");
-		if (selectedFriend) selectedFriend = users.find(user => String(user.id) === String(selectedFriend.id)) || null;
+		if (currentUser) {
+			const existing = (() => {
+				try { return JSON.parse(localStorage.getItem("dieuNwUser") || "{}"); } catch { return {}; }
+			})();
+			localStorage.setItem("dieuNwUser", JSON.stringify({ ...existing, ...currentUser }));
+		} else {
+			localStorage.removeItem("dieuNwUser");
+		}
 		render();
 	}
 
@@ -69,6 +81,11 @@ document.addEventListener("DOMContentLoaded", () => {
 		return name.split(/[\s@._-]+/).filter(Boolean).slice(0, 2).map(part => part[0]).join("").toUpperCase();
 	}
 
+	function openFriendProfile(user) {
+		if (!user || !user.id) return;
+		window.location.href = `./profile.html?userId=${encodeURIComponent(user.id)}`;
+	}
+
 	function makePersonCard(user, index) {
 		const card = document.createElement("article");
 		card.className = "friends-person";
@@ -77,7 +94,18 @@ document.addEventListener("DOMContentLoaded", () => {
 		const avatar = document.createElement("div");
 		avatar.className = "friends-avatar";
 		avatar.setAttribute("aria-hidden", "true");
-		avatar.textContent = initials(user);
+		if (user.avatar && user.avatar !== "./DIEU.png") {
+			const img = document.createElement("img");
+			img.src = user.avatar;
+			img.alt = "";
+			img.style.width = "100%";
+			img.style.height = "100%";
+			img.style.borderRadius = "50%";
+			img.style.objectFit = "cover";
+			avatar.appendChild(img);
+		} else {
+			avatar.textContent = initials(user);
+		}
 
 		const details = document.createElement("div");
 		details.className = "friends-person-details";
@@ -89,7 +117,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 		const actions = document.createElement("div");
 		actions.className = "friends-person-actions";
-		const userId = String(user.id);
 		const relation = user.relationship || "none";
 
 		if (activeFilter === "requests") {
@@ -107,10 +134,16 @@ document.addEventListener("DOMContentLoaded", () => {
 				makeButton("Nhắn tin", "friends-secondary-button", () => openAuthPrompt("message"))
 			);
 		} else if (relation === "friend") {
-			actions.append(makeButton("Hủy kết bạn", "friends-remove-button", () => removeFriend(user)));
-		} else if (relation !== "friend") {
+			actions.append(
+				makeButton("Nhắn tin", "friends-primary-button", () => {
+					window.location.href = `./messages.html?with=${encodeURIComponent(user.id)}`;
+				}),
+				makeButton("Hủy kết bạn", "friends-remove-button", () => removeFriend(user))
+			);
+		} else {
 			actions.append(makeButton("Kết bạn", "friends-primary-button", () => sendRequest(user)));
 		}
+
 		actions.append(makeButton("Hồ sơ", "friends-secondary-button", () => openFriendProfile(user)));
 
 		card.append(avatar, details, actions);
@@ -128,7 +161,9 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 
 		const term = searchInput.value.trim().toLocaleLowerCase("vi");
-		if (term) result = result.filter(user => `${user.name || ""} ${user.email || ""}`.toLocaleLowerCase("vi").includes(term));
+		if (term) {
+			result = result.filter(user => `${user.name || ""} ${user.email || ""}`.toLocaleLowerCase("vi").includes(term));
+		}
 		return result;
 	}
 
@@ -148,8 +183,8 @@ document.addEventListener("DOMContentLoaded", () => {
 		});
 
 		list.replaceChildren();
-		const filteredUsers = getFilteredUsers();	
-		if (!currentUser) setStatus("Đăng nhập tài khoản DIEUNW để kết bạn, nhắn tin và gọi video.");
+		const filteredUsers = getFilteredUsers();
+		if (!currentUser) setStatus("Đăng nhập tài khoản DIEUNW để kết bạn, nhắn tin và xem hồ sơ.");
 		else setStatus("");
 
 		if (!filteredUsers.length) {
@@ -166,8 +201,6 @@ document.addEventListener("DOMContentLoaded", () => {
 		} else {
 			filteredUsers.forEach((user, index) => list.append(makePersonCard(user, index)));
 		}
-
-		if (selectedFriend) openFriendProfile(selectedFriend);
 	}
 
 	function selectFilter(filter) {
@@ -179,10 +212,10 @@ document.addEventListener("DOMContentLoaded", () => {
 		if (!currentUser) return;
 		setStatus("Đang gửi lời mời...");
 		try {
-			const response = await fetch("https://dieunw.onrender.com/api/friend-requests", {
+			const response = await fetch(`${API_BASE}/api/friend-requests`, {
 				method: "POST",
 				credentials: "include",
-				headers: { "Content-Type": "application/json" },
+				headers: getAuthHeaders({ "Content-Type": "application/json" }),
 				body: JSON.stringify({ userId: String(target.id) })
 			});
 			const data = await response.json();
@@ -196,10 +229,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 	async function acceptRequest(sender) {
 		try {
-			const response = await fetch(`https://dieunw.onrender.com/api/friend-requests/${encodeURIComponent(sender.id)}/accept`, {
+			const response = await fetch(`${API_BASE}/api/friend-requests/${encodeURIComponent(sender.id)}/accept`, {
 				method: "POST",
 				credentials: "include",
-				headers: { "Content-Type": "application/json" },
+				headers: getAuthHeaders({ "Content-Type": "application/json" }),
 				body: "{}"
 			});
 			const data = await response.json();
@@ -213,10 +246,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 	async function rejectRequest(sender) {
 		try {
-			const response = await fetch(`https://dieunw.onrender.com/api/friend-requests/${encodeURIComponent(sender.id)}/reject`, {
+			const response = await fetch(`${API_BASE}/api/friend-requests/${encodeURIComponent(sender.id)}/reject`, {
 				method: "POST",
 				credentials: "include",
-				headers: { "Content-Type": "application/json" },
+				headers: getAuthHeaders({ "Content-Type": "application/json" }),
 				body: "{}"
 			});
 			const data = await response.json();
@@ -232,17 +265,13 @@ document.addEventListener("DOMContentLoaded", () => {
 		if (!window.confirm(`Hủy kết bạn với ${friend.name || friend.email}? Lịch sử tin nhắn riêng sẽ được giữ lại.`)) return;
 		setStatus("Đang cập nhật danh sách bạn bè...");
 		try {
-			const response = await fetch(`https://dieunw.onrender.com/api/friends/${encodeURIComponent(friend.id)}`, {
+			const response = await fetch(`${API_BASE}/api/friends/${encodeURIComponent(friend.id)}`, {
 				method: "DELETE",
-				credentials: "include"
+				credentials: "include",
+				headers: getAuthHeaders()
 			});
 			const data = await response.json();
 			if (!response.ok) throw new Error(data.error || "Không thể hủy kết bạn.");
-			if (String(selectedFriend?.id) === String(friend.id)) {
-				selectedFriend = null;
-				profilePanel.hidden = true;
-				emptyState.hidden = false;
-			}
 			await fetchUsers();
 			setStatus(`Đã hủy kết bạn với ${friend.name || friend.email}.`);
 		} catch (error) {
@@ -250,64 +279,11 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 	}
 
-	function openFriendProfile(friend) {
-		selectedFriend = friend;
-		emptyState.hidden = true;
-		profilePanel.hidden = false;
-		meetingFrame.src = "about:blank";
-		meeting.hidden = true;
-		const coverImage = document.getElementById("friend-cover-image");
-		const cover = typeof friend.cover === "string" ? friend.cover.trim() : "";
-		coverImage.hidden = !cover;
-		if (cover) coverImage.src = cover;
-		else coverImage.removeAttribute("src");
-		document.getElementById("friend-avatar-image").src = friend.avatar || "./DIEU.png";
-		document.getElementById("friend-profile-name").textContent = friend.name || "Thành viên DIEUNW";
-		document.getElementById("friend-profile-email").textContent = friend.email || "";
-		document.getElementById("friend-profile-class").textContent = friend.studentClass ? `Lớp ${friend.studentClass}` : "Học sinh trường NQD";
-		document.getElementById("friend-profile-bio").textContent = friend.bio || "Chưa có lời giới thiệu.";
-		const isFriend = friend.relationship === "friend";
-		profileMessageButton.disabled = Boolean(currentUser && !isFriend);
-		profileMessageButton.textContent = currentUser && !isFriend ? "Kết bạn để nhắn tin" : "Nhắn tin";
-		profileMeetingButton.hidden = !isFriend;
-	}
-
-	function openSelectedFriendMessages() {
-		if (!selectedFriend) return;
-		if (!currentUser) {
-			openAuthPrompt("message");
-			return;
-		}
-		if (selectedFriend.relationship !== "friend") return;
-		location.href = `./messages.html?with=${encodeURIComponent(selectedFriend.id)}`;
-	}
-
-	function startMeeting(friend) {
-		if (!currentUser || friend.relationship !== "friend") return;
-		const roomMembers = [String(currentUser.id), String(friend.id)].sort().map(escapeRoomPart).join("-");
-		const roomName = `dieunw-${roomMembers}`;
-		document.getElementById("friends-meeting-title").textContent = `Jitsi với ${friend.name || friend.email}`;
-		meetingFrame.src = `https://meet.jit.si/${encodeURIComponent(roomName)}`;
-		meetingFrame.hidden = false;
-		meeting.hidden = false;
-		document.getElementById("friends-meeting-note").textContent = `Phòng ${roomName}. Người bạn cần tham gia cùng phòng này.`;
-		meeting.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
-	}
-
 	filterButtons.forEach(button => button.addEventListener("click", () => selectFilter(button.dataset.friendsFilter)));
 	searchInput.addEventListener("input", render);
 	document.getElementById("friends-search-form").addEventListener("submit", event => {
 		event.preventDefault();
 		render();
-	});
-	profileMessageButton.addEventListener("click", openSelectedFriendMessages);
-	profileMeetingButton.addEventListener("click", () => {
-		if (selectedFriend) startMeeting(selectedFriend);
-	});
-	document.getElementById("friends-meeting-close").addEventListener("click", () => {
-		meetingFrame.src = "about:blank";
-		meetingFrame.hidden = true;
-		meeting.hidden = true;
 	});
 	document.getElementById("friends-auth-close").addEventListener("click", closeAuthPrompt);
 	authModal.addEventListener("click", event => {

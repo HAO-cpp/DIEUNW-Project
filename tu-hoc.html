@@ -1,124 +1,144 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="style.css">
-    <link rel="icon" type="image/png" href="./DIEU.png?v=1">
-    <title>DIEUNW - Phòng Tự Học</title>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="theme-color" content="#1769aa">
+	<link rel="stylesheet" href="./style.css">
+	<link rel="icon" type="image/png" href="./DIEU.png?v=1">
+	<title>DIEUNW - Phòng Tự Học</title>
 </head>
 <body id="study-page-body">
-    <!-- Thanh điều hướng Navbar dùng chung -->
-    <header class="navbar nav-scroll">
-        <div class="nav-left">
-            <a href="./index.html" class="brand-logo-link">
-                <img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo">
-            </a>
-        </div>
-        <nav class="nav-menu">
-            <a href="./index.html" class="nav-item">Trang chủ</a>
-            <a href="./tu-hoc.html" class="nav-item active">Phòng tự học</a>
-            <a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
-            <a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
-            <a href="./friends.html" class="nav-item">Bạn bè</a>
-            <a href="./messages.html" class="nav-item">Tin nhắn</a>
-            <a href="./clubs.html" class="nav-item">CLB</a>
-            <a href="./announcements.html" class="nav-item">Thông báo</a>
-        </nav>
-        <div class="nav-right">
-            <a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
-                <img class="nav-user-avatar" src="./DIEU.png" alt="">
-            </a>
-        </div>
-    </header>
+	<header class="navbar nav-scroll">
+		<div class="nav-left">
+			<a href="./index.html" class="brand-logo-link">
+				<img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo">
+			</a>
+		</div>
+		<nav class="nav-menu" aria-label="Điều hướng chính">
+			<a href="./index.html" class="nav-item">Trang chủ</a>
+			<a href="./tu-hoc.html" class="nav-item active" aria-current="page">Phòng tự học</a>
+			<a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
+			<a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
+			<a href="./friends.html" class="nav-item">Bạn bè</a>
+			<a href="./messages.html" class="nav-item">Tin nhắn</a>
+			<a href="./clubs.html" class="nav-item">CLB</a>
+			<a href="./announcements.html" class="nav-item">Thông báo</a>
+		</nav>
+		<div class="nav-right">
+			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
+				<img class="nav-user-avatar" src="./DIEU.png" alt="">
+			</a>
+		</div>
+	</header>
 
-    <!-- KHU VỰC PHÒNG TỰ HỌC -->
-    <main class="study-container page-enter">
-        
-        <!-- Cột trái: Đồng hồ Pomodoro -->
-        <section class="pomodoro-card">
-            <div class="study-header">
-                <h2>⏱ Góc Tập Trung Pomodoro</h2>
-                <span id="study-streak-badge" class="streak-badge">🔥 Đã hoàn thành: 0 phiên</span>
-            </div>
+	<main class="study-container page-enter">
+		<!-- Cột trái: Đồng hồ Pomodoro & Không gian âm nhạc -->
+		<section class="pomodoro-card">
+			<div class="study-header">
+				<h2>⏱ Góc Tập Trung Pomodoro</h2>
+				<span id="study-streak-badge" class="streak-badge">Đã hoàn thành: 0 phiên</span>
+			</div>
 
-            <!-- Các nút chọn chế độ -->
-            <div class="mode-selector">
-                <button class="mode-btn active" data-time="25" data-mode="focus">Tập trung (25p)</button>
-                <button class="mode-btn" data-time="5" data-mode="short">Nghỉ ngắn (5p)</button>
-                <button class="mode-btn" data-time="15" data-mode="long">Nghỉ dài (15p)</button>
-            </div>
+			<div class="mode-selector">
+				<button type="button" class="mode-btn active" data-time="25" data-mode="focus">Tập trung (25p)</button>
+				<button type="button" class="mode-btn" data-time="5" data-mode="short">Nghỉ ngắn (5p)</button>
+				<button type="button" class="mode-btn" data-time="15" data-mode="long">Nghỉ dài (15p)</button>
+			</div>
 
-            <!-- Khung hiển thị đồng hồ -->
-            <div class="timer-circle">
-                <div id="timer-display" class="timer-digits">25:00</div>
-                <p id="timer-status-text" class="timer-subtext">Sẵn sàng bắt đầu phiên học!</p>
-            </div>
+			<div class="timer-circle">
+				<div id="timer-display" class="timer-digits">25:00</div>
+				<p id="timer-status-text" class="timer-subtext">Sẵn sàng bắt đầu phiên học!</p>
+			</div>
 
-            <!-- Các nút điều khiển đồng hồ -->
-            <div class="timer-controls">
-                <button id="btn-start-timer" class="btn-timer primary">▶ Bắt đầu</button>
-                <button id="btn-pause-timer" class="btn-timer secondary" style="display: none;">⏸ Tạm dừng</button>
-                <button id="btn-reset-timer" class="btn-timer outline">↻ Đặt lại</button>
-            </div>
+			<div class="timer-controls">
+				<button type="button" id="btn-start-timer" class="btn-timer primary">▶ Bắt đầu</button>
+				<button type="button" id="btn-pause-timer" class="btn-timer secondary" style="display: none;">⏸ Tạm dừng</button>
+				<button type="button" id="btn-reset-timer" class="btn-timer outline">↻ Đặt lại</button>
+			</div>
 
-            <!-- Khu vực chọn không gian nền & Âm thanh -->
-            <div class="ambiance-bar">
-                <div class="ambiance-group">
-                    <label><b>Chủ đề nền:</b></label>
-                    <select id="theme-selector">
-                        <option value="default"><ii>Sáng mặc định</ii></option>
-                        <option value="dark"><ii>Tối bảo vệ mắt (Dark Mode)</ii></option>
-                        <option value="forest"><ii>Xanh rừng thông thư giãn</ii></option>
-                        <option value="sunset"><ii>Hoàng hôn ấm áp</ii></option>
-                    </select>
-                </div>
+			<!-- Chọn chủ đề nền -->
+			<div class="ambiance-bar">
+				<div class="ambiance-group">
+					<label for="theme-selector"><b>Chủ đề nền:</b></label>
+					<select id="theme-selector">
+						<option value="default">Sáng mặc định</option>
+						<option value="dark">Tối bảo vệ mắt (Dark Mode)</option>
+						<option value="forest">Xanh rừng thông thư giãn</option>
+						<option value="sunset">Hoàng hôn ấm áp</option>
+					</select>
+				</div>
+			</div>
 
-                <div class="ambiance-group">
-                    <label><b>Âm thanh nền:</b></label>
-                    <div class="custom-audio-box">
-                        <!-- Nút chọn file nhạc từ máy -->
-                        <label for="custom-audio-upload" style="cursor: pointer;">
-                            Chọn nhạc từ máy
-                        </label>
-                        <input type="file" id="custom-audio-upload" accept="audio/*" style="display: none;" />
+			<!-- Khung phát nhạc riêng có viền theo theme -->
+			<section class="audio-player-panel" id="audio-player-panel" aria-label="Trình phát nhạc tự chọn">
+				<div class="audio-player-top">
+					<div class="vinyl-stage" aria-hidden="true">
+						<div class="vinyl-disc">
+							<div class="vinyl-label">
+								<span class="vinyl-spindle"></span>
+							</div>
+						</div>
+						<div class="floating-notes">
+							<span class="floating-note n1">♪</span>
+							<span class="floating-note n2">♫</span>
+							<span class="floating-note n3">♩</span>
+							<span class="floating-note n4">♬</span>
+						</div>
+					</div>
 
-                        <!-- Hiển thị tên bài hát đang chọn -->
-                        <span id="audio-file-name">Chưa chọn file nhạc nào</span>
+					<div class="audio-info-col">
+						<div class="audio-info-head">
+							<label for="custom-audio-upload" class="audio-upload-btn">+ Thêm nhạc / Playlist</label>
+							<input type="file" id="custom-audio-upload" accept="audio/*" multiple hidden>
+						</div>
 
-                        <!-- Nút bật/tắt nhạc và thanh chỉnh âm lượng -->
-                        <button id="btn-toggle-audio" style="display: none;">⏸</button>
-                        <input type="range" id="audio-volume" min="0" max="1" step="0.05" value="0.4" style="display: none;" title="Âm lượng" />
+						<p id="audio-file-name">Chưa có bài hát nào trong playlist</p>
 
-                        <!-- Thẻ phát nhạc (thêm loop để tự động lặp lại khi hết bài) -->
-                        <audio id="bg-audio-player" loop></audio>
-                    </div>
+						<div class="audio-controls-row">
+							<button type="button" id="btn-prev-audio" class="audio-ctrl-btn" title="Bài trước" aria-label="Bài trước">⏮</button>
+							<button type="button" id="btn-toggle-audio" class="audio-ctrl-btn primary" title="Phát hoặc tạm dừng" aria-label="Phát hoặc tạm dừng">▶</button>
+							<button type="button" id="btn-next-audio" class="audio-ctrl-btn" title="Bài tiếp theo" aria-label="Bài tiếp theo">⏭</button>
+							<button type="button" id="btn-replay-playlist" class="audio-ctrl-btn" title="Lặp lại playlist" aria-label="Lặp lại playlist" aria-pressed="false">🔁</button>
+						</div>
 
-                </div>
-            </div>
-        </section>
+						<div class="audio-speed-row">
+							<div class="audio-speed-group" role="group" aria-label="Tốc độ phát nhạc">
+								<span class="audio-speed-label">Tốc độ:</span>
+								<button type="button" class="audio-speed-btn" data-speed="0.5">0.5x</button>
+								<button type="button" class="audio-speed-btn active" data-speed="1">1x</button>
+								<button type="button" class="audio-speed-btn" data-speed="1.5">1.5x</button>
+								<button type="button" class="audio-speed-btn" data-speed="2">2x</button>
+							</div>
+							<label class="audio-volume-wrap" title="Âm lượng">
+								<span aria-hidden="true">🔊</span>
+								<input type="range" id="audio-volume" min="0" max="1" step="0.05" value="0.5" aria-label="Âm lượng">
+							</label>
+						</div>
+					</div>
+				</div>
 
-        <!-- Cột phải: Danh sách mục tiêu học tập (To-do List) -->
-        <section class="todo-card">
-            <h3>Mục Tiêu Phiên Học</h3>
-            <p class="todo-subtitle">Liệt kê các bài tập cần giải quyết hôm nay</p>
+				<ul id="audio-playlist" class="audio-playlist" aria-label="Danh sách phát nhạc" hidden></ul>
+			</section>
+		</section>
 
-            <div class="todo-input-box">
-                <input type="text" id="todo-input" placeholder="VD: Làm 3 bài tập Quy hoạch động...">
-                <button id="btn-add-todo" class="btn-add-task">+</button>
-            </div>
+		<!-- Cột phải: Danh sách mục tiêu học tập -->
+		<section class="todo-card">
+			<h3>Mục Tiêu Phiên Học</h3>
+			<p class="todo-subtitle">Liệt kê các bài tập cần giải quyết hôm nay</p>
 
-            <ul id="todo-list" class="todo-list-container">
-                <!-- Danh sách công việc sẽ được JS vẽ vào đây -->
-            </ul>
-        </section>
+			<div class="todo-input-box">
+				<input type="text" id="todo-input" placeholder="VD: Làm 3 bài tập Quy hoạch động...">
+				<button type="button" id="btn-add-todo" class="btn-add-task" aria-label="Thêm mục tiêu">+</button>
+			</div>
 
-    </main>
+			<ul id="todo-list" class="todo-list-container"></ul>
+		</section>
+	</main>
 
-    <!-- Thẻ Audio ẩn để phát âm thanh nền -->
-    <audio id="bg-audio-player" loop></audio>
+	<audio id="bg-audio-player"></audio>
 
-    <script src="./tu-hoc.js?v=1" defer></script>
-    <script src="./nav-profile.js" defer></script>
+	<script src="./tu-hoc.js?v=2" defer></script>
+	<script src="./nav-profile.js?v=2" defer></script>
 </body>
 </html>

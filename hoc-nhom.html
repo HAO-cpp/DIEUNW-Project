@@ -58,7 +58,6 @@
 							<legend>Khối</legend>
 							<div id="grade-choices" class="grade-grid"></div>
 						</fieldset>
-
 					</div>
 
 					<fieldset class="choice-fieldset">
@@ -71,13 +70,13 @@
 					<input class="group-input" id="resource-title" name="title" maxlength="120" placeholder="Ví dụ: Đề cương ôn tập học kỳ I" required>
 
 					<label class="form-label" for="resource-description">Mô tả</label>
-					<textarea class="group-input group-textarea" id="resource-description" name="description" maxlength="1500" placeholder="Chia sẻ nội dung hoặc lời nhắn cho mọi người..."></textarea>
+					<textarea class="group-input group-textarea" id="resource-description" name="description" maxlength="3000" placeholder="Chia sẻ nội dung hoặc lời nhắn cho mọi người..."></textarea>
 
-					<label class="form-label" for="resource-link">Liên kết tài liệu</label>
-					<input class="group-input" id="resource-link" name="link" type="url" placeholder="https://..." required>
+					<label class="form-label" for="resource-link">Liên kết tài liệu (cần ít nhất 1 trong 2: Liên kết hoặc Tệp)</label>
+					<input class="group-input" id="resource-link" name="link" type="text" placeholder="https://... (có thể bỏ trống nếu đã chọn tệp)">
 
-					<label class="form-label" for="resource-file">Tệp tài liệu (PDF, Word, ...)</label>
-					<input class="group-input" id="resource-file" name="resource_file" type="file" accept=".pdf,.doc,.docx,.txt">
+					<label class="form-label" for="resource-file">Tệp tài liệu (PDF, Word, ảnh... — tùy chọn nếu đã có liên kết)</label>
+					<input class="group-input" id="resource-file" name="resource_file" type="file" accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg,.zip">
 
 					<label class="form-label" for="resource-cover-color">Màu bìa sách</label>
 					<div class="cover-color-row">
@@ -118,38 +117,14 @@
 				<section class="resource-feed" aria-labelledby="resource-feed-heading">
 					<div class="feed-heading">
 						<div>
-							<p class="group-eyebrow">GÓC CHIA SẺ</p>
-							<h1 id="resource-feed-heading">Tài liệu mới</h1>
+							<p class="group-eyebrow">THƯ VIỆN TÀI LIỆU</p>
+							<h1 id="resource-feed-heading">Kệ sách tài liệu</h1>
 						</div>
-						<button id="resource-refresh" class="refresh-button" type="button" aria-label="Tải lại tài liệu" title="Tải lại">↻</button>
+						<button id="resource-refresh" class="refresh-button" type="button" aria-label="Tải lại kệ sách" title="Tải lại">↻</button>
 					</div>
-					<div class="resource-filter-bar" aria-label="Lọc tài liệu">
-						<label class="resource-filter-control">
-							<span>Chương trình</span>
-							<select id="filter-track" class="group-input">
-								<option value="">Tất cả</option>
-								<option value="Chuyên">Chuyên</option>
-								<option value="Thường">Thường</option>
-							</select>
-						</label>
-						<label class="resource-filter-control">
-							<span>Môn học</span>
-							<select id="filter-subject" class="group-input">
-								<option value="">Tất cả môn</option>
-							</select>
-						</label>
-						<label class="resource-filter-control">
-							<span>Khối</span>
-							<select id="filter-grade" class="group-input">
-								<option value="">Tất cả khối</option>
-								<option value="10">Khối 10</option>
-								<option value="11">Khối 11</option>
-								<option value="12">Khối 12</option>
-							</select>
-						</label>
-					</div>
+
 					<div id="resource-list" class="resource-list book-shelf" aria-live="polite">
-						<p class="feed-state">Đang tải tài liệu...</p>
+						<p class="feed-state">Đang tải kệ sách...</p>
 					</div>
 				</section>
 			</div>
@@ -182,7 +157,40 @@
 		</section>
 	</main>
 
-	<script src="./nav-profile.js" defer></script>
-	<script src="./hoc-nhom.js" defer></script>
+	<!-- Hộp mở sách đọc tài liệu với hiệu ứng lật trang trái/phải & lưu tài liệu -->
+	<div id="book-reader-overlay" class="book-reader-overlay" hidden>
+		<section class="book-reader-modal" id="book-reader-modal" role="dialog" aria-modal="true" aria-labelledby="reader-book-title">
+			<header class="book-reader-topbar">
+				<div>
+					<p class="group-eyebrow" id="reader-meta-eyebrow">TÀI LIỆU HỌC TẬP</p>
+					<h2 id="reader-book-title">Tên tài liệu</h2>
+				</div>
+				<button type="button" id="book-reader-close" class="book-reader-close" aria-label="Đóng sách">&times;</button>
+			</header>
+
+			<div id="book-spread" class="book-spread">
+				<article class="book-page-panel" id="book-page-left"></article>
+				<article class="book-page-panel" id="book-page-right"></article>
+			</div>
+
+			<footer class="book-reader-footer">
+				<div class="book-flip-controls">
+					<button type="button" id="book-flip-prev" class="book-flip-btn">‹ Lật trái</button>
+					<span id="book-page-indicator" class="book-page-indicator">Trang 1-2 / 2</span>
+					<button type="button" id="book-flip-next" class="book-flip-btn">Lật phải ›</button>
+				</div>
+
+				<div class="book-reader-actions">
+					<button type="button" id="book-bookmark-btn" class="book-action-link secondary">☆ Lưu tài liệu</button>
+					<a id="book-download-btn" class="book-action-link" href="#" download target="_blank" rel="noopener noreferrer" hidden>⬇ Tải tệp</a>
+					<a id="book-open-link-btn" class="book-action-link secondary" href="#" target="_blank" rel="noopener noreferrer" hidden>↗ Mở liên kết</a>
+					<button type="button" id="book-delete-btn" class="post-delete-button" hidden>Xóa tài liệu</button>
+				</div>
+			</footer>
+		</section>
+	</div>
+
+	<script src="./nav-profile.js?v=2" defer></script>
+	<script src="./hoc-nhom.js?v=2" defer></script>
 </body>
 </html>

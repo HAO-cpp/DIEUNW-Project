@@ -9,10 +9,11 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const SESSION_COOKIE = "dieu_session";
 const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000;
 const OTP_DURATION = 10 * 60 * 1000;
-const MAX_BODY_BYTES = 1024 * 1024;
+const MAX_BODY_BYTES = 5 * 1024 * 1024;
 const MAX_UPLOAD_BYTES = 10485760;
 const UPLOAD_DIR = path.join(ROOT, "uploads");
 const STATIC_EXTENSIONS = new Set([".html", ".js", ".css", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".ico", ".svg", ".pdf", ".doc", ".docx", ".txt"]);
+const ALLOWED_UPLOAD_EXTENSIONS = new Set([".pdf", ".doc", ".docx", ".txt", ".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".png", ".jpg", ".jpeg", ".webp", ".gif"]);
 const MIME_TYPES = {
 	".css": "text/css; charset=utf-8",
 	".gif": "image/gif",
@@ -25,10 +26,64 @@ const MIME_TYPES = {
 	".pdf": "application/pdf",
 	".doc": "application/msword",
 	".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+	".ppt": "application/vnd.ms-powerpoint",
+	".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+	".xls": "application/vnd.ms-excel",
+	".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+	".zip": "application/zip",
 	".svg": "image/svg+xml",
 	".txt": "text/plain; charset=utf-8",
 	".webp": "image/webp"
 };
+
+class MaxHeap {
+	constructor(compareFn) {
+		this.heap = [];
+		this.compare = compareFn;
+	}
+	push(item) {
+		this.heap.push(item);
+		this._siftUp(this.heap.length - 1);
+	}
+	pop() {
+		if (!this.heap.length) return null;
+		const top = this.heap[0];
+		const last = this.heap.pop();
+		if (this.heap.length) {
+			this.heap[0] = last;
+			this._siftDown(0);
+		}
+		return top;
+	}
+	toSortedArray() {
+		const copy = new MaxHeap(this.compare);
+		copy.heap = [...this.heap];
+		const out = [];
+		while (copy.heap.length) out.push(copy.pop());
+		return out;
+	}
+	_siftUp(index) {
+		while (index > 0) {
+			const parent = Math.floor((index - 1) / 2);
+			if (this.compare(this.heap[index], this.heap[parent]) <= 0) break;
+			[this.heap[index], this.heap[parent]] = [this.heap[parent], this.heap[index]];
+			index = parent;
+		}
+	}
+	_siftDown(index) {
+		const n = this.heap.length;
+		while (true) {
+			let largest = index;
+			const left = 2 * index + 1;
+			const right = 2 * index + 2;
+			if (left < n && this.compare(this.heap[left], this.heap[largest]) > 0) largest = left;
+			if (right < n && this.compare(this.heap[right], this.heap[largest]) > 0) largest = right;
+			if (largest === index) break;
+			[this.heap[index], this.heap[largest]] = [this.heap[largest], this.heap[index]];
+			index = largest;
+		}
+	}
+}
 
 function serializeCookie(name, value, { maxAge, secure }) {
 	const parts = [`${name}=${encodeURIComponent(value)}`, "HttpOnly", "Path=/"];
@@ -36,6 +91,11 @@ function serializeCookie(name, value, { maxAge, secure }) {
 	if (secure) parts.push("SameSite=None", "Secure");
 	else parts.push("SameSite=Lax");
 	return parts.join("; ");
+}
+
+function parseBoundary(contentType) {
+	const match = /boundary=(?:"([^"]+)"|([^;\s]+))/i.exec(contentType || "");
+	return match ? (match[1] || match[2] || "").trim() : null;
 }
 
 async function parseMultipart(request) {
@@ -46,7 +106,7 @@ async function parseMultipart(request) {
 	let size = 0;
 	for await (const chunk of request) {
 		size += chunk.length;
-		if (size > MAX_UPLOAD_BYTES) throw makeError(413, "Tệp tải lên quá lớn.");
+		if (size > MAX_UPLOAD_BYTES) throw makeError(413, "Tệp tải lên quá lớn (tối đa 10 MB).");
 		chunks.push(chunk);
 	}
 
@@ -83,20 +143,30 @@ async function parseMultipart(request) {
 	return parts;
 }
 
-function saveUploadedFile(filePart) {
+function saveUploadedFile(db, filePart, allowedExts = ALLOWED_UPLOAD_EXTENSIONS) {
 	if (!filePart || !filePart.fileName || !filePart.body.length) return null;
 	const ext = path.extname(filePart.fileName).toLowerCase();
-	const allowedExts = new Set([".pdf", ".doc", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".webp"]);
 	if (!allowedExts.has(ext)) {
-		throw makeError(400, "Chỉ hỗ trợ tệp PDF, DOC, DOCX, TXT hoặc ảnh.");
+		throw makeError(400, "Định dạng tệp chưa được hỗ trợ.");
 	}
 	mkdirSync(UPLOAD_DIR, { recursive: true });
 	const storedName = `${randomBytes(16).toString("hex")}${ext}`;
+	const mimeType = filePart.contentType || MIME_TYPES[ext] || "application/octet-stream";
 	writeFileSync(path.join(UPLOAD_DIR, storedName), filePart.body);
+
+	// Lưu bản sao vào SQLite/Turso cho các tệp <= 4 MB để không bị mất khi Render sleep/restart
+	if (filePart.body.length <= 4 * 1024 * 1024) {
+		db.prepare(`
+			INSERT OR REPLACE INTO stored_files(stored_name, original_name, mime_type, data_base64, file_size, created_at)
+			VALUES (?, ?, ?, ?, ?, ?)
+		`).run(storedName, filePart.fileName, mimeType, filePart.body.toString("base64"), filePart.body.length, new Date().toISOString());
+		syncDb(db);
+	}
+
 	return {
 		fileUrl: `/uploads/${storedName}`,
 		fileName: filePart.fileName,
-		fileType: filePart.contentType || ext.slice(1).toUpperCase(),
+		fileType: mimeType,
 		fileSize: filePart.body.length
 	};
 }
@@ -132,6 +202,7 @@ function cleanUser(row) {
 		cover: row.cover,
 		bio: row.bio,
 		isAdmin: Boolean(row.is_admin),
+		isModerator: Boolean(row.is_moderator),
 		createdAt: row.created_at
 	};
 }
@@ -162,7 +233,9 @@ function profileUser(db, row) {
 	};
 }
 
-function syncDb(db) { if (process.env.TURSO_DATABASE_URL) db.sync(); }
+function syncDb(db) {
+	if (process.env.TURSO_DATABASE_URL) db.sync();
+}
 
 function initializeDatabase(dbPath) {
 	if (dbPath !== ":memory:") mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -189,9 +262,14 @@ function initializeDatabase(dbPath) {
 			cover TEXT NOT NULL DEFAULT '',
 			bio TEXT NOT NULL DEFAULT '',
 			is_admin INTEGER NOT NULL DEFAULT 0,
+			is_moderator INTEGER NOT NULL DEFAULT 0,
 			created_at TEXT NOT NULL
 		);
 		CREATE TABLE IF NOT EXISTS admin_emails (
+			email TEXT PRIMARY KEY COLLATE NOCASE,
+			created_at TEXT NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS moderator_emails (
 			email TEXT PRIMARY KEY COLLATE NOCASE,
 			created_at TEXT NOT NULL
 		);
@@ -216,6 +294,11 @@ function initializeDatabase(dbPath) {
 			club_id TEXT NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
 			author_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			content TEXT NOT NULL,
+			image TEXT NOT NULL DEFAULT '',
+			file_url TEXT NOT NULL DEFAULT '',
+			file_name TEXT NOT NULL DEFAULT '',
+			file_type TEXT NOT NULL DEFAULT '',
+			file_size INTEGER NOT NULL DEFAULT 0,
 			created_at TEXT NOT NULL
 		);
 		CREATE TABLE IF NOT EXISTS profile_achievements (
@@ -274,6 +357,7 @@ function initializeDatabase(dbPath) {
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			club_id TEXT REFERENCES clubs(id) ON DELETE CASCADE,
 			content TEXT NOT NULL,
+			content_html TEXT NOT NULL DEFAULT '',
 			image TEXT NOT NULL DEFAULT '',
 			visibility TEXT NOT NULL CHECK(visibility IN ('public', 'private')),
 			created_at TEXT NOT NULL
@@ -289,6 +373,23 @@ function initializeDatabase(dbPath) {
 			post_id TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			content TEXT NOT NULL,
+			created_at TEXT NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS reports (
+			id TEXT PRIMARY KEY,
+			target_type TEXT NOT NULL CHECK(target_type IN ('post', 'user')),
+			target_id TEXT NOT NULL,
+			reporter_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			reason TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL,
+			UNIQUE(target_type, target_id, reporter_id)
+		);
+		CREATE TABLE IF NOT EXISTS stored_files (
+			stored_name TEXT PRIMARY KEY,
+			original_name TEXT NOT NULL,
+			mime_type TEXT NOT NULL,
+			data_base64 TEXT NOT NULL,
+			file_size INTEGER NOT NULL DEFAULT 0,
 			created_at TEXT NOT NULL
 		);
 		CREATE TABLE IF NOT EXISTS conversations (
@@ -316,23 +417,33 @@ function initializeDatabase(dbPath) {
 		CREATE INDEX IF NOT EXISTS posts_visibility_idx ON posts(visibility, created_at);
 		CREATE INDEX IF NOT EXISTS conversation_members_user_idx ON conversation_members(user_id);
 		CREATE INDEX IF NOT EXISTS messages_conversation_idx ON messages(conversation_id, created_at);
+		CREATE INDEX IF NOT EXISTS reports_target_idx ON reports(target_type, target_id);
 	`);
 
 	const userColumns = db.prepare("PRAGMA table_info(users)").all().map(column => column.name);
 	if (!userColumns.includes("is_admin")) db.exec("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0");
+	if (!userColumns.includes("is_moderator")) db.exec("ALTER TABLE users ADD COLUMN is_moderator INTEGER NOT NULL DEFAULT 0");
 
 	const clubColumns = db.prepare("PRAGMA table_info(clubs)").all().map(column => column.name);
 	const clubAlters = [];
 	if (!clubColumns.includes("manager_emails")) clubAlters.push("ADD COLUMN manager_emails TEXT NOT NULL DEFAULT '[]'");
 	if (!clubColumns.includes("cover")) clubAlters.push("ADD COLUMN cover TEXT NOT NULL DEFAULT ''");
 	if (!clubColumns.includes("bio")) clubAlters.push("ADD COLUMN bio TEXT NOT NULL DEFAULT ''");
-	for (const alter of clubAlters) {
-		db.exec(`ALTER TABLE clubs ${alter}`);
-	}
+	for (const alter of clubAlters) db.exec(`ALTER TABLE clubs ${alter}`);
+
+	const clubPostColumns = db.prepare("PRAGMA table_info(club_posts)").all().map(column => column.name);
+	const clubPostAlters = [];
+	if (!clubPostColumns.includes("image")) clubPostAlters.push("ADD COLUMN image TEXT NOT NULL DEFAULT ''");
+	if (!clubPostColumns.includes("file_url")) clubPostAlters.push("ADD COLUMN file_url TEXT NOT NULL DEFAULT ''");
+	if (!clubPostColumns.includes("file_name")) clubPostAlters.push("ADD COLUMN file_name TEXT NOT NULL DEFAULT ''");
+	if (!clubPostColumns.includes("file_type")) clubPostAlters.push("ADD COLUMN file_type TEXT NOT NULL DEFAULT ''");
+	if (!clubPostColumns.includes("file_size")) clubPostAlters.push("ADD COLUMN file_size INTEGER NOT NULL DEFAULT 0");
+	for (const alter of clubPostAlters) db.exec(`ALTER TABLE club_posts ${alter}`);
 
 	const postColumns = db.prepare("PRAGMA table_info(posts)").all().map(column => column.name);
 	const postAlters = [];
 	if (!postColumns.includes("club_id")) postAlters.push("ADD COLUMN club_id TEXT REFERENCES clubs(id) ON DELETE CASCADE");
+	if (!postColumns.includes("content_html")) postAlters.push("ADD COLUMN content_html TEXT NOT NULL DEFAULT ''");
 	if (!postColumns.includes("type")) postAlters.push("ADD COLUMN type TEXT NOT NULL DEFAULT \"post\"");
 	if (!postColumns.includes("resource_title")) postAlters.push("ADD COLUMN resource_title TEXT NOT NULL DEFAULT \"\"");
 	if (!postColumns.includes("resource_description")) postAlters.push("ADD COLUMN resource_description TEXT NOT NULL DEFAULT \"\"");
@@ -345,17 +456,17 @@ function initializeDatabase(dbPath) {
 	if (!postColumns.includes("resource_file_type")) postAlters.push("ADD COLUMN resource_file_type TEXT NOT NULL DEFAULT \"\"");
 	if (!postColumns.includes("resource_file_size")) postAlters.push("ADD COLUMN resource_file_size INTEGER NOT NULL DEFAULT 0");
 	if (!postColumns.includes("resource_cover_color")) postAlters.push("ADD COLUMN resource_cover_color TEXT NOT NULL DEFAULT \"\"");
-	for (const alter of postAlters) {
-		db.exec(`ALTER TABLE posts ${alter}`);
-	}
+	for (const alter of postAlters) db.exec(`ALTER TABLE posts ${alter}`);
 
 	if (process.env.TURSO_DATABASE_URL) {
 		syncDb(db);
 	}
 
 	const now = new Date().toISOString();
-	db.prepare("INSERT OR IGNORE INTO admin_emails(email, created_at) VALUES (?, ?)").run("k18th.hao2802@nqd.edu.vn", now); syncDb(db);
-	db.prepare("UPDATE users SET is_admin = 1 WHERE email IN (SELECT email FROM admin_emails)").run(); syncDb(db);
+	db.prepare("INSERT OR IGNORE INTO admin_emails(email, created_at) VALUES (?, ?)").run("k18th.hao2802@nqd.edu.vn", now);
+	db.prepare("UPDATE users SET is_admin = 1 WHERE email IN (SELECT email FROM admin_emails)").run();
+	db.prepare("UPDATE users SET is_moderator = 1 WHERE email IN (SELECT email FROM moderator_emails)").run();
+	syncDb(db);
 	return db;
 }
 
@@ -364,7 +475,7 @@ async function readJson(request) {
 	let size = 0;
 	for await (const chunk of request) {
 		size += chunk.length;
-		if (size > MAX_BODY_BYTES) throw makeError(413, "Yêu cầu quá lớn.");
+		if (size > MAX_BODY_BYTES) throw makeError(413, "Yêu cầu quá lớn (tối đa 5 MB).");
 		chunks.push(chunk);
 	}
 	if (!chunks.length) return {};
@@ -380,11 +491,6 @@ function sendJson(response, statusCode, payload, headers = {}) {
 	response.end(JSON.stringify(payload));
 }
 
-function parseBoundary(contentType) {
-	const match = /boundary=([^;]+)/i.exec(contentType || "");
-	return match ? match[1].trim() : null;
-}
-
 function parseCookies(request) {
 	const cookieHeader = request.headers.cookie || "";
 	return Object.fromEntries(cookieHeader.split(";").map(part => {
@@ -396,13 +502,11 @@ function parseCookies(request) {
 function getUserForRequest(db, request) {
 	const authHeader = request.headers.authorization || "";
 	let sessionToken = null;
-
 	if (authHeader.startsWith("Bearer ")) {
 		sessionToken = authHeader.slice(7).trim();
 	} else {
 		sessionToken = parseCookies(request)[SESSION_COOKIE];
 	}
-
 	if (!sessionToken) return null;
 
 	const row = db.prepare(`
@@ -415,7 +519,13 @@ function getUserForRequest(db, request) {
 }
 
 function requireAdmin(user) {
-	if (!user.isAdmin) throw makeError(403, "Chỉ quản trị viên mới có thể thực hiện thao tác này.");
+	if (!user.isAdmin) throw makeError(403, "Chỉ quản trị viên (Admin) mới có thể thực hiện thao tác này.");
+}
+
+function requireModeratorOrAdmin(user) {
+	if (!user.isAdmin && !user.isModerator) {
+		throw makeError(403, "Chỉ Admin hoặc Ban duyệt bài mới có quyền truy cập.");
+	}
 }
 
 function clubForViewer(db, row) {
@@ -454,10 +564,9 @@ function requireUser(db, request) {
 function setSession(db, userId, response, secure) {
 	const token = randomBytes(32).toString("hex");
 	const expiresAt = Date.now() + SESSION_DURATION;
-
 	db.prepare("INSERT INTO sessions(token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)")
-		.run(hashValue(token), userId, expiresAt, new Date().toISOString()); syncDb(db);
-
+		.run(hashValue(token), userId, expiresAt, new Date().toISOString());
+	syncDb(db);
 	return `${SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=None; Path=/; Max-Age=${SESSION_DURATION / 1000}; Secure`;
 }
 
@@ -466,14 +575,15 @@ function clearSession(db, request, secure) {
 	const sessionToken = authHeader.startsWith("Bearer ")
 		? authHeader.slice(7).trim()
 		: parseCookies(request)[SESSION_COOKIE];
-
 	if (sessionToken) {
-		db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hashValue(sessionToken)); syncDb(db);
+		db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hashValue(sessionToken));
+		syncDb(db);
 	}
 	return serializeCookie(SESSION_COOKIE, "", { maxAge: 0, secure });
 }
 
 function relationship(db, viewerId, otherId) {
+	if (!viewerId) return "none";
 	if (viewerId === otherId) return "self";
 	const low = viewerId < otherId ? viewerId : otherId;
 	const high = viewerId < otherId ? otherId : viewerId;
@@ -492,10 +602,11 @@ function ensureConversation(db, userA, userB) {
 	const id = `direct-${pair[0]}-${pair[1]}`;
 	const now = new Date().toISOString();
 	db.prepare("INSERT OR IGNORE INTO conversations(id, type, name, created_by, created_at) VALUES (?, 'direct', '', ?, ?)")
-		.run(id, pair[0], now); syncDb(db);
+		.run(id, pair[0], now);
 	const addMember = db.prepare("INSERT OR IGNORE INTO conversation_members(conversation_id, user_id, joined_at) VALUES (?, ?, ?)");
-	addMember.run(id, pair[0], now); syncDb(db);
-	addMember.run(id, pair[1], now); syncDb(db);
+	addMember.run(id, pair[0], now);
+	addMember.run(id, pair[1], now);
+	syncDb(db);
 	return id;
 }
 
@@ -507,18 +618,118 @@ function canViewPost(db, post, userId) {
 	return post.visibility === "public" || post.user_id === userId;
 }
 
+function escapeHtmlText(text) {
+	return String(text ?? "").replace(/[&<>"']/g, ch => ({
+		"&": "&amp;",
+		"<": "&lt;",
+		">": "&gt;",
+		'"': "&quot;",
+		"'": "&#39;"
+	})[ch]);
+}
+
+function isValidCssColor(value) {
+	const trimmed = String(value || "").trim();
+	return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(trimmed)
+		|| /^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/i.test(trimmed);
+}
+
+function linkifyPlainMentions(db, textSegment) {
+	return textSegment.replace(/@([a-zA-Z0-9._-]+@nqd\.edu\.vn)/gi, (full, email) => {
+		const target = db.prepare("SELECT id, email FROM users WHERE email = ? COLLATE NOCASE").get(email.toLowerCase());
+		if (!target) return full;
+		return `<a class="mention-tag" href="./profile.html?userId=${encodeURIComponent(target.id)}" data-mention-user-id="${escapeHtmlText(target.id)}">@${escapeHtmlText(target.email)}</a>`;
+	});
+}
+
+function sanitizeRichPostHtml(db, rawHtml, fallbackText = "") {
+	const input = String(rawHtml || "").trim();
+	if (!input) {
+		if (!fallbackText) return "";
+		return linkifyPlainMentions(db, escapeHtmlText(fallbackText)).replace(/\n/g, "<br>");
+	}
+
+	const stripped = input
+		.replace(/<!--[\s\S]*?-->/g, "")
+		.replace(/<\s*(script|style|iframe|object|embed|svg|form|input|textarea|button|meta|link)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "")
+		.replace(/<\s*(script|style|iframe|object|embed|svg|form|input|textarea|button|meta|link)[^>]*\/?\s*>/gi, "");
+
+	const allowedTags = new Set(["b", "strong", "i", "em", "u", "h1", "h2", "h3", "h4", "h5", "p", "div", "br", "span", "font", "a"]);
+	const tokens = stripped.split(/(<[^>]+>)/g);
+	let insideAnchor = false;
+	const output = [];
+
+	for (const token of tokens) {
+		if (!token) continue;
+		if (!token.startsWith("<")) {
+			output.push(insideAnchor ? token : linkifyPlainMentions(db, token));
+			continue;
+		}
+		const match = /^<\s*(\/?)\s*([a-zA-Z0-9]+)([^>]*)>$/.exec(token);
+		if (!match) continue;
+		const isClosing = Boolean(match[1]);
+		const tag = match[2].toLowerCase();
+		const rawAttrs = match[3] || "";
+		if (!allowedTags.has(tag)) continue;
+
+		if (tag === "br") {
+			output.push("<br>");
+			continue;
+		}
+
+		if (isClosing) {
+			if (tag === "a") insideAnchor = false;
+			output.push(`</${tag === "font" ? "span" : tag}>`);
+			continue;
+		}
+
+		if (tag === "a") {
+			const hrefMatch = /href\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(rawAttrs);
+			const href = (hrefMatch?.[1] || hrefMatch?.[2] || "").trim();
+			const mentionMatch = /^\.\/profile\.html\?userId=([a-zA-Z0-9_-]+)$/.exec(href);
+			if (mentionMatch) {
+				insideAnchor = true;
+				output.push(`<a class="mention-tag" href="./profile.html?userId=${encodeURIComponent(mentionMatch[1])}" data-mention-user-id="${escapeHtmlText(mentionMatch[1])}">`);
+			} else if (/^https?:\/\//i.test(href)) {
+				insideAnchor = true;
+				output.push(`<a href="${escapeHtmlText(href)}" target="_blank" rel="noopener noreferrer">`);
+			}
+			continue;
+		}
+
+		let colorValue = "";
+		const styleMatch = /style\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(rawAttrs);
+		const styleText = styleMatch?.[1] || styleMatch?.[2] || "";
+		const colorStyleMatch = /(?:^|;)\s*color\s*:\s*([^;]+)/i.exec(styleText);
+		if (colorStyleMatch && isValidCssColor(colorStyleMatch[1])) {
+			colorValue = colorStyleMatch[1].trim();
+		} else if (tag === "font") {
+			const fontColorMatch = /color\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(rawAttrs);
+			if (fontColorMatch && isValidCssColor(fontColorMatch[1] || fontColorMatch[2])) {
+				colorValue = (fontColorMatch[1] || fontColorMatch[2]).trim();
+			}
+		}
+
+		const outTag = tag === "font" ? "span" : tag;
+		const styleAttr = colorValue ? ` style="color: ${escapeHtmlText(colorValue)};"` : "";
+		output.push(`<${outTag}${styleAttr}>`);
+	}
+
+	return output.join("").slice(0, 30000);
+}
+
 function postForViewer(db, row, viewerId) {
 	const author = db.prepare("SELECT name, email, avatar FROM users WHERE id = ?").get(row.user_id);
 	const club = row.club_id ? db.prepare("SELECT id, name, logo FROM clubs WHERE id = ?").get(row.club_id) : null;
 
 	const comments = db.prepare(`
 		SELECT comments.id, comments.content AS text, comments.created_at AS createdAt,
-			users.name, users.avatar, users.email
+			users.id AS userId, users.name, users.avatar, users.email
 		FROM post_comments AS comments JOIN users ON users.id = comments.user_id
 		WHERE comments.post_id = ? ORDER BY comments.created_at
 	`).all(row.id);
 	const likes = db.prepare("SELECT COUNT(*) AS count FROM post_likes WHERE post_id = ?").get(row.id).count;
-	const likedByMe = Boolean(db.prepare("SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?").get(row.id, viewerId));
+	const likedByMe = Boolean(viewerId && db.prepare("SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?").get(row.id, viewerId));
 
 	return {
 		id: row.id,
@@ -529,6 +740,7 @@ function postForViewer(db, row, viewerId) {
 		authorEmail: author?.email || "",
 		avatar: club ? (club.logo || "./DIEU.png") : (author?.avatar || "./DIEU.png"),
 		content: row.content,
+		contentHtml: row.content_html || "",
 		image: row.image,
 		visibility: row.visibility,
 		createdAt: row.created_at,
@@ -566,7 +778,7 @@ async function sendOtp(email, code, purpose, env) {
 		});
 		if (!response.ok) throw new Error("EmailJS từ chối gửi mã.");
 		return { sent: true };
-	} catch (error) {
+	} catch {
 		if (env.NODE_ENV === "production") throw makeError(502, "Không gửi được mã xác nhận qua email.");
 		return { sent: false, devCode: code };
 	}
@@ -584,13 +796,24 @@ function validatePassword(password) {
 	}
 }
 
-function validateProfileImage(value, required = false) {
+function validateDataOrHttpImage(value, { required = false, allowDefault = false } = {}) {
 	const image = String(value || "").trim();
 	if (!image && !required) return "";
-	if (image.length > 700000 || !/^data:image\/(png|jpeg|webp|gif);base64,[a-z0-9+/]+={0,2}$/i.test(image)) {
-		throw makeError(400, "Ảnh phải là PNG, JPG, WEBP hoặc GIF và không vượt quá 500 KB.");
+	if (allowDefault && image === "./DIEU.png") return image;
+	if (/^data:image\/(png|jpeg|webp|gif);base64,[a-z0-9+/]+={0,2}$/i.test(image)) {
+		if (image.length > 1500000) {
+			throw makeError(400, "Ảnh tải lên quá lớn (tối đa khoảng 1 MB).");
+		}
+		return image;
 	}
-	return image;
+	if (/^(\/uploads\/[a-z0-9._-]+|https?:\/\/\S+)$/i.test(image) && image.length <= 2000) {
+		return image;
+	}
+	throw makeError(400, "Ảnh phải là tệp PNG, JPG, WEBP, GIF hoặc đường dẫn hợp lệ.");
+}
+
+function validateProfileImage(value, required = false) {
+	return validateDataOrHttpImage(value, { required, allowDefault: false });
 }
 
 function serializeConversation(db, row, userId) {
@@ -627,11 +850,7 @@ function createServer(options = {}) {
 				return;
 			}
 			if (request.method === "GET" && url.pathname.startsWith("/uploads/")) {
-				const fileName = path.basename(decodeURIComponent(url.pathname.slice("/uploads/".length)));
-				const filePath = path.join(UPLOAD_DIR, fileName);
-				if (!existsSync(filePath) || !statSync(filePath).isFile()) throw makeError(404, "Không tìm thấy tệp.");
-				response.writeHead(200, { "Content-Type": MIME_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream" });
-				createReadStream(filePath).pipe(response);
+				serveUpload(db, url, response);
 				return;
 			}
 			serveStatic(request, response, url);
@@ -648,19 +867,63 @@ function createServer(options = {}) {
 	return server;
 }
 
+function serveUpload(db, url, response) {
+	const fileName = path.basename(decodeURIComponent(url.pathname.slice("/uploads/".length)));
+	const download = url.searchParams.get("download") === "1";
+	const filePath = path.join(UPLOAD_DIR, fileName);
+	const stored = db.prepare("SELECT original_name, mime_type, data_base64 FROM stored_files WHERE stored_name = ?").get(fileName);
+
+	if (existsSync(filePath) && statSync(filePath).isFile()) {
+		const ext = path.extname(filePath).toLowerCase();
+		const headers = {
+			"Content-Type": stored?.mime_type || MIME_TYPES[ext] || "application/octet-stream",
+			"Access-Control-Allow-Origin": "*"
+		};
+		if (download) {
+			headers["Content-Disposition"] = `attachment; filename="${encodeURIComponent(stored?.original_name || fileName)}"`;
+		}
+		response.writeHead(200, headers);
+		createReadStream(filePath).pipe(response);
+		return;
+	}
+
+	if (stored) {
+		const buf = Buffer.from(stored.data_base64, "base64");
+		const headers = {
+			"Content-Type": stored.mime_type || "application/octet-stream",
+			"Content-Length": buf.length,
+			"Access-Control-Allow-Origin": "*"
+		};
+		if (download) {
+			headers["Content-Disposition"] = `attachment; filename="${encodeURIComponent(stored.original_name || fileName)}"`;
+		}
+		response.writeHead(200, headers);
+		response.end(buf);
+		return;
+	}
+
+	throw makeError(404, "Không tìm thấy tệp.");
+}
+
 async function handleApi({ request, response, url, db, env, secure }) {
 	const { pathname } = url;
 	const method = request.method || "GET";
 
-	const allowedOrigin = "https://hao-cpp.github.io";
+	const allowedOrigins = new Set([
+		"https://hao-cpp.github.io",
+		"http://localhost:4173",
+		"http://127.0.0.1:4173",
+		"http://localhost:3000",
+		"http://127.0.0.1:3000"
+	]);
 	const origin = request.headers.origin;
 
-	if (origin && origin !== allowedOrigin) {
+	if (origin && !allowedOrigins.has(origin)) {
 		throw makeError(403, "Nguồn yêu cầu không được phép.");
 	}
 
-	if (origin === allowedOrigin) {
-		response.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+	if (origin && allowedOrigins.has(origin)) {
+		response.setHeader("Access-Control-Allow-Origin", origin);
 		response.setHeader("Access-Control-Allow-Credentials", "true");
 		response.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
 		response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -689,7 +952,6 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		}
 		const cookie = setSession(db, user.id, response, secure);
 		const token = cookie.split(";")[0].split("=")[1];
-
 		sendJson(response, 200, { user: profileUser(db, user), token }, { "Set-Cookie": cookie });
 		return;
 	}
@@ -708,7 +970,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			INSERT INTO email_challenges(email, purpose, code_hash, payload, attempts, expires_at)
 			VALUES (?, 'register', ?, ?, 0, ?)
 			ON CONFLICT(email, purpose) DO UPDATE SET code_hash = excluded.code_hash, payload = excluded.payload, attempts = 0, expires_at = excluded.expires_at
-		`).run(email, hashValue(`${email}:${code}`), payload, Date.now() + OTP_DURATION); syncDb(db);
+		`).run(email, hashValue(`${email}:${code}`), payload, Date.now() + OTP_DURATION);
+		syncDb(db);
 		const delivery = await sendOtp(email, code, "Đăng ký", env);
 		sendJson(response, 200, { ok: true, email, expiresIn: OTP_DURATION / 1000, ...(delivery.devCode ? { devCode: delivery.devCode } : {}) });
 		return;
@@ -718,18 +981,23 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const email = validateEmail(body.email);
 		const challenge = db.prepare("SELECT * FROM email_challenges WHERE email = ? COLLATE NOCASE AND purpose = 'register'").get(email);
 		if (!challenge || challenge.expires_at < Date.now() || challenge.attempts >= 5 || challenge.code_hash !== hashValue(`${email}:${String(body.code || "")}`)) {
-			if (challenge) { db.prepare("UPDATE email_challenges SET attempts = attempts + 1 WHERE email = ? AND purpose = 'register'").run(email); syncDb(db); }
+			if (challenge) {
+				db.prepare("UPDATE email_challenges SET attempts = attempts + 1 WHERE email = ? AND purpose = 'register'").run(email);
+				syncDb(db);
+			}
 			throw makeError(400, "Mã xác nhận không hợp lệ hoặc đã hết hạn.");
 		}
 		const pending = JSON.parse(challenge.payload);
 		const userId = randomBytes(16).toString("hex");
 		const now = new Date().toISOString();
 		db.prepare(`
-			INSERT INTO users(id, name, email, password_hash, password_salt, student_class, avatar, cover, bio, is_admin, created_at)
+			INSERT INTO users(id, name, email, password_hash, password_salt, student_class, avatar, cover, bio, is_admin, is_moderator, created_at)
 			VALUES (?, ?, ?, ?, ?, 'Học sinh NQD', './DIEU.png', '', 'Chào mừng đến với góc học tập của mình trên DIEUNW!',
-				EXISTS(SELECT 1 FROM admin_emails WHERE email = ? COLLATE NOCASE), ?)
-		`).run(userId, pending.name, email, pending.password_hash, pending.password_salt, email, now); syncDb(db);
-		db.prepare("DELETE FROM email_challenges WHERE email = ? AND purpose = 'register'").run(email); syncDb(db);
+				EXISTS(SELECT 1 FROM admin_emails WHERE email = ? COLLATE NOCASE),
+				EXISTS(SELECT 1 FROM moderator_emails WHERE email = ? COLLATE NOCASE), ?)
+		`).run(userId, pending.name, email, pending.password_hash, pending.password_salt, email, email, now);
+		db.prepare("DELETE FROM email_challenges WHERE email = ? AND purpose = 'register'").run(email);
+		syncDb(db);
 		const user = db.prepare("SELECT * FROM users WHERE id = ?").get(userId);
 		const cookie = setSession(db, userId, response, secure);
 		const token = cookie.split(";")[0].split("=")[1];
@@ -749,7 +1017,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			INSERT INTO email_challenges(email, purpose, code_hash, payload, attempts, expires_at)
 			VALUES (?, 'password', ?, ?, 0, ?)
 			ON CONFLICT(email, purpose) DO UPDATE SET code_hash = excluded.code_hash, payload = excluded.payload, attempts = 0, expires_at = excluded.expires_at
-		`).run(email, hashValue(`${email}:${code}`), JSON.stringify({ userId: user.id }), Date.now() + OTP_DURATION); syncDb(db);
+		`).run(email, hashValue(`${email}:${code}`), JSON.stringify({ userId: user.id }), Date.now() + OTP_DURATION);
+		syncDb(db);
 		const delivery = await sendOtp(email, code, "Khôi phục mật khẩu", env);
 		sendJson(response, 200, { ok: true, ...(delivery.devCode ? { devCode: delivery.devCode } : {}) });
 		return;
@@ -760,14 +1029,18 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		validatePassword(body.password);
 		const challenge = db.prepare("SELECT * FROM email_challenges WHERE email = ? COLLATE NOCASE AND purpose = 'password'").get(email);
 		if (!challenge || challenge.expires_at < Date.now() || challenge.attempts >= 5 || challenge.code_hash !== hashValue(`${email}:${String(body.code || "")}`)) {
-			if (challenge) { db.prepare("UPDATE email_challenges SET attempts = attempts + 1 WHERE email = ? AND purpose = 'password'").run(email); syncDb(db); }
+			if (challenge) {
+				db.prepare("UPDATE email_challenges SET attempts = attempts + 1 WHERE email = ? AND purpose = 'password'").run(email);
+				syncDb(db);
+			}
 			throw makeError(400, "Mã xác nhận không hợp lệ hoặc đã hết hạn.");
 		}
 		const pending = JSON.parse(challenge.payload);
 		const password = hashPassword(body.password);
-		db.prepare("UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?").run(password.hash, password.salt, pending.userId); syncDb(db);
-		db.prepare("DELETE FROM email_challenges WHERE email = ? AND purpose = 'password'").run(email); syncDb(db);
-		db.prepare("DELETE FROM sessions WHERE user_id = ?").run(pending.userId); syncDb(db);
+		db.prepare("UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?").run(password.hash, password.salt, pending.userId);
+		db.prepare("DELETE FROM email_challenges WHERE email = ? AND purpose = 'password'").run(email);
+		db.prepare("DELETE FROM sessions WHERE user_id = ?").run(pending.userId);
+		syncDb(db);
 		const cookie = setSession(db, pending.userId, response, secure);
 		const token = cookie.split(";")[0].split("=")[1];
 		sendJson(response, 200, { user: profileUser(db, db.prepare("SELECT * FROM users WHERE id = ?").get(pending.userId)), token }, { "Set-Cookie": cookie });
@@ -783,7 +1056,6 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
-	// LẤY CHI TIẾT 1 CLB CHO TRANG FANPAGE (Khách chưa đăng nhập cũng xem được CLB đã duyệt)
 	const clubDetailMatch = pathname.match(/^\/api\/clubs\/([^/]+)$/);
 	if (method === "GET" && clubDetailMatch) {
 		const clubId = decodeURIComponent(clubDetailMatch[1]);
@@ -821,12 +1093,18 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			clubLogo: row.club_logo,
 			tagColor: row.tag_color,
 			content: row.content,
+			image: row.image || "",
+			fileUrl: row.file_url || "",
+			fileName: row.file_name || "",
+			fileType: row.file_type || "",
+			fileSize: row.file_size || 0,
 			author: { name: row.author_name },
 			createdAt: row.created_at
 		}));
 		sendJson(response, 200, { posts });
 		return;
 	}
+
 	if (method === "GET" && pathname === "/api/users") {
 		const term = String(url.searchParams.get("q") || "").trim();
 		const rows = term
@@ -835,6 +1113,36 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		sendJson(response, 200, {
 			users: rows.map(row => publicUser(db, row, optionalUser?.id || "")),
 			currentUser: optionalUser
+		});
+		return;
+	}
+
+	// HỒ SƠ CÔNG KHAI CỦA BẠN BÈ / THÀNH VIÊN (xem hồ sơ, bài viết công khai, thành tích, sở thích, album)
+	const userProfileMatch = pathname.match(/^\/api\/users\/([^/]+)\/profile$/);
+	if (method === "GET" && userProfileMatch) {
+		const targetUserId = decodeURIComponent(userProfileMatch[1]);
+		const targetRow = db.prepare("SELECT * FROM users WHERE id = ?").get(targetUserId);
+		if (!targetRow) throw makeError(404, "Không tìm thấy người dùng.");
+
+		const targetProfile = {
+			...profileUser(db, targetRow),
+			relationship: relationship(db, optionalUser?.id || "", targetRow.id)
+		};
+
+		const publicPosts = db.prepare(`
+			SELECT * FROM posts
+			WHERE user_id = ? AND club_id IS NULL AND type != 'study-resource' AND visibility = 'public'
+			ORDER BY created_at DESC LIMIT 100
+		`).all(targetRow.id).map(post => postForViewer(db, post, optionalUser?.id || ""));
+
+		const achievements = db.prepare("SELECT id, title, certificate_image AS certificateImage, created_at AS createdAt FROM profile_achievements WHERE user_id = ? ORDER BY created_at DESC").all(targetRow.id);
+		const interests = db.prepare("SELECT id, name, created_at AS createdAt FROM profile_interests WHERE user_id = ? ORDER BY created_at DESC").all(targetRow.id);
+		const photos = db.prepare("SELECT id, image, caption, created_at AS createdAt FROM profile_photos WHERE user_id = ? ORDER BY created_at DESC").all(targetRow.id);
+
+		sendJson(response, 200, {
+			user: targetProfile,
+			posts: publicPosts,
+			sections: { achievements, interests, photos }
 		});
 		return;
 	}
@@ -857,7 +1165,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
 		const certificateImage = validateProfileImage(body.certificateImage);
-		db.prepare("INSERT INTO profile_achievements(id, user_id, title, certificate_image, created_at) VALUES (?, ?, ?, ?, ?)").run(id, user.id, title, certificateImage, createdAt); syncDb(db);
+		db.prepare("INSERT INTO profile_achievements(id, user_id, title, certificate_image, created_at) VALUES (?, ?, ?, ?, ?)").run(id, user.id, title, certificateImage, createdAt);
+		syncDb(db);
 		sendJson(response, 201, { achievement: { id, title, certificateImage, createdAt } });
 		return;
 	}
@@ -869,7 +1178,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
 		try {
-			db.prepare("INSERT INTO profile_interests(id, user_id, name, created_at) VALUES (?, ?, ?, ?)").run(id, user.id, name, createdAt); syncDb(db);
+			db.prepare("INSERT INTO profile_interests(id, user_id, name, created_at) VALUES (?, ?, ?, ?)").run(id, user.id, name, createdAt);
+			syncDb(db);
 		} catch {
 			throw makeError(409, "Sở thích này đã có trong hồ sơ.");
 		}
@@ -884,7 +1194,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		if (db.prepare("SELECT COUNT(*) AS count FROM profile_photos WHERE user_id = ?").get(user.id).count >= 50) throw makeError(409, "Album có thể lưu tối đa 50 ảnh.");
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
-		db.prepare("INSERT INTO profile_photos(id, user_id, image, caption, created_at) VALUES (?, ?, ?, ?, ?)").run(id, user.id, image, caption, createdAt); syncDb(db);
+		db.prepare("INSERT INTO profile_photos(id, user_id, image, caption, created_at) VALUES (?, ?, ?, ?, ?)").run(id, user.id, image, caption, createdAt);
+		syncDb(db);
 		sendJson(response, 201, { photo: { id, image, caption, createdAt } });
 		return;
 	}
@@ -892,7 +1203,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	if (method === "DELETE" && profileItem) {
 		const table = { achievements: "profile_achievements", interests: "profile_interests", photos: "profile_photos" }[profileItem[1]];
 		const itemId = decodeURIComponent(profileItem[2]);
-		const result = db.prepare(`DELETE FROM ${table} WHERE id = ? AND user_id = ?`).run(itemId, user.id); syncDb(db);
+		const result = db.prepare(`DELETE FROM ${table} WHERE id = ? AND user_id = ?`).run(itemId, user.id);
+		syncDb(db);
 		if (!result.changes) throw makeError(404, "Không tìm thấy mục trong hồ sơ của bạn.");
 		sendJson(response, 200, { ok: true });
 		return;
@@ -902,17 +1214,13 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const body = await readJson(request);
 		const name = String(body.name || "").trim();
 		const tagColor = String(body.tagColor || "").trim();
-		const logo = String(body.logo || "").trim();
-
+		const logo = validateDataOrHttpImage(body.logo || "", { required: false, allowDefault: false });
 		const rawList = Array.isArray(body.managerEmails) ? body.managerEmails : [body.managerEmail];
 		const managerEmails = [...new Set(rawList.map(e => validateEmail(e)))];
 
 		if (!name || name.length > 80) throw makeError(400, "Tên CLB phải có từ 1 đến 80 ký tự.");
 		if (!managerEmails.length) throw makeError(400, "Cần ít nhất 1 email quản lý.");
 		if (!/^#[0-9a-f]{6}$/i.test(tagColor)) throw makeError(400, "Màu tag không hợp lệ.");
-		if (logo.length > 700000 || (logo && !(/^(https?:\/\/|data:image\/(png|jpeg|webp|gif);base64,)/i.test(logo)))) {
-			throw makeError(400, "Logo phải là ảnh PNG, JPG, WEBP hoặc GIF hợp lệ.");
-		}
 
 		const managers = managerEmails.map(email => {
 			const m = db.prepare("SELECT id FROM users WHERE email = ? COLLATE NOCASE").get(email);
@@ -932,7 +1240,6 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
-	// CẬP NHẬT FANPAGE CLB (Chỉ quản lý CLB hoặc Admin mới được sửa)
 	if (method === "PATCH" && clubDetailMatch) {
 		const clubId = decodeURIComponent(clubDetailMatch[1]);
 		const row = db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId);
@@ -940,14 +1247,16 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 		const currentClub = clubForViewer(db, row);
 		const isAllowed = currentClub.managerEmails.some(e => String(e || "").toLowerCase() === user.email.toLowerCase()) || user.isAdmin;
-		if (!isAllowed) {
-			throw makeError(403, "Bạn không có quyền chỉnh sửa Fanpage CLB này.");
-		}
+		if (!isAllowed) throw makeError(403, "Bạn không có quyền chỉnh sửa Fanpage CLB này.");
 
 		const body = await readJson(request);
 		const newName = body.name !== undefined ? String(body.name).trim() : row.name;
-		const newLogo = body.logo !== undefined ? String(body.logo).trim().slice(0, 700000) : row.logo;
-		const newCover = body.cover !== undefined ? String(body.cover).trim().slice(0, 700000) : (row.cover || "");
+		const newLogo = body.logo !== undefined
+			? validateDataOrHttpImage(body.logo, { required: false, allowDefault: true })
+			: row.logo;
+		const newCover = body.cover !== undefined
+			? validateDataOrHttpImage(body.cover, { required: false, allowDefault: false })
+			: (row.cover || "");
 		const newBio = body.bio !== undefined ? String(body.bio).trim().slice(0, 500) : (row.bio || "");
 
 		if (!newName || newName.length > 80) throw makeError(400, "Tên CLB không hợp lệ.");
@@ -960,20 +1269,203 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
+	// QUẢN LÝ ADMIN (chỉ Admin)
 	if (method === "GET" && pathname === "/api/admins") {
 		requireAdmin(user);
 		const admins = db.prepare("SELECT email FROM admin_emails ORDER BY email").all();
 		sendJson(response, 200, { admins: admins.map(admin => admin.email) });
 		return;
 	}
-
 	if (method === "POST" && pathname === "/api/admins") {
 		requireAdmin(user);
 		const body = await readJson(request);
 		const email = validateEmail(body.email);
-		db.prepare("INSERT OR IGNORE INTO admin_emails(email, created_at) VALUES (?, ?)").run(email, new Date().toISOString()); syncDb(db);
-		db.prepare("UPDATE users SET is_admin = 1 WHERE email = ? COLLATE NOCASE").run(email); syncDb(db);
+		db.prepare("INSERT OR IGNORE INTO admin_emails(email, created_at) VALUES (?, ?)").run(email, new Date().toISOString());
+		db.prepare("UPDATE users SET is_admin = 1 WHERE email = ? COLLATE NOCASE").run(email);
+		syncDb(db);
 		sendJson(response, 200, { ok: true, email, accountExists: Boolean(db.prepare("SELECT 1 FROM users WHERE email = ? COLLATE NOCASE").get(email)) });
+		return;
+	}
+
+	// QUẢN LÝ BAN DUYỆT BÀI (chỉ Admin được thêm/gỡ)
+	if (method === "GET" && pathname === "/api/moderators") {
+		requireAdmin(user);
+		const rows = db.prepare("SELECT email FROM moderator_emails ORDER BY email").all();
+		sendJson(response, 200, { moderators: rows.map(row => row.email) });
+		return;
+	}
+	if (method === "POST" && pathname === "/api/moderators") {
+		requireAdmin(user);
+		const body = await readJson(request);
+		const email = validateEmail(body.email);
+		db.prepare("INSERT OR IGNORE INTO moderator_emails(email, created_at) VALUES (?, ?)").run(email, new Date().toISOString());
+		db.prepare("UPDATE users SET is_moderator = 1 WHERE email = ? COLLATE NOCASE").run(email);
+		syncDb(db);
+		sendJson(response, 200, {
+			ok: true,
+			email,
+			accountExists: Boolean(db.prepare("SELECT 1 FROM users WHERE email = ? COLLATE NOCASE").get(email))
+		});
+		return;
+	}
+	const deleteModerator = pathname.match(/^\/api\/moderators\/([^/]+)$/);
+	if (method === "DELETE" && deleteModerator) {
+		requireAdmin(user);
+		const email = validateEmail(decodeURIComponent(deleteModerator[1]));
+		db.prepare("DELETE FROM moderator_emails WHERE email = ? COLLATE NOCASE").run(email);
+		db.prepare("UPDATE users SET is_moderator = 0 WHERE email = ? COLLATE NOCASE").run(email);
+		syncDb(db);
+		sendJson(response, 200, { ok: true });
+		return;
+	}
+
+	// HỆ THỐNG BÁO CÁO BÀI VIẾT / TÀI KHOẢN + HÀNG ĐỢI MAX-HEAP
+	if (method === "POST" && pathname === "/api/reports") {
+		const body = await readJson(request);
+		const targetType = String(body.targetType || "").trim();
+		const targetId = String(body.targetId || "").trim();
+		const reason = String(body.reason || "").trim().slice(0, 500);
+		if (!["post", "user"].includes(targetType) || !targetId) {
+			throw makeError(400, "Thông tin báo cáo không hợp lệ.");
+		}
+		if (targetType === "post") {
+			const post = db.prepare("SELECT id, user_id FROM posts WHERE id = ?").get(targetId);
+			if (!post) throw makeError(404, "Không tìm thấy bài viết cần báo cáo.");
+			if (post.user_id === user.id) throw makeError(400, "Bạn không thể tự báo cáo bài viết của chính mình.");
+		} else {
+			const targetUser = db.prepare("SELECT id FROM users WHERE id = ?").get(targetId);
+			if (!targetUser) throw makeError(404, "Không tìm thấy tài khoản cần báo cáo.");
+			if (targetUser.id === user.id) throw makeError(400, "Bạn không thể tự báo cáo chính mình.");
+		}
+
+		const id = randomBytes(16).toString("hex");
+		const createdAt = new Date().toISOString();
+		db.prepare(`
+			INSERT INTO reports(id, target_type, target_id, reporter_id, reason, created_at)
+			VALUES (?, ?, ?, ?, ?, ?)
+			ON CONFLICT(target_type, target_id, reporter_id)
+			DO UPDATE SET reason = excluded.reason, created_at = excluded.created_at
+		`).run(id, targetType, targetId, user.id, reason || "Báo cáo vi phạm tiêu chuẩn cộng đồng.", createdAt);
+		syncDb(db);
+		sendJson(response, 201, { ok: true });
+		return;
+	}
+
+	if (method === "GET" && pathname === "/api/reports") {
+		requireModeratorOrAdmin(user);
+
+		const heapCompare = (a, b) => {
+			if (a.reportCount !== b.reportCount) return a.reportCount - b.reportCount;
+			return new Date(a.latestReportAt).getTime() - new Date(b.latestReportAt).getTime();
+		};
+
+		const postGroups = db.prepare(`
+			SELECT target_id, COUNT(*) AS report_count, MAX(created_at) AS latest_report_at
+			FROM reports
+			WHERE target_type = 'post'
+			GROUP BY target_id
+			HAVING COUNT(*) > 0
+		`).all();
+
+		const postHeap = new MaxHeap(heapCompare);
+		for (const group of postGroups) {
+			const postRow = db.prepare("SELECT * FROM posts WHERE id = ?").get(group.target_id);
+			if (!postRow) {
+				db.prepare("DELETE FROM reports WHERE target_type = 'post' AND target_id = ?").run(group.target_id);
+				continue;
+			}
+			const reasons = db.prepare(`
+				SELECT r.reason, r.created_at AS createdAt, u.name AS reporterName, u.email AS reporterEmail
+				FROM reports r
+				JOIN users u ON u.id = r.reporter_id
+				WHERE r.target_type = 'post' AND r.target_id = ?
+				ORDER BY r.created_at DESC
+			`).all(group.target_id);
+			postHeap.push({
+				targetType: "post",
+				targetId: group.target_id,
+				reportCount: Number(group.report_count),
+				latestReportAt: group.latest_report_at,
+				post: postForViewer(db, postRow, user.id),
+				reasons
+			});
+		}
+
+		const userGroups = db.prepare(`
+			SELECT target_id, COUNT(*) AS report_count, MAX(created_at) AS latest_report_at
+			FROM reports
+			WHERE target_type = 'user'
+			GROUP BY target_id
+			HAVING COUNT(*) > 0
+		`).all();
+
+		const userHeap = new MaxHeap(heapCompare);
+		for (const group of userGroups) {
+			const userRow = db.prepare("SELECT * FROM users WHERE id = ?").get(group.target_id);
+			if (!userRow) {
+				db.prepare("DELETE FROM reports WHERE target_type = 'user' AND target_id = ?").run(group.target_id);
+				continue;
+			}
+			const reasons = db.prepare(`
+				SELECT r.reason, r.created_at AS createdAt, u.name AS reporterName, u.email AS reporterEmail
+				FROM reports r
+				JOIN users u ON u.id = r.reporter_id
+				WHERE r.target_type = 'user' AND r.target_id = ?
+				ORDER BY r.created_at DESC
+			`).all(group.target_id);
+			const postsCount = db.prepare("SELECT COUNT(*) AS count FROM posts WHERE user_id = ? AND club_id IS NULL").get(userRow.id).count;
+			userHeap.push({
+				targetType: "user",
+				targetId: group.target_id,
+				reportCount: Number(group.report_count),
+				latestReportAt: group.latest_report_at,
+				account: { ...profileUser(db, userRow), postsCount },
+				reasons
+			});
+		}
+		syncDb(db);
+
+		sendJson(response, 200, {
+			reportedPosts: postHeap.toSortedArray(),
+			reportedUsers: userHeap.toSortedArray()
+		});
+		return;
+	}
+
+	const clearReportMatch = pathname.match(/^\/api\/reports\/(post|user)\/([^/]+)$/);
+	if (method === "DELETE" && clearReportMatch) {
+		requireModeratorOrAdmin(user);
+		const targetType = clearReportMatch[1];
+		const targetId = decodeURIComponent(clearReportMatch[2]);
+		db.prepare("DELETE FROM reports WHERE target_type = ? AND target_id = ?").run(targetType, targetId);
+		syncDb(db);
+		sendJson(response, 200, { ok: true });
+		return;
+	}
+
+	const clearUserPostsModMatch = pathname.match(/^\/api\/moderation\/users\/([^/]+)\/posts$/);
+	if (method === "DELETE" && clearUserPostsModMatch) {
+		requireModeratorOrAdmin(user);
+		const targetUserId = decodeURIComponent(clearUserPostsModMatch[1]);
+		db.prepare("DELETE FROM reports WHERE target_type = 'post' AND target_id IN (SELECT id FROM posts WHERE user_id = ?)").run(targetUserId);
+		db.prepare("DELETE FROM posts WHERE user_id = ?").run(targetUserId);
+		syncDb(db);
+		sendJson(response, 200, { ok: true });
+		return;
+	}
+
+	const deleteUserModMatch = pathname.match(/^\/api\/moderation\/users\/([^/]+)$/);
+	if (method === "DELETE" && deleteUserModMatch) {
+		requireAdmin(user);
+		const targetUserId = decodeURIComponent(deleteUserModMatch[1]);
+		if (targetUserId === user.id) throw makeError(400, "Không thể tự xóa tài khoản của chính mình.");
+		const target = db.prepare("SELECT id, is_admin FROM users WHERE id = ?").get(targetUserId);
+		if (!target) throw makeError(404, "Không tìm thấy tài khoản.");
+		if (target.is_admin) throw makeError(403, "Không thể xóa tài khoản Admin khác.");
+		db.prepare("DELETE FROM reports WHERE (target_type = 'user' AND target_id = ?) OR (target_type = 'post' AND target_id IN (SELECT id FROM posts WHERE user_id = ?))").run(targetUserId, targetUserId);
+		db.prepare("DELETE FROM users WHERE id = ?").run(targetUserId);
+		syncDb(db);
+		sendJson(response, 200, { ok: true });
 		return;
 	}
 
@@ -984,12 +1476,14 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		if (!["approved", "rejected"].includes(body.status)) throw makeError(400, "Trạng thái duyệt không hợp lệ.");
 		const clubId = decodeURIComponent(clubDecision[1]);
 		const result = db.prepare("UPDATE clubs SET status = ?, decided_by = ?, decided_at = ? WHERE id = ? AND status = 'pending'")
-			.run(body.status, user.id, new Date().toISOString(), clubId); syncDb(db);
+			.run(body.status, user.id, new Date().toISOString(), clubId);
+		syncDb(db);
 		if (!result.changes) throw makeError(404, "Không tìm thấy yêu cầu CLB đang chờ duyệt.");
 		sendJson(response, 200, { club: clubForViewer(db, db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId)) });
 		return;
 	}
 
+	// ĐĂNG THÔNG BÁO CLB (hỗ trợ đính kèm ảnh và/hoặc tệp: 0, 1 hoặc 2 đều được)
 	const clubPost = pathname.match(/^\/api\/clubs\/([^/]+)\/posts$/);
 	if (method === "POST" && clubPost) {
 		const clubId = decodeURIComponent(clubPost[1]);
@@ -998,12 +1492,54 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const clubData = clubForViewer(db, club);
 		const isClubManager = club.manager_id === user.id || clubData.managerEmails.some(e => String(e || "").toLowerCase() === user.email.toLowerCase());
 		if (!user.isAdmin && !isClubManager) throw makeError(403, "Chỉ quản lý CLB hoặc admin mới được đăng thông báo.");
-		const body = await readJson(request);
-		const content = String(body.content || "").trim();
+
+		const contentType = request.headers["content-type"] || "";
+		let content = "";
+		let image = "";
+		let fUrl = "";
+		let fName = "";
+		let fType = "";
+		let fSize = 0;
+
+		if (contentType.startsWith("multipart/form-data")) {
+			const parts = await parseMultipart(request);
+			const fields = {};
+			const fileParts = {};
+			for (const part of parts) {
+				if (part.fileName && part.body.length) fileParts[part.name] = part;
+				else fields[part.name] = part.body.toString("utf8");
+			}
+			content = String(fields.content || "").trim();
+			if (fields.image) {
+				image = validateDataOrHttpImage(fields.image, { required: false, allowDefault: false });
+			}
+			if (!image && fileParts.image_file) {
+				const savedImg = saveUploadedFile(db, fileParts.image_file, new Set([".png", ".jpg", ".jpeg", ".webp", ".gif"]));
+				if (savedImg) image = savedImg.fileUrl;
+			}
+			if (fileParts.attachment_file) {
+				const savedFile = saveUploadedFile(db, fileParts.attachment_file);
+				if (savedFile) {
+					fUrl = savedFile.fileUrl;
+					fName = savedFile.fileName;
+					fType = savedFile.fileType;
+					fSize = savedFile.fileSize;
+				}
+			}
+		} else {
+			const body = await readJson(request);
+			content = String(body.content || "").trim();
+			if (body.image) image = validateDataOrHttpImage(body.image, { required: false, allowDefault: false });
+		}
+
 		if (!content || content.length > 10000) throw makeError(400, "Nội dung thông báo không hợp lệ.");
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
-		db.prepare("INSERT INTO club_posts(id, club_id, author_id, content, created_at) VALUES (?, ?, ?, ?, ?)").run(id, clubId, user.id, content, createdAt); syncDb(db);
+		db.prepare(`
+			INSERT INTO club_posts(id, club_id, author_id, content, image, file_url, file_name, file_type, file_size, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`).run(id, clubId, user.id, content, image, fUrl, fName, fType, fSize, createdAt);
+		syncDb(db);
 		sendJson(response, 201, { ok: true, id, createdAt });
 		return;
 	}
@@ -1014,14 +1550,15 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			name: String(body.name || "").trim(),
 			email: validateEmail(body.email || user.email),
 			student_class: String(body.studentClass || "Học sinh NQD").trim().slice(0, 80),
-			avatar: String(body.avatar || "./DIEU.png").trim().slice(0, 1000),
-			cover: String(body.cover || "").trim().slice(0, 2000),
+			avatar: validateDataOrHttpImage(body.avatar || "./DIEU.png", { required: false, allowDefault: true }) || "./DIEU.png",
+			cover: validateDataOrHttpImage(body.cover || "", { required: false, allowDefault: false }),
 			bio: String(body.bio || "").trim().slice(0, 500)
 		};
 		if (!fields.name) throw makeError(400, "Tên hiển thị không được để trống.");
 		try {
 			db.prepare("UPDATE users SET name = ?, email = ?, student_class = ?, avatar = ?, cover = ?, bio = ? WHERE id = ?")
-				.run(fields.name, fields.email, fields.student_class, fields.avatar, fields.cover, fields.bio, user.id); syncDb(db);
+				.run(fields.name, fields.email, fields.student_class, fields.avatar, fields.cover, fields.bio, user.id);
+			syncDb(db);
 		} catch {
 			throw makeError(409, "Email này đã được tài khoản khác sử dụng.");
 		}
@@ -1043,17 +1580,14 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		if (contentType.startsWith("multipart/form-data")) {
 			const parts = await parseMultipart(request);
 			for (const part of parts) {
-				if (part.fileName) filePart = part;
+				if (part.fileName && part.body.length) filePart = part;
 				else fields[part.name] = part.body.toString("utf8");
 			}
 		} else {
 			fields = await readJson(request);
 		}
 
-		const isResource = contentType.startsWith("multipart/form-data")
-			|| fields.type === "study-resource"
-			|| Boolean(fields.resource_title);
-
+		const isResource = fields.type === "study-resource" || Boolean(fields.resource_title);
 		const visibility = fields.visibility === "private" ? "private" : "public";
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
@@ -1069,10 +1603,16 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			const coverColor = /^#[0-9a-f]{6}$/i.test(rawColor) ? rawColor : "#6aa68d";
 
 			if (!title) throw makeError(400, "Tiêu đề tài liệu không được để trống.");
+			if (!link && !filePart) {
+				throw makeError(400, "Vui lòng nhập liên kết tài liệu hoặc chọn tệp đính kèm (cần ít nhất 1 trong 2).");
+			}
+			if (link && !/^https?:\/\/\S+/i.test(link)) {
+				throw makeError(400, "Liên kết tài liệu phải bắt đầu bằng http:// hoặc https://.");
+			}
 
 			let fUrl = "", fName = "", fType = "", fSize = 0;
 			if (filePart) {
-				const saved = saveUploadedFile(filePart);
+				const saved = saveUploadedFile(db, filePart);
 				if (saved) {
 					fUrl = saved.fileUrl;
 					fName = saved.fileName;
@@ -1084,11 +1624,11 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			const content = title + (description ? " - " + description : "");
 			db.prepare(`
 				INSERT INTO posts(
-					id, user_id, type, content, image, visibility, created_at,
+					id, user_id, type, content, content_html, image, visibility, created_at,
 					resource_title, resource_description, resource_link,
 					resource_grade, resource_track, resource_subject,
 					resource_file_url, resource_file_name, resource_file_type, resource_file_size, resource_cover_color
-				) VALUES (?, ?, 'study-resource', ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				) VALUES (?, ?, 'study-resource', ?, '', '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			`).run(
 				id, user.id, content, visibility, createdAt,
 				title, description, link, grade, track, subject,
@@ -1097,11 +1637,12 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			syncDb(db);
 		} else {
 			const content = String(fields.content || "").trim();
-			const image = String(fields.image || "").trim().slice(0, 2000);
+			const contentHtml = sanitizeRichPostHtml(db, fields.contentHtml || "", content);
+			const image = validateDataOrHttpImage(fields.image || "", { required: false, allowDefault: false });
 			const clubId = fields.clubId ? String(fields.clubId).trim() : null;
 
 			if (!content || content.length > 5000) {
-				throw makeError(400, "Nội dung bài viết không hợp lệ.");
+				throw makeError(400, "Nội dung bài viết không hợp lệ (1 - 5000 ký tự).");
 			}
 
 			if (clubId) {
@@ -1113,9 +1654,9 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			}
 
 			db.prepare(`
-				INSERT INTO posts(id, user_id, club_id, type, content, image, visibility, created_at)
-				VALUES (?, ?, ?, 'post', ?, ?, ?, ?)
-			`).run(id, user.id, clubId, content, image, visibility, createdAt);
+				INSERT INTO posts(id, user_id, club_id, type, content, content_html, image, visibility, created_at)
+				VALUES (?, ?, ?, 'post', ?, ?, ?, ?, ?)
+			`).run(id, user.id, clubId, content, contentHtml, image, visibility, createdAt);
 			syncDb(db);
 		}
 
@@ -1125,9 +1666,10 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 	if (method === "DELETE" && deletePost) {
-		const post = db.prepare("SELECT user_id, club_id FROM posts WHERE id = ?").get(decodeURIComponent(deletePost[1]));
+		const postId = decodeURIComponent(deletePost[1]);
+		const post = db.prepare("SELECT user_id, club_id FROM posts WHERE id = ?").get(postId);
 		if (!post) throw makeError(404, "Không tìm thấy bài viết.");
-		let canDelete = post.user_id === user.id || user.isAdmin;
+		let canDelete = post.user_id === user.id || user.isAdmin || user.isModerator;
 		if (!canDelete && post.club_id) {
 			const clubRow = db.prepare("SELECT * FROM clubs WHERE id = ?").get(post.club_id);
 			if (clubRow) {
@@ -1135,8 +1677,10 @@ async function handleApi({ request, response, url, db, env, secure }) {
 				canDelete = clubData.managerEmails.some(e => String(e || "").toLowerCase() === user.email.toLowerCase());
 			}
 		}
-		if (!canDelete) throw makeError(403, "Chỉ người đăng mới có thể xóa bài viết này.");
-		db.prepare("DELETE FROM posts WHERE id = ?").run(decodeURIComponent(deletePost[1])); syncDb(db);
+		if (!canDelete) throw makeError(403, "Chỉ người đăng, quản trị viên hoặc Ban duyệt bài mới có thể xóa bài viết này.");
+		db.prepare("DELETE FROM reports WHERE target_type = 'post' AND target_id = ?").run(postId);
+		db.prepare("DELETE FROM posts WHERE id = ?").run(postId);
+		syncDb(db);
 		sendJson(response, 200, { ok: true });
 		return;
 	}
@@ -1148,11 +1692,10 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const body = await readJson(request);
 		if (body.liked) {
 			db.prepare("INSERT OR IGNORE INTO post_likes(post_id, user_id, created_at) VALUES (?, ?, ?)").run(post.id, user.id, new Date().toISOString());
-			syncDb(db);
 		} else {
 			db.prepare("DELETE FROM post_likes WHERE post_id = ? AND user_id = ?").run(post.id, user.id);
-			syncDb(db);
 		}
+		syncDb(db);
 		const likes = db.prepare("SELECT COUNT(*) AS count FROM post_likes WHERE post_id = ?").get(post.id).count;
 		sendJson(response, 200, { likes });
 		return;
@@ -1167,8 +1710,9 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		if (!content || content.length > 2000) throw makeError(400, "Bình luận không hợp lệ.");
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
-		db.prepare("INSERT INTO post_comments(id, post_id, user_id, content, created_at) VALUES (?, ?, ?, ?, ?)").run(id, post.id, user.id, content, createdAt); syncDb(db);
-		sendJson(response, 201, { comment: { id, text: content, name: user.name, avatar: user.avatar, createdAt } });
+		db.prepare("INSERT INTO post_comments(id, post_id, user_id, content, created_at) VALUES (?, ?, ?, ?, ?)").run(id, post.id, user.id, content, createdAt);
+		syncDb(db);
+		sendJson(response, 201, { comment: { id, text: content, userId: user.id, name: user.name, avatar: user.avatar, createdAt } });
 		return;
 	}
 
@@ -1190,10 +1734,11 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const pair = [user.id, friendId].sort();
 		db.exec("BEGIN");
 		try {
-			const result = db.prepare("DELETE FROM friendships WHERE user_low = ? AND user_high = ?").run(pair[0], pair[1]); syncDb(db);
+			const result = db.prepare("DELETE FROM friendships WHERE user_low = ? AND user_high = ?").run(pair[0], pair[1]);
 			if (!result.changes) throw makeError(404, "Hai tài khoản hiện không phải bạn bè.");
 			db.prepare("DELETE FROM friend_requests WHERE status = 'accepted' AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))")
-				.run(user.id, friendId, friendId, user.id); syncDb(db);
+				.run(user.id, friendId, friendId, user.id);
+			syncDb(db);
 			db.exec("COMMIT");
 		} catch (error) {
 			db.exec("ROLLBACK");
@@ -1212,7 +1757,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		if (status === "incoming") throw makeError(409, "Người này đã gửi lời mời cho bạn.");
 		if (status === "outgoing") throw makeError(409, "Bạn đã gửi lời mời rồi.");
 		db.prepare("INSERT INTO friend_requests(id, sender_id, receiver_id, status, created_at) VALUES (?, ?, ?, 'pending', ?)")
-			.run(randomBytes(16).toString("hex"), user.id, targetId, new Date().toISOString()); syncDb(db);
+			.run(randomBytes(16).toString("hex"), user.id, targetId, new Date().toISOString());
+		syncDb(db);
 		sendJson(response, 201, { ok: true });
 		return;
 	}
@@ -1223,16 +1769,18 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const requestRow = db.prepare("SELECT * FROM friend_requests WHERE sender_id = ? AND receiver_id = ? AND status = 'pending'").get(senderId, user.id);
 		if (!requestRow) throw makeError(404, "Không tìm thấy lời mời.");
 		if (friendAction[2] === "reject") {
-			db.prepare("UPDATE friend_requests SET status = 'rejected' WHERE id = ?").run(requestRow.id); syncDb(db);
+			db.prepare("UPDATE friend_requests SET status = 'rejected' WHERE id = ?").run(requestRow.id);
+			syncDb(db);
 			sendJson(response, 200, { ok: true });
 			return;
 		}
 		const pair = [user.id, senderId].sort();
 		db.exec("BEGIN");
 		try {
-			db.prepare("UPDATE friend_requests SET status = 'accepted' WHERE id = ?").run(requestRow.id); syncDb(db);
-			db.prepare("INSERT OR IGNORE INTO friendships(user_low, user_high, created_at) VALUES (?, ?, ?)").run(pair[0], pair[1], new Date().toISOString()); syncDb(db);
+			db.prepare("UPDATE friend_requests SET status = 'accepted' WHERE id = ?").run(requestRow.id);
+			db.prepare("INSERT OR IGNORE INTO friendships(user_low, user_high, created_at) VALUES (?, ?, ?)").run(pair[0], pair[1], new Date().toISOString());
 			ensureConversation(db, pair[0], pair[1]);
+			syncDb(db);
 			db.exec("COMMIT");
 		} catch (error) {
 			db.exec("ROLLBACK");
@@ -1265,9 +1813,10 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const createdAt = new Date().toISOString();
 		db.exec("BEGIN");
 		try {
-			db.prepare("INSERT INTO conversations(id, type, name, created_by, created_at) VALUES (?, 'group', ?, ?, ?)").run(id, name, user.id, createdAt); syncDb(db);
+			db.prepare("INSERT INTO conversations(id, type, name, created_by, created_at) VALUES (?, 'group', ?, ?, ?)").run(id, name, user.id, createdAt);
 			const addMember = db.prepare("INSERT INTO conversation_members(conversation_id, user_id, joined_at) VALUES (?, ?, ?)");
-			[user.id, ...memberIds].forEach(memberId => addMember.run(id, memberId, createdAt)); syncDb(db);
+			[user.id, ...memberIds].forEach(memberId => addMember.run(id, memberId, createdAt));
+			syncDb(db);
 			db.exec("COMMIT");
 		} catch (error) {
 			db.exec("ROLLBACK");
@@ -1283,7 +1832,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const conversation = db.prepare("SELECT type, created_by FROM conversations WHERE id = ?").get(conversationId);
 		if (!conversation || conversation.type !== "group") throw makeError(404, "Không tìm thấy nhóm chat.");
 		if (conversation.created_by !== user.id) throw makeError(403, "Chỉ người tạo nhóm mới có thể xóa nhóm này.");
-		db.prepare("DELETE FROM conversations WHERE id = ?").run(conversationId); syncDb(db);
+		db.prepare("DELETE FROM conversations WHERE id = ?").run(conversationId);
+		syncDb(db);
 		sendJson(response, 200, { ok: true });
 		return;
 	}
@@ -1306,17 +1856,14 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		if (!content || content.length > 1000) throw makeError(400, "Tin nhắn không hợp lệ.");
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
-		db.prepare("INSERT INTO messages(id, conversation_id, sender_id, content, created_at) VALUES (?, ?, ?, ?, ?)").run(id, conversationId, user.id, content, createdAt); syncDb(db);
+		db.prepare("INSERT INTO messages(id, conversation_id, sender_id, content, created_at) VALUES (?, ?, ?, ?, ?)").run(id, conversationId, user.id, content, createdAt);
+		syncDb(db);
 		sendJson(response, 201, { message: { id, text: content, fromId: user.id, name: user.name, avatar: user.avatar, createdAt } });
 		return;
 	}
 
 	if (method === "GET" && pathname.startsWith("/uploads/")) {
-		const fileName = path.basename(decodeURIComponent(pathname.slice("/uploads/".length)));
-		const filePath = path.join(UPLOAD_DIR, fileName);
-		if (!existsSync(filePath) || !statSync(filePath).isFile()) throw makeError(404, "Không tìm thấy tệp.");
-		response.writeHead(200, { "Content-Type": MIME_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream" });
-		createReadStream(filePath).pipe(response);
+		serveUpload(db, url, response);
 		return;
 	}
 	throw makeError(404, "Không tìm thấy API.");

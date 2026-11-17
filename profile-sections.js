@@ -1,5 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
-	if (new URLSearchParams(window.location.search).get("clubId")) return;
+	const params = new URLSearchParams(window.location.search);
+	if (params.get("clubId")) return;
+	const targetUserId = params.get("userId");
 
 	const achievementsList = document.getElementById("profile-achievements-list");
 	const interestsList = document.getElementById("profile-interests-list");
@@ -9,8 +11,19 @@ document.addEventListener("DOMContentLoaded", () => {
 	const albumStatus = document.getElementById("album-status");
 	const allowedImageTypes = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
+	function getToken() {
+		try {
+			return localStorage.getItem("session_token")
+				|| localStorage.getItem("dieuNwToken")
+				|| JSON.parse(localStorage.getItem("dieuNwUser") || "{}").token
+				|| "";
+		} catch {
+			return localStorage.getItem("session_token") || localStorage.getItem("dieuNwToken") || "";
+		}
+	}
+
 	async function api(url, options = {}) {
-		const token = localStorage.getItem("session_token");
+		const token = getToken();
 		const headers = {
 			...(token ? { Authorization: `Bearer ${token}` } : {}),
 			...(options.headers || {})
@@ -62,10 +75,11 @@ document.addEventListener("DOMContentLoaded", () => {
 		return button;
 	}
 
-	function renderAchievements(achievements) {
+	function renderAchievements(achievements, readOnly = false) {
+		if (!achievementsList) return;
 		achievementsList.replaceChildren();
 		if (!achievements.length) {
-			achievementsList.append(makeElement("p", "profile-extra-empty", "Thành tích bạn thêm sẽ hiện ở đây."));
+			achievementsList.append(makeElement("p", "profile-extra-empty", readOnly ? "Chưa có thành tích được chia sẻ." : "Thành tích bạn thêm sẽ hiện ở đây."));
 			return;
 		}
 		for (const achievement of achievements) {
@@ -84,29 +98,35 @@ document.addEventListener("DOMContentLoaded", () => {
 				certificate.append(image, makeElement("span", "", "Xem chứng nhận"));
 				item.append(certificate);
 			}
-			item.append(makeDeleteButton(`thành tích ${achievement.title}`, `/api/profile/achievements/${encodeURIComponent(achievement.id)}`, loadSections));
+			if (!readOnly) {
+				item.append(makeDeleteButton(`thành tích ${achievement.title}`, `/api/profile/achievements/${encodeURIComponent(achievement.id)}`, loadSections));
+			}
 			achievementsList.append(item);
 		}
 	}
 
-	function renderInterests(interests) {
+	function renderInterests(interests, readOnly = false) {
+		if (!interestsList) return;
 		interestsList.replaceChildren();
 		if (!interests.length) {
-			interestsList.append(makeElement("p", "profile-extra-empty", "Thêm vài điều bạn yêu thích."));
+			interestsList.append(makeElement("p", "profile-extra-empty", readOnly ? "Chưa có sở thích nào." : "Thêm vài điều bạn yêu thích."));
 			return;
 		}
 		for (const interest of interests) {
 			const tag = makeElement("span", "profile-interest-tag");
 			tag.append(makeElement("span", "", interest.name));
-			tag.append(makeDeleteButton(`sở thích ${interest.name}`, `/api/profile/interests/${encodeURIComponent(interest.id)}`, loadSections));
+			if (!readOnly) {
+				tag.append(makeDeleteButton(`sở thích ${interest.name}`, `/api/profile/interests/${encodeURIComponent(interest.id)}`, loadSections));
+			}
 			interestsList.append(tag);
 		}
 	}
 
-	function renderAlbum(photos) {
+	function renderAlbum(photos, readOnly = false) {
+		if (!albumList) return;
 		albumList.replaceChildren();
 		if (!photos.length) {
-			albumList.append(makeElement("p", "profile-extra-empty", "Ảnh bạn thêm vào album sẽ hiện ở đây."));
+			albumList.append(makeElement("p", "profile-extra-empty", readOnly ? "Chưa có ảnh trong album." : "Ảnh bạn thêm vào album sẽ hiện ở đây."));
 			return;
 		}
 		for (const photo of photos) {
@@ -117,16 +137,33 @@ document.addEventListener("DOMContentLoaded", () => {
 			image.loading = "lazy";
 			item.append(image);
 			if (photo.caption) item.append(makeElement("p", "profile-album-caption", photo.caption));
-			item.append(makeDeleteButton("ảnh trong album", `/api/profile/photos/${encodeURIComponent(photo.id)}`, loadSections));
+			if (!readOnly) {
+				item.append(makeDeleteButton("ảnh trong album", `/api/profile/photos/${encodeURIComponent(photo.id)}`, loadSections));
+			}
 			albumList.append(item);
+		}
+	}
+
+	window.renderFriendSections = (sections = {}) => {
+		renderAchievements(sections.achievements || [], true);
+		renderInterests(sections.interests || [], true);
+		renderAlbum(sections.photos || [], true);
+	};
+
+	if (targetUserId) {
+		const me = (() => {
+			try { return JSON.parse(localStorage.getItem("dieuNwUser") || "null"); } catch { return null; }
+		})();
+		if (!me || String(me.id) !== String(targetUserId)) {
+			return;
 		}
 	}
 
 	async function loadSections() {
 		const data = await api("/api/profile/sections");
-		renderAchievements(data.achievements);
-		renderInterests(data.interests);
-		renderAlbum(data.photos);
+		renderAchievements(data.achievements || [], false);
+		renderInterests(data.interests || [], false);
+		renderAlbum(data.photos || [], false);
 	}
 
 	document.getElementById("achievement-form")?.addEventListener("submit", async event => {
@@ -199,12 +236,12 @@ document.addEventListener("DOMContentLoaded", () => {
 	});
 
 	window.addEventListener("dieu-profile-ready", () => loadSections().catch(error => {
-		achievementStatus.textContent = error.message || "Không thể tải dữ liệu hồ sơ.";
+		if (achievementStatus) achievementStatus.textContent = error.message || "Không thể tải dữ liệu hồ sơ.";
 	}));
 
 	api("/api/auth/me")
 		.then(data => data.user ? loadSections() : null)
 		.catch(error => {
-			achievementStatus.textContent = error.message || "Không thể tải dữ liệu hồ sơ.";
+			if (achievementStatus) achievementStatus.textContent = error.message || "Không thể tải dữ liệu hồ sơ.";
 		});
 });

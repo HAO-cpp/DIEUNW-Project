@@ -1,290 +1,367 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="style.css">
-    <link rel="icon" type="image/png" href="./DIEU.png?v=1">
-    <title>DIEUNW - Trang Cá Nhân</title>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="stylesheet" href="./style.css">
+	<link rel="icon" type="image/png" href="./DIEU.png?v=1">
+	<title>DIEUNW - Trang Cá Nhân</title>
 </head>
 <body class="profile-page">
-    <!-- Thanh điều hướng Navbar -->
-    <header class="navbar">
-        <div class="nav-left">
-            <a href="./index.html" class="brand-logo-link">
-                <img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo">
-            </a>
-        </div>
-        <nav class="nav-menu">
-            <a href="./index.html" class="nav-item">Trang chủ</a>
-            <a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
-            <a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
-            <a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
-            <a href="./friends.html" class="nav-item">Bạn bè</a>
-            <a href="./messages.html" class="nav-item">Tin nhắn</a>
-            <a href="./clubs.html" class="nav-item">CLB</a>
-            <a href="./announcements.html" class="nav-item">Thông báo</a>
-        </nav>
-        <div class="nav-right">
-            <a href="./profile.html" class="nav-avatar-link active" aria-label="Trang cá nhân" title="Trang cá nhân" aria-current="page">
-                <img class="nav-user-avatar" src="./DIEU.png" alt="">
-            </a>
-        </div>
-    </header>
+	<header class="navbar">
+		<div class="nav-left">
+			<a href="./index.html" class="brand-logo-link">
+				<img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo">
+			</a>
+		</div>
+		<nav class="nav-menu">
+			<a href="./index.html" class="nav-item">Trang chủ</a>
+			<a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
+			<a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
+			<a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
+			<a href="./friends.html" class="nav-item">Bạn bè</a>
+			<a href="./messages.html" class="nav-item">Tin nhắn</a>
+			<a href="./clubs.html" class="nav-item">CLB</a>
+			<a href="./announcements.html" class="nav-item">Thông báo</a>
+		</nav>
+		<div class="nav-right">
+			<a href="./profile.html" class="nav-avatar-link active" aria-label="Trang cá nhân" title="Trang cá nhân" aria-current="page">
+				<img class="nav-user-avatar" src="./DIEU.png" alt="">
+			</a>
+		</div>
+	</header>
 
-    <!-- KHU VỰC NỘI DUNG CHÍNH -->
-    <main class="main-content page-enter">
-        
-        <!-- 1. Hộp thoại Tài khoản 3 trong 1 (Đăng nhập / Đăng ký / Quên mật khẩu) -->
-        <div id="auth-container" class="auth-box">
-            
-            <!-- TAB 1: ĐĂNG NHẬP -->
-            <div id="login-view">
-                <h2>Chào mừng bạn đã trở lại DIEUNW</h2>
-                <p class="auth-subtitle">Nhập Email trường và mật khẩu để truy cập góc học tập.</p>
-                <div class="input-group">
-                    <input type="email" id="login-email" placeholder="Email trường (@nqd.edu.vn)">
-                </div>
-                <div class="input-group" style="position: relative;">
-                    <input 
-                        type="password" 
-                        id="login-password" 
-                        placeholder="Mật khẩu của bạn" 
-                        style="padding-right: 40px;"
-                    >
-                    <button 
-                        type="button" 
-                        id="toggle-password" 
-                        aria-label="Hiện mật khẩu"
-                        style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #65676b; padding: 0; display: flex; align-items: center;"
-                    >
-                        <svg id="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                    </button>
-                </div>
+	<main class="main-content page-enter">
+		<!-- 1. Hộp thoại Tài khoản 3 trong 1 -->
+		<div id="auth-container" class="auth-box">
+			<div id="login-view">
+				<h2>Chào mừng bạn đã trở lại DIEUNW</h2>
+				<p class="auth-subtitle">Nhập Email trường và mật khẩu để truy cập góc học tập.</p>
+				<div class="input-group">
+					<input type="email" id="login-email" placeholder="Email trường (@nqd.edu.vn)">
+				</div>
+				<div class="input-group" style="position: relative;">
+					<input type="password" id="login-password" placeholder="Mật khẩu của bạn" style="padding-right: 40px;">
+					<button type="button" id="toggle-password" aria-label="Hiện mật khẩu" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #65676b; padding: 0; display: flex; align-items: center;">
+						<svg id="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+							<circle cx="12" cy="12" r="3"></circle>
+						</svg>
+					</button>
+				</div>
+				<button id="btn-login" class="btn-auth" type="button">Đăng nhập</button>
+				<div style="margin-top: 15px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px;">
+					<a href="#" id="link-to-forgot" style="color: #65676b; text-decoration: none;">Quên mật khẩu?</a>
+					<p>Chưa có tài khoản? <a href="#" id="link-to-register" style="color: #0078ff; font-weight: 600; text-decoration: none;">Đăng ký</a></p>
+				</div>
+			</div>
 
-                <button id="btn-login" class="btn-auth">Đăng nhập</button>
-                <div style="margin-top: 15px; display: flex; flex-direction: column; justify-content: space-between; font-size: 13.5px;">
-                    <a href="#" id="link-to-forgot" style="color: #65676b; text-decoration: none;">Quên mật khẩu?</a>
-                    <p>Chưa có tài khoản? <a href="#" id="link-to-register" style="color: #0078ff; font-weight: 600; text-decoration: none;">Đăng ký</a></p>
-                </div>
-            </div>
+			<div id="register-view" style="display: none;">
+				<h2>Đăng Ký Học Sinh NQD</h2>
+				<p class="auth-subtitle">Xác thực email trường 1 lần duy nhất để tạo tài khoản.</p>
+				<div id="reg-step-1">
+					<div class="input-group"><input type="text" id="reg-name" placeholder="Tên hiển thị (VD: Nguyễn Văn Diệu)"></div>
+					<div class="input-group"><input type="email" id="reg-email" placeholder="Email trường (@nqd.edu.vn)"></div>
+					<div class="input-group"><input type="password" id="reg-password" placeholder="Tạo mật khẩu (tối thiểu 8 ký tự)"></div>
+					<button id="btn-reg-send-otp" class="btn-auth" type="button">Gửi mã xác nhận Email</button>
+				</div>
+				<div id="reg-step-2" style="display: none; margin-top: 15px;">
+					<p class="otp-notice">Mã OTP đã được gửi đến email của bạn.</p>
+					<div class="input-group"><input type="text" id="reg-otp-input" placeholder="Nhập mã OTP 6 số" maxlength="6"></div>
+					<button id="btn-reg-verify" class="btn-auth btn-success" type="button">Hoàn tất Đăng ký</button>
+				</div>
+				<p style="margin-top: 15px; font-size: 13.5px;">
+					<a href="#" class="link-to-login" style="color: #0078ff; text-decoration: none;">← Quay lại Đăng nhập</a>
+				</p>
+			</div>
 
-            <!-- TAB 2: ĐĂNG KÝ TÀI KHOẢN MỚI -->
-            <div id="register-view" style="display: none;">
-                <h2>Đăng Ký Học Sinh NQD</h2>
-                <p class="auth-subtitle">Xác thực email trường 1 lần duy nhất để tạo tài khoản.</p>
-                
-                <div id="reg-step-1">
-                    <div class="input-group">
-                        <input type="text" id="reg-name" placeholder="Tên hiển thị (VD: Nguyễn Văn Diệu)">
-                    </div>
-                    <div class="input-group">
-                        <input type="email" id="reg-email" placeholder="Email trường (@nqd.edu.vn)">
-                    </div>
-                    <div class="input-group">
-                        <input type="password" id="reg-password" placeholder="Tạo mật khẩu (tối thiểu 8 ký tự)">
-                    </div>
-                    <button id="btn-reg-send-otp" class="btn-auth">Gửi mã xác nhận Email</button>
-                </div>
+			<div id="forgot-view" style="display: none;">
+				<h2>🔑 Khôi Phục Mật Khẩu</h2>
+				<p class="auth-subtitle">Nhập email đã đăng ký để nhận mã đặt lại mật khẩu.</p>
+				<div id="forgot-step-1">
+					<div class="input-group"><input type="email" id="forgot-email" placeholder="Email trường (@nqd.edu.vn)"></div>
+					<button id="btn-forgot-send-otp" class="btn-auth" type="button">Gửi mã khôi phục</button>
+				</div>
+				<div id="forgot-step-2" style="display: none; margin-top: 15px;">
+					<p class="otp-notice">Mã khôi phục đã được gửi đến email của bạn.</p>
+					<div class="input-group"><input type="text" id="forgot-otp-input" placeholder="Nhập mã OTP 6 số" maxlength="6"></div>
+					<div class="input-group"><input type="password" id="forgot-new-password" placeholder="Nhập mật khẩu mới (tối thiểu 8 ký tự)"></div>
+					<button id="btn-forgot-reset" class="btn-auth btn-success" type="button">Đổi mật khẩu mới</button>
+				</div>
+				<p style="margin-top: 15px; font-size: 13.5px;">
+					<a href="#" class="link-to-login" style="color: #0078ff; text-decoration: none;">← Quay lại Đăng nhập</a>
+				</p>
+			</div>
+		</div>
 
-                <div id="reg-step-2" style="display: none; margin-top: 15px;">
-                    <p class="otp-notice">Mã OTP đã được gửi đến email của bạn.</p>
-                    <div class="input-group">
-                        <input type="text" id="reg-otp-input" placeholder="Nhập mã OTP 6 số" maxlength="6">
-                    </div>
-                    <button id="btn-reg-verify" class="btn-auth btn-success">Hoàn tất Đăng ký</button>
-                </div>
+		<!-- 2. Hồ sơ cá nhân / Hồ sơ bạn bè / Fanpage CLB -->
+		<div id="profile-container" style="display: none; max-width: 680px; margin: 30px auto;">
+			<div class="profile-card-box" style="max-width: 100%; margin: 0 0 25px 0;">
+				<div class="profile-cover">
+					<img id="profile-cover-image" alt="Ảnh bìa hồ sơ">
+				</div>
+				<div class="profile-header-info">
+					<img id="user-display-avatar" src="./DIEU.png" alt="Avatar" class="profile-avatar-large">
+					<h1 id="user-display-name" class="profile-main-name">Tên Học Sinh</h1>
+					<p id="user-display-email" class="profile-sub-email">email@nqd.edu.vn</p>
+					<p id="user-display-class" class="user-class-badge">Học sinh trường NQD</p>
+					<div id="profile-role-tags" class="profile-role-tags" aria-label="Vai trò"></div>
+					<p id="user-display-bio" class="user-bio-text">Chào mừng đến với góc học tập của mình trên DIEUNW!</p>
+					<span class="verified-badge">✓ Đã xác thực học sinh trường NQD</span>
+				</div>
 
-                <p style="margin-top: 15px; font-size: 13.5px;">
-                    <a href="#" class="link-to-login" style="color: #0078ff; text-decoration: none;">← Quay lại Đăng nhập</a>
-                </p>
-            </div>
+				<div class="profile-stats">
+					<div class="stat-item">
+						<strong id="stat-posts">0</strong>
+						<span>Bài viết</span>
+					</div>
+					<div class="stat-item">
+						<strong id="stat-likes">0</strong>
+						<span>Lượt thích</span>
+					</div>
+				</div>
 
-            <!-- TAB 3: QUÊN MẬT KHẨU -->
-            <div id="forgot-view" style="display: none;">
-                <h2>🔑 Khôi Phục Mật Khẩu</h2>
-                <p class="auth-subtitle">Nhập email đã đăng ký để nhận mã đặt lại mật khẩu.</p>
-                
-                <div id="forgot-step-1">
-                    <div class="input-group">
-                        <input type="email" id="forgot-email" placeholder="Email trường (@nqd.edu.vn)">
-                    </div>
-                    <button id="btn-forgot-send-otp" class="btn-auth">Gửi mã khôi phục</button>
-                </div>
+				<div class="profile-actions" id="profile-actions-bar">
+					<button id="btn-edit-profile" class="btn-auth" type="button" style="width: auto; padding: 10px 20px;">Chỉnh sửa hồ sơ</button>
+					<button id="btn-logout" class="btn-logout" type="button" style="margin-top: 0;">Đăng xuất</button>
+					<a id="btn-friend-message" class="btn-auth" href="./messages.html" hidden style="width:auto; padding:10px 20px; text-decoration:none;">Nhắn tin</a>
+					<a id="btn-friend-back" class="btn-timer outline" href="./friends.html" hidden style="padding:10px 18px; text-decoration:none;">← Quay lại Bạn bè</a>
+					<button id="btn-report-account" class="post-report-button" type="button" hidden>⚑ Báo cáo tài khoản</button>
+				</div>
 
-                <div id="forgot-step-2" style="display: none; margin-top: 15px;">
-                    <p class="otp-notice">Mã khôi phục đã được gửi đến email của bạn.</p>
-                    <div class="input-group">
-                        <input type="text" id="forgot-otp-input" placeholder="Nhập mã OTP 6 số" maxlength="6">
-                    </div>
-                    <div class="input-group">
-                        <input type="password" id="forgot-new-password" placeholder="Nhập mật khẩu mới (tối thiểu 8 ký tự)">
-                    </div>
-                    <button id="btn-forgot-reset" class="btn-auth btn-success">Đổi mật khẩu mới</button>
-                </div>
+				<!-- Form chỉnh sửa thông tin (upload ảnh từ máy) -->
+				<div id="edit-profile-form" class="edit-form-box" style="display: none;">
+					<h2 id="update">Cập nhật thông tin cá nhân</h2>
+					<div class="input-group">
+						<input type="text" id="edit-name-input" placeholder="Tên hiển thị mới (VD: Nguyễn Văn Diệu)">
+					</div>
+					<div class="input-group">
+						<input type="email" id="edit-email-input" placeholder="Email hiển thị">
+					</div>
+					<div class="input-group">
+						<input type="text" id="edit-class-input" placeholder="Lớp của bạn (VD: 10TH)">
+					</div>
 
-                <p style="margin-top: 15px; font-size: 13.5px;">
-                    <a href="#" class="link-to-login" style="color: #0078ff; text-decoration: none;">← Quay lại Đăng nhập</a>
-                </p>
-            </div>
+					<div class="image-upload-box" style="margin-bottom: 14px;">
+						<div class="image-upload-row">
+							<label class="image-upload-label" for="edit-avatar-file">📷 Chọn ảnh đại diện</label>
+							<input id="edit-avatar-file" type="file" accept="image/*" hidden>
+							<span id="edit-avatar-filename" class="image-upload-filename">Giữ nguyên ảnh hiện tại</span>
+							<button type="button" id="edit-avatar-clear" class="btn-clear-upload" hidden>Xóa ảnh</button>
+						</div>
+						<div id="edit-avatar-preview-wrap" class="image-preview-wrap" hidden>
+							<img id="edit-avatar-preview" class="image-preview-thumb" alt="Xem trước ảnh đại diện">
+						</div>
+					</div>
 
-        </div>
+					<div class="image-upload-box" style="margin-bottom: 14px;">
+						<div class="image-upload-row">
+							<label class="image-upload-label" for="edit-cover-file">🖼️ Chọn ảnh bìa</label>
+							<input id="edit-cover-file" type="file" accept="image/*" hidden>
+							<span id="edit-cover-filename" class="image-upload-filename">Giữ nguyên ảnh hiện tại</span>
+							<button type="button" id="edit-cover-clear" class="btn-clear-upload" hidden>Xóa ảnh</button>
+						</div>
+						<div id="edit-cover-preview-wrap" class="image-preview-wrap" hidden>
+							<img id="edit-cover-preview" class="image-preview-thumb" alt="Xem trước ảnh bìa">
+						</div>
+					</div>
 
-        <!-- 2. Hộp thoại Hồ sơ cá nhân / Fanpage CLB -->
-        <div id="profile-container" style="display: none; max-width: 680px; margin: 30px auto;">
-            
-            <div class="profile-card-box" style="max-width: 100%; margin: 0 0 25px 0;">
-                <div class="profile-cover">
-                    <img id="profile-cover-image" alt="Ảnh bìa hồ sơ">
-                </div>
-                <div class="profile-header-info">
-                    <img id="user-display-avatar" src="./DIEU.png" alt="Avatar" class="profile-avatar-large">
-                    <h1 id="user-display-name" class="profile-main-name">Tên Học Sinh</h1>
-                    <p id="user-display-email" class="profile-sub-email">email@nqd.edu.vn</p>
-                    <p id="user-display-class" class="user-class-badge">Học sinh trường NQD</p>
-                    <div id="profile-role-tags" class="profile-role-tags" aria-label="Vai trò"></div>
-                    <p id="user-display-bio" class="user-bio-text">Chào mừng đến với góc học tập của mình trên DIEUNW!</p>
-                    <span class="verified-badge">✓ Đã xác thực học sinh trường NQD</span>
-                </div>
+					<div class="input-group">
+						<input type="text" id="edit-bio-input" placeholder="Tiểu sử ngắn hoặc câu châm ngôn yêu thích...">
+					</div>
+					<div style="display: flex; gap: 10px; justify-content: center;">
+						<button id="btn-save-profile" class="btn-auth btn-success" type="button" style="width: auto; padding: 10px 24px;">Lưu thay đổi</button>
+						<button id="btn-cancel-edit" class="btn-logout" type="button" style="margin-top: 0;">Hủy</button>
+					</div>
+				</div>
+			</div>
 
-                <!-- Thống kê bài viết và lượt thích -->
-                <div class="profile-stats">
-                    <div class="stat-item">
-                        <strong id="stat-posts">0</strong>
-                        <span>Bài viết</span>
-                    </div>
-                    <div class="stat-item">
-                        <strong id="stat-likes">0</strong>
-                        <span>Lượt thích</span>
-                    </div>
-                </div>
+			<!-- Quản trị hệ thống (Chỉ Admin) -->
+			<section id="admin-tools" class="admin-tools" hidden>
+				<div>
+					<p class="clubs-eyebrow">QUẢN TRỊ HỆ THỐNG</p>
+					<h2>Quản lý Admin &amp; Ban duyệt bài</h2>
+				</div>
+				<form id="admin-add-form" class="admin-add-form">
+					<label for="admin-email-input">Thêm Admin (Email trường)</label>
+					<div class="admin-add-row">
+						<input id="admin-email-input" type="email" placeholder="ten@nqd.edu.vn" required>
+						<button class="clubs-button" type="submit">Thêm admin</button>
+					</div>
+					<p id="admin-action-status" class="clubs-form-status" role="status" aria-live="polite"></p>
+				</form>
+				<ul id="admin-list" class="admin-list" aria-label="Danh sách admin"></ul>
 
-                <!-- Các nút thao tác -->
-                <div class="profile-actions">
-                    <button id="btn-edit-profile" class="btn-auth" style="width: auto; padding: 10px 20px;">Chỉnh sửa hồ sơ</button>
-                    <button id="btn-logout" class="btn-logout" style="margin-top: 0;">Đăng xuất</button>
-                </div>
+				<div class="admin-tools-divider">
+					<form id="moderator-add-form" class="admin-add-form">
+						<label for="moderator-email-input">Thêm thành viên Ban duyệt bài (Email trường)</label>
+						<div class="admin-add-row">
+							<input id="moderator-email-input" type="email" placeholder="duyetbai@nqd.edu.vn" required>
+							<button class="clubs-button" type="submit">Thêm Ban duyệt bài</button>
+						</div>
+						<p id="moderator-action-status" class="clubs-form-status" role="status" aria-live="polite"></p>
+					</form>
+					<ul id="moderator-list" class="admin-list" aria-label="Danh sách Ban duyệt bài"></ul>
+				</div>
+			</section>
 
-                <!-- Form chỉnh sửa thông tin -->
-                <div id="edit-profile-form" class="edit-form-box" style="display: none;">
-                    <h2 id="update">Cập nhật thông tin cá nhân</h2>
-                    <div class="input-group">
-                        <input type="text" id="edit-name-input" placeholder="Tên hiển thị mới (VD: Nguyễn Văn Diệu)">
-                    </div>
-                    <div class="input-group">
-                        <input type="email" id="edit-email-input" placeholder="Email hiển thị (VD: k18th.dieunw1101@nqd.edu.vn)">
-                    </div>
-                    <div class="input-group">
-                        <input type="text" id="edit-class-input" placeholder="Lớp của bạn (VD: 10TH)">
-                    </div>
-                    <div class="input-group">
-                        <input type="text" id="edit-avatar-input" placeholder="Dán đường link ảnh đại diện (.png, .jpg)">
-                    </div>
-                    <div class="input-group">
-                        <input type="text" id="edit-cover-input" placeholder="Dán đường link ảnh bìa (.png, .jpg)">
-                    </div>
-                    <div class="input-group">
-                        <input type="text" id="edit-bio-input" placeholder="Tiểu sử ngắn hoặc câu châm ngôn yêu thích...">
-                    </div>
-                    <div style="display: flex; gap: 10px; justify-content: center;">
-                        <button id="btn-save-profile" class="btn-auth btn-success" style="width: auto; padding: 10px 24px;">Lưu thay đổi</button>
-                        <button id="btn-cancel-edit" class="btn-logout" style="margin-top: 0;">Hủy</button>
-                    </div>
-                </div>
-            </div>
+			<!-- Hàng đợi duyệt báo cáo (Admin & Ban duyệt bài — Max-Heap theo số lượt báo cáo) -->
+			<section id="moderation-panel" class="moderation-panel" hidden>
+				<div>
+					<p class="clubs-eyebrow">BAN DUYỆT BÀI</p>
+					<h2>Hàng đợi báo cáo (Ưu tiên cao nhất trước)</h2>
+				</div>
+				<div class="mod-tabs" role="tablist">
+					<button type="button" class="mod-tab active" data-mod-tab="posts">Bài viết bị báo cáo (<span id="mod-posts-count">0</span>)</button>
+					<button type="button" class="mod-tab" data-mod-tab="users">Tài khoản bị báo cáo (<span id="mod-users-count">0</span>)</button>
+				</div>
+				<div id="mod-queue-list" class="mod-queue-list" aria-live="polite"></div>
+			</section>
 
-            <section id="admin-tools" class="admin-tools" hidden>
-                <div>
-                    <p class="clubs-eyebrow">QUẢN TRỊ HỆ THỐNG</p>
-                    <h2>Quản lý admin</h2>
-                </div>
-                <form id="admin-add-form" class="admin-add-form">
-                    <label for="admin-email-input">Email trường</label>
-                    <div class="admin-add-row">
-                        <input id="admin-email-input" type="email" placeholder="ten@nqd.edu.vn" required>
-                        <button class="clubs-button" type="submit">Thêm admin</button>
-                    </div>
-                    <p id="admin-action-status" class="clubs-form-status" role="status" aria-live="polite"></p>
-                </form>
-                <ul id="admin-list" class="admin-list" aria-label="Danh sách admin"></ul>
-            </section>
+			<div class="profile-extras">
+				<section class="profile-extra-section" aria-labelledby="profile-achievements-title">
+					<header class="profile-extra-heading">
+						<div>
+							<p class="profile-extra-eyebrow">DẤU MỐC CÁ NHÂN</p>
+							<h2 id="profile-achievements-title">Góc thành tích</h2>
+						</div>
+					</header>
+					<form id="achievement-form" class="profile-extra-form">
+						<label for="achievement-title">Tên giải thưởng hoặc thành tích</label>
+						<input id="achievement-title" maxlength="100" placeholder="Ví dụ: Giải Nhất học sinh giỏi cấp thành phố" required>
+						<label for="achievement-certificate">Ảnh chứng nhận (không bắt buộc)</label>
+						<input id="achievement-certificate" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+						<p class="profile-extra-hint">Ảnh PNG, JPG, WEBP hoặc GIF, tối đa 500 KB.</p>
+						<button class="profile-extra-button" type="submit">Thêm thành tích</button>
+						<p id="achievement-status" class="profile-extra-status" role="status" aria-live="polite"></p>
+					</form>
+					<div id="profile-achievements-list" class="profile-achievements-list" aria-live="polite"></div>
+				</section>
 
-            <div class="profile-extras">
-                <section class="profile-extra-section" aria-labelledby="profile-achievements-title">
-                    <header class="profile-extra-heading">
-                        <div>
-                            <p class="profile-extra-eyebrow">DẤU MỐC CỦA BẠN</p>
-                            <h2 id="profile-achievements-title">Góc thành tích</h2>
-                        </div>
-                    </header>
-                    <form id="achievement-form" class="profile-extra-form">
-                        <label for="achievement-title">Tên giải thưởng hoặc thành tích</label>
-                        <input id="achievement-title" maxlength="100" placeholder="Ví dụ: Giải Nhất học sinh giỏi cấp thành phố" required>
-                        <label for="achievement-certificate">Ảnh chứng nhận (không bắt buộc)</label>
-                        <input id="achievement-certificate" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
-                        <p class="profile-extra-hint">Ảnh PNG, JPG, WEBP hoặc GIF, tối đa 500 KB.</p>
-                        <button class="profile-extra-button" type="submit">Thêm thành tích</button>
-                        <p id="achievement-status" class="profile-extra-status" role="status" aria-live="polite"></p>
-                    </form>
-                    <div id="profile-achievements-list" class="profile-achievements-list" aria-live="polite"></div>
-                </section>
+				<section class="profile-extra-section" aria-labelledby="profile-interests-title">
+					<header class="profile-extra-heading">
+						<div>
+							<p class="profile-extra-eyebrow">NHỮNG ĐIỀU YÊU THÍCH</p>
+							<h2 id="profile-interests-title">Sở thích &amp; album ảnh</h2>
+						</div>
+					</header>
+					<div class="profile-subsection">
+						<h3>Sở thích</h3>
+						<form id="interest-form" class="profile-interest-form">
+							<label class="sr-only" for="interest-name">Thêm sở thích</label>
+							<input id="interest-name" maxlength="40" placeholder="Ví dụ: Nhiếp ảnh" required>
+							<button class="profile-extra-button" type="submit">Thêm tag</button>
+						</form>
+						<p id="interest-status" class="profile-extra-status" role="status" aria-live="polite"></p>
+						<div id="profile-interests-list" class="profile-interests-list" aria-live="polite"></div>
+					</div>
+					<div class="profile-subsection profile-album-section">
+						<h3>Album ảnh</h3>
+						<form id="album-form" class="profile-extra-form profile-album-form">
+							<label for="album-photo">Chọn ảnh</label>
+							<input id="album-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required>
+							<label for="album-caption">Chú thích</label>
+							<input id="album-caption" maxlength="160" placeholder="Một chút về bức ảnh này...">
+							<button class="profile-extra-button" type="submit">Thêm vào album</button>
+							<p id="album-status" class="profile-extra-status" role="status" aria-live="polite"></p>
+						</form>
+						<div id="profile-album-list" class="profile-album-list" aria-live="polite"></div>
+					</div>
+				</section>
+			</div>
 
-                <section class="profile-extra-section" aria-labelledby="profile-interests-title">
-                    <header class="profile-extra-heading">
-                        <div>
-                            <p class="profile-extra-eyebrow">NHỮNG ĐIỀU BẠN YÊU THÍCH</p>
-                            <h2 id="profile-interests-title">Sở thích & album ảnh</h2>
-                        </div>
-                    </header>
-                    <div class="profile-subsection">
-                        <h3>Sở thích</h3>
-                        <form id="interest-form" class="profile-interest-form">
-                            <label class="sr-only" for="interest-name">Thêm sở thích</label>
-                            <input id="interest-name" maxlength="40" placeholder="Ví dụ: Nhiếp ảnh" required>
-                            <button class="profile-extra-button" type="submit">Thêm tag</button>
-                        </form>
-                        <p id="interest-status" class="profile-extra-status" role="status" aria-live="polite"></p>
-                        <div id="profile-interests-list" class="profile-interests-list" aria-live="polite"></div>
-                    </div>
-                    <div class="profile-subsection profile-album-section">
-                        <h3>Album ảnh</h3>
-                        <form id="album-form" class="profile-extra-form profile-album-form">
-                            <label for="album-photo">Chọn ảnh</label>
-                            <input id="album-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required>
-                            <label for="album-caption">Chú thích</label>
-                            <input id="album-caption" maxlength="160" placeholder="Một chút về bức ảnh này...">
-                            <button class="profile-extra-button" type="submit">Thêm vào album</button>
-                            <p id="album-status" class="profile-extra-status" role="status" aria-live="polite"></p>
-                        </form>
-                        <div id="profile-album-list" class="profile-album-list" aria-live="polite"></div>
-                    </div>
-                </section>
-            </div>
+			<!-- Khung đăng bài cho Fanpage CLB (Rich Text + @tag + Upload ảnh) -->
+			<form id="club-post-composer" class="edit-form-box" style="display: none; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+				<h3 style="margin: 0;">Đăng bài với tư cách Fanpage CLB</h3>
+				<div class="rte-wrapper" id="club-rte-wrapper">
+					<div class="rte-toolbar">
+						<button type="button" class="rte-btn" data-cmd="bold" title="In đậm"><b>B</b></button>
+						<button type="button" class="rte-btn" data-cmd="italic" title="In nghiêng"><i>I</i></button>
+						<select class="rte-select" id="club-heading-select" aria-label="Cỡ tiêu đề">
+							<option value="P">Văn bản thường</option>
+							<option value="H1">Tiêu đề H1</option>
+							<option value="H2">Tiêu đề H2</option>
+							<option value="H3">Tiêu đề H3</option>
+							<option value="H4">Tiêu đề H4</option>
+							<option value="H5">Tiêu đề H5</option>
+						</select>
+						<label class="rte-color-wrap" title="Màu chữ">
+							<span>Màu chữ</span>
+							<input type="color" id="club-color-picker" value="#173853">
+						</label>
+						<button type="button" class="rte-btn" id="club-mention-trigger">@Tag</button>
+					</div>
+					<div id="club-post-rich-editor" class="rte-editor" contenteditable="true" data-placeholder="Chia sẻ hoạt động, sự kiện mới của CLB... Gõ @ để gắn thẻ..."></div>
+					<div id="club-mention-dropdown" class="mention-dropdown" hidden></div>
+				</div>
 
-            <!-- Khung đăng bài cho Fanpage CLB (chỉ hiện với quản lý CLB) -->
-            <form id="club-post-composer" class="edit-form-box" style="display: none; flex-direction: column; gap: 10px; margin-bottom: 20px;">
-                <h3 style="margin: 0;">Đăng bài với tư cách Fanpage CLB</h3>
-                <textarea id="club-post-content" rows="3" maxlength="5000" placeholder="Chia sẻ hoạt động, sự kiện mới của CLB..." style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #d0d7de;" required></textarea>
-                <input id="club-post-image" type="text" placeholder="Link ảnh đính kèm (không bắt buộc)" style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #d0d7de;">
-                <button type="submit" class="btn-auth" style="width: auto; align-self: flex-end; padding: 10px 20px;">Đăng lên Fanpage</button>
-            </form>
+				<div class="image-upload-box">
+					<div class="image-upload-row">
+						<label class="image-upload-label" for="club-post-image-file">📷 Chọn ảnh đính kèm</label>
+						<input id="club-post-image-file" type="file" accept="image/*" hidden>
+						<span id="club-post-image-filename" class="image-upload-filename">Không có ảnh</span>
+						<button type="button" id="club-post-image-clear" class="btn-clear-upload" hidden>Xóa ảnh</button>
+					</div>
+					<div id="club-post-image-preview-wrap" class="image-preview-wrap" hidden>
+						<img id="club-post-image-preview" class="image-preview-thumb" alt="Xem trước ảnh bài viết CLB">
+					</div>
+				</div>
 
-            <!-- Danh sách bài viết -->
-            <div class="my-posts-section">
-                <h3 style="margin-bottom: 15px; color: #1c1e21;">Bài viết đã đăng của bạn</h3>
-                <div id="my-posts-container">
-                    <p style="text-align: center; color: #65676b;">Đang tải bài viết...</p>
-                </div>
-            </div>
+				<button type="submit" class="btn-auth" style="width: auto; align-self: flex-end; padding: 10px 20px;">Đăng lên Fanpage</button>
+			</form>
 
-        </div>
-    </main>
+			<!-- Danh sách bài viết -->
+			<div class="my-posts-section">
+				<h3 id="posts-section-heading" style="margin-bottom: 15px; color: #1c1e21;">Bài viết đã đăng của bạn</h3>
+				<div id="my-posts-container">
+					<p style="text-align: center; color: #65676b;">Đang tải bài viết...</p>
+				</div>
+			</div>
+		</div>
+	</main>
 
-    <script src="./nav-profile.js"></script>
-    <script src="./profile-auth.js"></script>
-    <script src="./profile-sections.js"></script>
+	<!-- Modal Báo cáo (cho bài viết hoặc tài khoản bạn bè) -->
+	<div id="report-modal-overlay" class="report-modal-overlay" hidden>
+		<section class="report-modal-box" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
+			<div class="report-modal-header">
+				<h3 id="report-modal-title">Báo cáo vi phạm</h3>
+				<button type="button" id="report-modal-close" class="close-badge" aria-label="Đóng">&times;</button>
+			</div>
+			<p id="report-target-label" style="font-size:13px; color:#5e7488; margin-bottom:10px;"></p>
+			<div class="report-reason-chips">
+				<button type="button" class="report-chip" data-reason="Nội dung không phù hợp">Nội dung không phù hợp</button>
+				<button type="button" class="report-chip" data-reason="Ngôn từ thù ghét hoặc xúc phạm">Xúc phạm / Thù ghét</button>
+				<button type="button" class="report-chip" data-reason="Spam hoặc giả mạo">Spam / Giả mạo</button>
+			</div>
+			<textarea id="report-reason-input" rows="3" maxlength="500" placeholder="Nhập lý do chi tiết..."></textarea>
+			<p id="report-modal-status" class="form-message" role="status"></p>
+			<div style="display:flex; justify-content:flex-end; gap:10px; margin-top:12px;">
+				<button type="button" id="report-modal-cancel" class="btn-timer outline" style="padding:8px 16px;">Hủy</button>
+				<button type="button" id="report-modal-submit" class="btn-auth" style="width:auto; padding:8px 18px; background:#b42318;">Gửi báo cáo</button>
+			</div>
+		</section>
+	</div>
+
+	<!-- Modal Chi tiết kiểm duyệt (Admin & Ban duyệt bài) -->
+	<div id="mod-inspect-overlay" class="report-modal-overlay" hidden>
+		<section class="report-modal-box" role="dialog" aria-modal="true" aria-labelledby="mod-inspect-title">
+			<div class="report-modal-header">
+				<h3 id="mod-inspect-title">Kiểm tra báo cáo</h3>
+				<button type="button" id="mod-inspect-close" class="close-badge" aria-label="Đóng">&times;</button>
+			</div>
+			<div id="mod-inspect-body"></div>
+			<div id="mod-inspect-actions" class="mod-actions-row"></div>
+		</section>
+	</div>
+
+	<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+	<script>
+		if (typeof emailjs !== "undefined") {
+			emailjs.init({ publicKey: "dViu70h7kpGKrNHN0" });
+		}
+	</script>
+	<script src="./nav-profile.js?v=2" defer></script>
+	<script src="./profile-auth.js?v=2" defer></script>
+	<script src="./profile-sections.js?v=2" defer></script>
 </body>
 </html>
