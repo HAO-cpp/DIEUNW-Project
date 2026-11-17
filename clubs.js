@@ -5,12 +5,32 @@ document.addEventListener("DOMContentLoaded", () => {
 	const adminReviewPanel = document.getElementById("admin-review-panel");
 	const reviewList = document.getElementById("club-review-list");
 	let currentUser = null;
+
+	// Biến quản lý danh sách nhiều email quản lý CLB
 	let managerEmails = [];
 	const managerInput = document.getElementById("club-manager-input");
 	const managersListEl = document.getElementById("club-managers-list");
 	const btnAddManager = document.getElementById("btn-add-manager");
 
+	async function api(url, options = {}) {
+		const response = await fetch(`https://onrender.com${url}`, {
+			credentials: "include",
+			...options
+		});
+		const data = await response.json();
+		if (!response.ok) throw new Error(data.error || "Không thể hoàn tất yêu cầu.");
+		return data;
+	}
+
+	function element(tag, className, text) {
+		const node = document.createElement(tag);
+		if (className) node.className = className;
+		if (text !== undefined) node.textContent = text;
+		return node;
+	}
+
 	function renderManagersList() {
+		if (!managersListEl) return;
 		managersListEl.replaceChildren();
 		managerEmails.forEach((email, index) => {
 			const li = document.createElement("li");
@@ -49,32 +69,13 @@ document.addEventListener("DOMContentLoaded", () => {
 		renderManagersList();
 	});
 
-	// Khi user đăng nhập xong, tự động điền sẵn email của người tạo vào list
-	// (Thay thế dòng document.getElementById("club-manager-email").value = currentUser.email;)
-	if (currentUser && !managerEmails.includes(currentUser.email)) {
-		managerEmails.push(currentUser.email);
-		renderManagersList();
-	}
-
-	async function api(url, options = {}) {
-		const response = await fetch(`https://dieunw.onrender.com${url}`, {
-    	credentials: "include",
-    	...options
-	});
-		const data = await response.json();
-		if (!response.ok) throw new Error(data.error || "Không thể hoàn tất yêu cầu.");
-		return data;
-	}
-
-	function element(tag, className, text) {
-		const node = document.createElement(tag);
-		if (className) node.className = className;
-		if (text !== undefined) node.textContent = text;
-		return node;
-	}
-
 	function renderClub(club) {
 		const card = element("article", "club-card");
+		card.style.cursor = "pointer";
+		card.addEventListener("click", () => {
+			window.location.href = `./profile.html?clubId=${encodeURIComponent(club.id)}`;
+		});
+
 		const brand = element("div", "club-card-brand");
 		if (club.logo) {
 			const logo = element("img", "club-card-logo");
@@ -84,11 +85,17 @@ document.addEventListener("DOMContentLoaded", () => {
 		} else {
 			brand.append(element("span", "club-card-monogram", club.name.slice(0, 1).toUpperCase()));
 		}
+
+		const managersText = Array.isArray(club.managerEmails)
+			? club.managerEmails.join(", ")
+			: (club.manager?.name || club.managerEmail);
+
 		const identity = element("div", "club-card-identity");
-		identity.append(element("h3", "", club.name), element("p", "", club.manager?.name || club.managerEmail));
+		identity.append(element("h3", "", club.name), element("p", "", managersText));
 		brand.append(identity);
 		card.append(brand);
-		const managerTag = element("span", "club-manager-tag", `Quản lý · ${club.manager?.name || club.managerEmail}`);
+
+		const managerTag = element("span", "club-manager-tag", `Quản lý · ${managersText}`);
 		managerTag.style.setProperty("--club-color", club.tagColor);
 		card.append(managerTag);
 		return card;
@@ -97,7 +104,11 @@ document.addEventListener("DOMContentLoaded", () => {
 	function renderReview(club) {
 		const item = element("article", "club-review-item");
 		const details = element("div", "club-review-details");
-		details.append(element("h3", "", club.name), element("p", "", `Quản lý: ${club.manager?.name || club.managerEmail}`));
+		const managersText = Array.isArray(club.managerEmails)
+			? club.managerEmails.join(", ")
+			: (club.manager?.name || club.managerEmail);
+
+		details.append(element("h3", "", club.name), element("p", "", `Quản lý: ${managersText}`));
 		if (club.logo) {
 			const logo = element("img", "club-review-logo");
 			logo.src = club.logo;
@@ -172,45 +183,6 @@ document.addEventListener("DOMContentLoaded", () => {
 	const colorInput = document.getElementById("club-tag-color");
 	colorInput.addEventListener("input", () => {
 		document.getElementById("club-color-value").textContent = colorInput.value.toUpperCase();
-	});
-
-	function renderManagersList() {
-		managersListEl.replaceChildren();
-		managerEmails.forEach((email, index) => {
-			const li = document.createElement("li");
-			li.style.display = "inline-flex";
-			li.style.alignItems = "center";
-			li.style.gap = "6px";
-			li.textContent = email;
-
-			const removeBtn = document.createElement("button");
-			removeBtn.type = "button";
-			removeBtn.textContent = "×";
-			removeBtn.style.cssText = "border:none; background:none; color:#b5473c; font-weight:bold; cursor:pointer; font-size:14px;";
-			removeBtn.onclick = () => {
-				managerEmails.splice(index, 1);
-				renderManagersList();
-			};
-			li.append(removeBtn);
-			managersListEl.append(li);
-		});
-	}
-
-	btnAddManager?.addEventListener("click", () => {
-		const email = managerInput.value.trim().toLowerCase();
-		if (!email) return;
-		if (!email.endsWith("@nqd.edu.vn")) {
-			requestStatus.textContent = "Vui lòng nhập email trường (@nqd.edu.vn).";
-			return;
-		}
-		if (managerEmails.includes(email)) {
-			requestStatus.textContent = "Email này đã có trong danh sách quản lý.";
-			return;
-		}
-		managerEmails.push(email);
-		managerInput.value = "";
-		requestStatus.textContent = "";
-		renderManagersList();
 	});
 
 	requestForm.addEventListener("submit", async event => {
