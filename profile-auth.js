@@ -1,6 +1,5 @@
 const API_BASE = "https://dieunw.onrender.com";
 document.addEventListener("DOMContentLoaded", () => {
-    if (new URLSearchParams(window.location.search).has("clubId")) return;
     const authContainer = document.getElementById("auth-container");
     const profileContainer = document.getElementById("profile-container");
 
@@ -311,6 +310,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     document.getElementById("btn-save-profile")?.addEventListener("click", async () => {
+        const clubId = new URLSearchParams(window.location.search).get("clubId");
         const currentUser = JSON.parse(localStorage.getItem("dieuNwUser")) || {};
         const newName = document.getElementById("edit-name-input").value.trim();
         const newEmail = document.getElementById("edit-email-input").value.trim().toLowerCase();
@@ -324,6 +324,27 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        if (clubId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/clubs/${encodeURIComponent(clubId)}`, {
+                    method: "PATCH",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: newName, logo: newAvatar, cover: newCover, bio: newBio })
+                });
+                const data = await readApiResponse(response);
+                if (!response.ok) throw new Error(data.error || "Không thể cập nhật Fanpage CLB.");
+
+                editProfileForm.style.display = "none";
+                btnEditProfile.style.display = "inline-block";
+                alert("Cập nhật Fanpage CLB thành công!");
+                const currentUser = JSON.parse(localStorage.getItem("dieuNwUser")) || null;
+                await loadClubProfile(clubId, currentUser);
+            } catch (error) {
+                alert(requestErrorMessage(error, "Lỗi khi lưu thông tin Fanpage CLB!"));
+            }
+            return;
+        }
         const updatedFields = {
             name: newName,
             email: newEmail,
@@ -538,9 +559,7 @@ document.addEventListener("DOMContentLoaded", () => {
             myPostsContainer.innerHTML = "<p style='color:red; text-align:center;'>Không thể tải lịch sử bài viết.</p>";
         }
     }
-});
-
-async function loadClubProfile(clubId, currentUser) {
+    async function loadClubProfile(clubId, currentUser) {
     if (authContainer) authContainer.style.display = "none";
     if (profileContainer) profileContainer.style.display = "block";
 
@@ -609,6 +628,7 @@ async function loadClubProfile(clubId, currentUser) {
         alert(requestErrorMessage(error, "Lỗi tải dữ liệu Fanpage CLB."));
     }
 }
+});
 
 // --- BẬT / TẮT HIỂN THỊ MẬT KHẨU ---
 const passwordInput = document.getElementById("login-password");
