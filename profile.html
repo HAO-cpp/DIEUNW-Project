@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<link rel="stylesheet" href="./style.css">
+	<link rel="stylesheet" href="./style.css?v=10">
 	<link rel="icon" type="image/png" href="./DIEU.png?v=1">
 	<title>DIEUNW - Trang Cá Nhân</title>
 </head>
@@ -30,6 +30,10 @@
 			</a>
 		</div>
 	</header>
+
+	<div id="hero-banner" aria-hidden="true">
+		<img src="./DIEUNW.png" alt="">
+	</div>
 
 	<main class="main-content page-enter">
 		<!-- 1. Hộp thoại Tài khoản 3 trong 1 -->
@@ -76,7 +80,7 @@
 			</div>
 
 			<div id="forgot-view" style="display: none;">
-				<h2>🔑 Khôi Phục Mật Khẩu</h2>
+				<h2>Khôi Phục Mật Khẩu</h2>
 				<p class="auth-subtitle">Nhập email đã đăng ký để nhận mã đặt lại mật khẩu.</p>
 				<div id="forgot-step-1">
 					<div class="input-group"><input type="email" id="forgot-email" placeholder="Email trường (@nqd.edu.vn)"></div>
@@ -95,7 +99,7 @@
 		</div>
 
 		<!-- 2. Hồ sơ cá nhân / Hồ sơ bạn bè / Fanpage CLB -->
-		<div id="profile-container" style="display: none; max-width: 680px; margin: 30px auto;">
+		<div id="profile-container" style="display: none; max-width: 680px; margin: 10px auto 30px;">
 			<div class="profile-card-box" style="max-width: 100%; margin: 0 0 25px 0;">
 				<div class="profile-cover">
 					<img id="profile-cover-image" alt="Ảnh bìa hồ sơ">
@@ -144,7 +148,7 @@
 
 					<div class="image-upload-box" style="margin-bottom: 14px;">
 						<div class="image-upload-row">
-							<label class="image-upload-label" for="edit-avatar-file">📷 Chọn ảnh đại diện</label>
+							<label class="image-upload-label" for="edit-avatar-file">Chọn ảnh đại diện</label>
 							<input id="edit-avatar-file" type="file" accept="image/*" hidden>
 							<span id="edit-avatar-filename" class="image-upload-filename">Giữ nguyên ảnh hiện tại</span>
 							<button type="button" id="edit-avatar-clear" class="btn-clear-upload" hidden>Xóa ảnh</button>
@@ -156,7 +160,7 @@
 
 					<div class="image-upload-box" style="margin-bottom: 14px;">
 						<div class="image-upload-row">
-							<label class="image-upload-label" for="edit-cover-file">🖼️ Chọn ảnh bìa</label>
+							<label class="image-upload-label" for="edit-cover-file">Chọn ảnh bìa</label>
 							<input id="edit-cover-file" type="file" accept="image/*" hidden>
 							<span id="edit-cover-filename" class="image-upload-filename">Giữ nguyên ảnh hiện tại</span>
 							<button type="button" id="edit-cover-clear" class="btn-clear-upload" hidden>Xóa ảnh</button>
@@ -297,7 +301,7 @@
 
 				<div class="image-upload-box">
 					<div class="image-upload-row">
-						<label class="image-upload-label" for="club-post-image-file">📷 Chọn ảnh đính kèm</label>
+						<label class="image-upload-label" for="club-post-image-file">Chọn ảnh đính kèm</label>
 						<input id="club-post-image-file" type="file" accept="image/*" hidden>
 						<span id="club-post-image-filename" class="image-upload-filename">Không có ảnh</span>
 						<button type="button" id="club-post-image-clear" class="btn-clear-upload" hidden>Xóa ảnh</button>

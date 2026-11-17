@@ -4,7 +4,7 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta name="theme-color" content="#1769aa">
-	<link rel="stylesheet" href="./style.css">
+	<link rel="stylesheet" href="./style.css?v=10">
 	<link rel="icon" type="image/png" href="./DIEU.png?v=1">
 	<title>Thông báo CLB - DIEUNW</title>
 </head>
@@ -23,6 +23,10 @@
 		</nav>
 		<div class="nav-right"><a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân"><img class="nav-user-avatar" src="./DIEU.png" alt=""></a></div>
 	</header>
+
+	<div id="hero-banner" aria-hidden="true">
+		<img src="./DIEUNW.png" alt="">
+	</div>
 
 	<main class="announcements-main page-enter">
 		<header class="clubs-heading announcements-heading">
@@ -46,7 +50,7 @@
 				<div class="announcement-attachments-row">
 					<div class="announcement-attach-card">
 						<div class="image-upload-row">
-							<label class="image-upload-label" for="announcement-image-file">🖼️ Đính kèm ảnh (tùy chọn)</label>
+							<label class="image-upload-label" for="announcement-image-file">Đính kèm ảnh (tùy chọn)</label>
 							<input id="announcement-image-file" type="file" accept="image/*" hidden>
 							<span id="announcement-image-name" class="image-upload-filename">Không có ảnh</span>
 							<button type="button" id="announcement-image-clear" class="btn-clear-upload" hidden>Xóa</button>
@@ -58,7 +62,7 @@
 
 					<div class="announcement-attach-card">
 						<div class="image-upload-row">
-							<label class="image-upload-label" for="announcement-file">📎 Đính kèm tệp (tùy chọn)</label>
+							<label class="image-upload-label" for="announcement-file">Đính kèm tệp (tùy chọn)</label>
 							<input id="announcement-file" type="file" accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.xls,.xlsx,.zip,.rar,.png,.jpg,.jpeg" hidden>
 							<span id="announcement-file-name" class="image-upload-filename">Không có tệp</span>
 							<button type="button" id="announcement-file-clear" class="btn-clear-upload" hidden>Xóa</button>
