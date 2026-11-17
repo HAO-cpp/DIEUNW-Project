@@ -174,8 +174,51 @@ document.addEventListener("DOMContentLoaded", () => {
 		document.getElementById("club-color-value").textContent = colorInput.value.toUpperCase();
 	});
 
+	function renderManagersList() {
+		managersListEl.replaceChildren();
+		managerEmails.forEach((email, index) => {
+			const li = document.createElement("li");
+			li.style.display = "inline-flex";
+			li.style.alignItems = "center";
+			li.style.gap = "6px";
+			li.textContent = email;
+
+			const removeBtn = document.createElement("button");
+			removeBtn.type = "button";
+			removeBtn.textContent = "×";
+			removeBtn.style.cssText = "border:none; background:none; color:#b5473c; font-weight:bold; cursor:pointer; font-size:14px;";
+			removeBtn.onclick = () => {
+				managerEmails.splice(index, 1);
+				renderManagersList();
+			};
+			li.append(removeBtn);
+			managersListEl.append(li);
+		});
+	}
+
+	btnAddManager?.addEventListener("click", () => {
+		const email = managerInput.value.trim().toLowerCase();
+		if (!email) return;
+		if (!email.endsWith("@nqd.edu.vn")) {
+			requestStatus.textContent = "Vui lòng nhập email trường (@nqd.edu.vn).";
+			return;
+		}
+		if (managerEmails.includes(email)) {
+			requestStatus.textContent = "Email này đã có trong danh sách quản lý.";
+			return;
+		}
+		managerEmails.push(email);
+		managerInput.value = "";
+		requestStatus.textContent = "";
+		renderManagersList();
+	});
+
 	requestForm.addEventListener("submit", async event => {
 		event.preventDefault();
+		if (!managerEmails.length) {
+			requestStatus.textContent = "Vui lòng thêm ít nhất 1 email quản lý.";
+			return;
+		}
 		const submit = requestForm.querySelector("button[type='submit']");
 		submit.disabled = true;
 		requestStatus.textContent = "Đang gửi yêu cầu...";
@@ -193,13 +236,14 @@ document.addEventListener("DOMContentLoaded", () => {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					name: document.getElementById("club-name").value.trim(),
-					managerEmail: document.getElementById("club-manager-email").value.trim(),
+					managerEmails,
 					logo,
 					tagColor: colorInput.value
 				})
 			});
 			requestForm.reset();
-			document.getElementById("club-manager-email").value = currentUser.email;
+			managerEmails = currentUser ? [currentUser.email] : [];
+			renderManagersList();
 			logoPreview.hidden = true;
 			colorInput.value = "#1769aa";
 			document.getElementById("club-color-value").textContent = "#1769AA";
@@ -217,7 +261,10 @@ document.addEventListener("DOMContentLoaded", () => {
 			currentUser = auth.user;
 			if (currentUser) {
 				requestForm.hidden = false;
-				document.getElementById("club-manager-email").value = currentUser.email;
+				if (!managerEmails.includes(currentUser.email)) {
+					managerEmails.push(currentUser.email);
+					renderManagersList();
+				}
 			} else {
 				document.getElementById("clubs-auth-gate").hidden = false;
 			}
