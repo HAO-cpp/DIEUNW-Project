@@ -485,7 +485,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!myPostsContainer) return;
 
         try {
-            const response = await fetch(`${API_BASE}/api/clubs/${encodeURIComponent(clubId)}`, {
+            const response = await fetch(API_BASE + "/api/clubs/" + encodeURIComponent(clubId), {
                 credentials: "include"
             });
             const data = await readApiResponse(response);
