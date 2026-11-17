@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	const btnAddManager = document.getElementById("btn-add-manager");
 
 	async function api(url, options = {}) {
-		const response = await fetch(`https://onrender.com${url}`, {
+		const response = await fetch(`https://dieunw.onrender.com${url}`, {
 			credentials: "include",
 			...options
 		});
