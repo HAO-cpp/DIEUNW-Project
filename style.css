@@ -501,6 +501,18 @@
     border-color: #124d7b;
 }
 
+#friend-cover-image{
+    height: 190px;
+    margin: -30px -30px 20px;
+    overflow: hidden;
+    border-radius: 11px 11px 0 0;
+    background: linear-gradient(120deg, #dcecf2, #e6f0e9);
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 55%, rgba(0, 0, 0, 0) 100%);
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 55%, rgba(0, 0, 0, 0) 100%);
+}
+
+.friend-cover-image img[hidden] { display: none; }
+
 .post-card-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
 .post-delete-button, .messages-delete-group, .friends-remove-button {
     min-height: 34px;
@@ -2008,10 +2020,15 @@ body.theme-sunset .mode-btn.active, body.theme-sunset .btn-timer.primary, body.t
     border: 1px solid #c5ddf3;
     border-radius: 12px;
     background: #fff;
-    color: var(--chat-blue-deep);
-    font-size: 13px;
-    font-weight: 900;
     box-shadow: 0 6px 20px rgba(27, 111, 185, 0.08);
+    overflow: hidden;
+}
+
+.chat-heading-mark img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Đổi thành 'contain' nếu DIEU.png là logo có nền trong suốt và cần khoảng thở */
+    display: block;
 }
 
 .live-indicator, .room-live-key i {
@@ -2909,8 +2926,29 @@ body.theme-sunset .mode-btn.active, body.theme-sunset .btn-timer.primary, body.t
 .messages-chat-title { min-width: 0; flex: 1; }
 .messages-chat-title h2 { overflow: hidden; color: #173853; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .messages-chat-title p { margin-top: 4px; color: #71879a; font-size: 10px; }
-.messages-call-button { padding: 8px 12px; border: 1px solid #c9d9e7; border-radius: 6px; background: #fff; color: #31536e; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
-.messages-call-button:hover { background: #f3f8ff; }
+
+.messages-call-button { 
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px; 
+    border: 1px solid #c9d9e7; 
+    border-radius: 6px; 
+    background: #fff; 
+    cursor: pointer; 
+}
+
+.messages-call-button:hover { 
+    background: #f3f8ff; 
+}
+
+.messages-call-button img {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    display: block;
+}
+
 .messages-status { min-height: 0; padding: 0 17px; color: #1769aa; font-size: 11px; }
 .messages-status.error { padding-top: 7px; color: #b5473c; }
 
