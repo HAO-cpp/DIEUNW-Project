@@ -2943,8 +2943,8 @@ body.theme-sunset .mode-btn.active, body.theme-sunset .btn-timer.primary, body.t
 }
 
 .messages-call-button img {
-    width: 32px;
-    height: 32px;
+    width: 128px;
+    height: 128px;
     object-fit: contain;
     display: block;
 }
