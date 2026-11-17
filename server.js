@@ -194,10 +194,6 @@ function initializeDatabase(dbPath) {
 			decided_by TEXT REFERENCES users(id) ON DELETE SET NULL,
 			created_at TEXT NOT NULL,
 			decided_at TEXT
-			try { db.exec("ALTER TABLE clubs ADD COLUMN manager_emails TEXT"); } catch {}
-			try { db.exec("ALTER TABLE clubs ADD COLUMN cover TEXT"); } catch {}
-			try { db.exec("ALTER TABLE clubs ADD COLUMN bio TEXT"); } catch {}
-			try { db.exec("ALTER TABLE posts ADD COLUMN club_id TEXT"); } catch {}
 		);
 		CREATE TABLE IF NOT EXISTS club_posts (
 			id TEXT PRIMARY KEY,
