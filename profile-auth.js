@@ -485,7 +485,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!myPostsContainer) return;
 
         try {
-            const response = await fetch("https://dieunw.onrender.com/api/posts", { credentials: "include" });
+            const response = await fetch(`${API_BASE}/api/clubs/${encodeURIComponent(clubId)}`, {
+                credentials: "include"
+            });
             const data = await readApiResponse(response);
             if (!response.ok) throw new Error(data.error || "Không thể tải bài viết.");
             const myPosts = data.posts.filter(post => String(post.userId) === String(userId)).reverse();
