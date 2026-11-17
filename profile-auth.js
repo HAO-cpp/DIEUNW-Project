@@ -564,7 +564,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (profileContainer) profileContainer.style.display = "block";
 
     try {
-        const response = await fetch(`https://onrender.com{encodeURIComponent(clubId)}`, {
+        const response = await fetch(`https://dieunw.onrender.com{encodeURIComponent(clubId)}`, {
             credentials: "include"
         });
         const data = await readApiResponse(response);
