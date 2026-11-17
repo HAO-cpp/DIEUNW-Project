@@ -1,5 +1,6 @@
 const API_BASE = "https://dieunw.onrender.com";
 document.addEventListener("DOMContentLoaded", () => {
+    if (new URLSearchParams(window.location.search).has("clubId")) return;
     const authContainer = document.getElementById("auth-container");
     const profileContainer = document.getElementById("profile-container");
 
@@ -30,20 +31,38 @@ document.addEventListener("DOMContentLoaded", () => {
         registerView.style.display = "block";
     }
 
+        const urlParams = new URLSearchParams(window.location.search);
+    const clubId = urlParams.get("clubId");
+
     fetch("https://dieunw.onrender.com/api/auth/me", { credentials: "include" })
         .then(response => response.json())
-        .then(data => {
-            if (data.user) {
-                localStorage.setItem("dieuNwUser", JSON.stringify(data.user));
-                showProfile(data.user);
+        .then(async data => {
+            const currentUser = data.user || null;
+
+            if (currentUser) {
+                localStorage.setItem("dieuNwUser", JSON.stringify(currentUser));
             } else {
                 localStorage.removeItem("dieuNwUser");
                 localStorage.removeItem("session_token");
                 window.updateNavAvatar?.(null);
                 window.updateHomeAccess?.(null);
             }
+
+            if (clubId) {
+                window.updateNavAvatar?.(currentUser);
+                window.updateHomeAccess?.(currentUser);
+                await loadClubProfile(clubId, currentUser);
+                return;
+            }
+
+            if (currentUser) {
+                showProfile(currentUser);
+            }
         })
-        .catch(() => {});
+        .catch(() => {
+            // Nếu lỗi mạng khi đang mở trang CLB vẫn thử tải thông tin CLB cho khách xem
+            if (clubId) loadClubProfile(clubId, null);
+        });
     // CHUYỂN ĐỔI GIỮA CÁC TAB ĐĂNG NHẬP / ĐĂNG KÝ / QUÊN MẬT KHẨU
     document.getElementById("link-to-register")?.addEventListener("click", (e) => {
         e.preventDefault();
@@ -520,6 +539,76 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 });
+
+async function loadClubProfile(clubId, currentUser) {
+    if (authContainer) authContainer.style.display = "none";
+    if (profileContainer) profileContainer.style.display = "block";
+
+    try {
+        const response = await fetch(`https://onrender.com{encodeURIComponent(clubId)}`, {
+            credentials: "include"
+        });
+        const data = await readApiResponse(response);
+        if (!response.ok) throw new Error(data.error || "Không tìm thấy CLB.");
+        const club = data.club;
+
+        // 1. Đổ thông tin CLB lên giao diện Profile có sẵn
+        document.getElementById("user-display-name").innerText = club.name;
+        const managersList = Array.isArray(club.managerEmails) ? club.managerEmails : [club.managerEmail];
+        document.getElementById("user-display-email").innerText = `Quản lý: ${managersList.filter(Boolean).join(", ")}`;
+        document.getElementById("user-display-class").innerText = "Câu lạc bộ trực thuộc trường NQD";
+        document.getElementById("user-display-bio").innerText = club.bio || `Fanpage chính thức của ${club.name}`;
+
+        const avatarEl = document.getElementById("user-display-avatar");
+        if (avatarEl) avatarEl.src = club.logo || "./DIEU.png";
+
+        const coverEl = document.getElementById("profile-cover-image");
+        if (coverEl) {
+            coverEl.hidden = !club.cover;
+            if (club.cover) coverEl.src = club.cover;
+            else coverEl.removeAttribute("src");
+        }
+
+        // 2. Gắn tag FANPAGE CLB
+        const roleContainer = document.getElementById("profile-role-tags");
+        if (roleContainer) {
+            roleContainer.replaceChildren();
+            const fanpageTag = document.createElement("span");
+            fanpageTag.className = "profile-role-tag";
+            fanpageTag.textContent = "✓ FANPAGE CLB";
+            fanpageTag.style.setProperty("--club-color", club.tagColor || "#1769aa");
+            roleContainer.append(fanpageTag);
+        }
+
+        // 3. Phân quyền Quản lý CLB (ẩn/hiện nút chỉnh sửa & đăng bài)
+        const normalizedManagers = managersList.map(e => String(e || "").toLowerCase());
+        const isManager = Boolean(
+            currentUser && (normalizedManagers.includes(currentUser.email.toLowerCase()) || currentUser.isAdmin)
+        );
+
+        const btnEdit = document.getElementById("btn-edit-profile");
+        const btnLogout = document.getElementById("btn-logout");
+        const adminTools = document.getElementById("admin-tools");
+        const clubComposer = document.getElementById("club-post-composer");
+
+        if (btnLogout) btnLogout.style.display = "none";
+        if (adminTools) adminTools.hidden = true;
+
+        if (isManager) {
+            if (btnEdit) {
+                btnEdit.style.display = "inline-block";
+                btnEdit.innerText = "Chỉnh sửa Fanpage";
+            }
+            if (clubComposer) clubComposer.style.display = "flex";
+        } else {
+            if (btnEdit) btnEdit.style.display = "none";
+            if (clubComposer) clubComposer.style.display = "none";
+        }
+
+    } catch (error) {
+        alert(requestErrorMessage(error, "Lỗi tải dữ liệu Fanpage CLB."));
+    }
+}
 
 // --- BẬT / TẮT HIỂN THỊ MẬT KHẨU ---
 const passwordInput = document.getElementById("login-password");

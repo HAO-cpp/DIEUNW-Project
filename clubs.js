@@ -5,6 +5,56 @@ document.addEventListener("DOMContentLoaded", () => {
 	const adminReviewPanel = document.getElementById("admin-review-panel");
 	const reviewList = document.getElementById("club-review-list");
 	let currentUser = null;
+	let managerEmails = [];
+	const managerInput = document.getElementById("club-manager-input");
+	const managersListEl = document.getElementById("club-managers-list");
+	const btnAddManager = document.getElementById("btn-add-manager");
+
+	function renderManagersList() {
+		managersListEl.replaceChildren();
+		managerEmails.forEach((email, index) => {
+			const li = document.createElement("li");
+			li.style.display = "inline-flex";
+			li.style.alignItems = "center";
+			li.style.gap = "6px";
+			li.textContent = email;
+
+			const removeBtn = document.createElement("button");
+			removeBtn.type = "button";
+			removeBtn.textContent = "×";
+			removeBtn.style.cssText = "border:none; background:none; color:#b5473c; font-weight:bold; cursor:pointer; font-size:14px;";
+			removeBtn.onclick = () => {
+				managerEmails.splice(index, 1);
+				renderManagersList();
+			};
+			li.append(removeBtn);
+			managersListEl.append(li);
+		});
+	}
+
+	btnAddManager?.addEventListener("click", () => {
+		const email = managerInput.value.trim().toLowerCase();
+		if (!email) return;
+		if (!email.endsWith("@nqd.edu.vn")) {
+			requestStatus.textContent = "Vui lòng nhập email trường (@nqd.edu.vn).";
+			return;
+		}
+		if (managerEmails.includes(email)) {
+			requestStatus.textContent = "Email này đã có trong danh sách quản lý.";
+			return;
+		}
+		managerEmails.push(email);
+		managerInput.value = "";
+		requestStatus.textContent = "";
+		renderManagersList();
+	});
+
+	// Khi user đăng nhập xong, tự động điền sẵn email của người tạo vào list
+	// (Thay thế dòng document.getElementById("club-manager-email").value = currentUser.email;)
+	if (currentUser && !managerEmails.includes(currentUser.email)) {
+		managerEmails.push(currentUser.email);
+		renderManagersList();
+	}
 
 	async function api(url, options = {}) {
 		const response = await fetch(`https://dieunw.onrender.com${url}`, {

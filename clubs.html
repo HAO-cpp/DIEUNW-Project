@@ -53,9 +53,14 @@
 					<h2>Đăng ký thành lập fanpage CLB</h2>
 					<label for="club-name">Tên CLB</label>
 					<input id="club-name" name="name" maxlength="80" placeholder="Ví dụ: CLB Robotics NQD" required>
-					<label for="club-manager-email">Email thành viên quản lý page</label>
-					<input id="club-manager-email" name="managerEmail" type="email" placeholder="ten@nqd.edu.vn" required>
-					<p class="clubs-field-hint">Email cần thuộc tài khoản DIEUNW đã đăng ký.</p>
+					<label for="club-manager-input">Danh sách Email thành viên quản lý page</label>
+					<div class="admin-add-row">
+						<input type="email" id="club-manager-input" placeholder="nhapemail@nqd.edu.vn">
+						<button type="button" id="btn-add-manager" class="clubs-button" style="margin-top: 0;">+ Thêm</button>
+					</div>
+					<p class="clubs-field-hint">Email cần thuộc tài khoản DIEUNW đã đăng ký. Có thể thêm nhiều quản lý.</p>
+					<!-- Khu vực hiển thị danh sách email quản lý đã thêm -->
+					<ul id="club-managers-list" class="admin-list" style="margin-top: 4px; margin-bottom: 8px;"></ul>
 					<label for="club-logo">Logo CLB</label>
 					<input id="club-logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
 					<p class="clubs-field-hint">PNG, JPG, WEBP hoặc GIF, tối đa 500 KB.</p>
