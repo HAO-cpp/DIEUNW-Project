@@ -1,4 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
+	if (new URLSearchParams(window.location.search).get("clubId")) return;
+
 	const achievementsList = document.getElementById("profile-achievements-list");
 	const interestsList = document.getElementById("profile-interests-list");
 	const albumList = document.getElementById("profile-album-list");
@@ -8,10 +10,16 @@ document.addEventListener("DOMContentLoaded", () => {
 	const allowedImageTypes = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
 	async function api(url, options = {}) {
+		const token = localStorage.getItem("session_token");
+		const headers = {
+			...(token ? { Authorization: `Bearer ${token}` } : {}),
+			...(options.headers || {})
+		};
 		const response = await fetch(`https://dieunw.onrender.com${url}`, {
-		credentials: "include",
-		...options
-	});
+			credentials: "include",
+			...options,
+			headers
+		});
 		const data = await response.json();
 		if (!response.ok) throw new Error(data.error || "Không thể hoàn tất yêu cầu.");
 		return data;
@@ -121,7 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		renderAlbum(data.photos);
 	}
 
-	document.getElementById("achievement-form").addEventListener("submit", async event => {
+	document.getElementById("achievement-form")?.addEventListener("submit", async event => {
 		event.preventDefault();
 		const form = event.currentTarget;
 		const button = form.querySelector("button[type='submit']");
@@ -144,7 +152,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 	});
 
-	document.getElementById("interest-form").addEventListener("submit", async event => {
+	document.getElementById("interest-form")?.addEventListener("submit", async event => {
 		event.preventDefault();
 		const form = event.currentTarget;
 		const button = form.querySelector("button[type='submit']");
@@ -166,7 +174,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 	});
 
-	document.getElementById("album-form").addEventListener("submit", async event => {
+	document.getElementById("album-form")?.addEventListener("submit", async event => {
 		event.preventDefault();
 		const form = event.currentTarget;
 		const button = form.querySelector("button[type='submit']");

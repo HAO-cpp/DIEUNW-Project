@@ -35,11 +35,10 @@
     <!-- KHU VỰC NỘI DUNG CHÍNH -->
     <main class="main-content page-enter">
         
-        <!-- 1. Hộp thoại Đăng nhập OTP -->
-                <!-- 1. Hộp thoại Tài khoản 3 trong 1 (Đăng nhập / Đăng ký / Quên mật khẩu) -->
+        <!-- 1. Hộp thoại Tài khoản 3 trong 1 (Đăng nhập / Đăng ký / Quên mật khẩu) -->
         <div id="auth-container" class="auth-box">
             
-            <!-- TAB 1: ĐĂNG NHẬP (Mặc định hiển thị - Không tốn lượt gửi mail) -->
+            <!-- TAB 1: ĐĂNG NHẬP -->
             <div id="login-view">
                 <h2>Chào mừng bạn đã trở lại DIEUNW</h2>
                 <p class="auth-subtitle">Nhập Email trường và mật khẩu để truy cập góc học tập.</p>
@@ -57,11 +56,11 @@
                         type="button" 
                         id="toggle-password" 
                         aria-label="Hiện mật khẩu"
-                            style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #65676b; padding: 0; display: flex; align-items: center;"
-                        >
+                        style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #65676b; padding: 0; display: flex; align-items: center;"
+                    >
                         <svg id="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                        <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
                         </svg>
                     </button>
                 </div>
@@ -73,7 +72,7 @@
                 </div>
             </div>
 
-            <!-- TAB 2: ĐĂNG KÝ TÀI KHOẢN MỚI (Gửi OTP xác nhận 1 lần duy nhất) -->
+            <!-- TAB 2: ĐĂNG KÝ TÀI KHOẢN MỚI -->
             <div id="register-view" style="display: none;">
                 <h2>Đăng Ký Học Sinh NQD</h2>
                 <p class="auth-subtitle">Xác thực email trường 1 lần duy nhất để tạo tài khoản.</p>
@@ -104,7 +103,7 @@
                 </p>
             </div>
 
-            <!-- TAB 3: QUÊN MẬT KHẨU (Gửi OTP để đặt lại mật khẩu mới) -->
+            <!-- TAB 3: QUÊN MẬT KHẨU -->
             <div id="forgot-view" style="display: none;">
                 <h2>🔑 Khôi Phục Mật Khẩu</h2>
                 <p class="auth-subtitle">Nhập email đã đăng ký để nhận mã đặt lại mật khẩu.</p>
@@ -134,8 +133,7 @@
 
         </div>
 
-
-        <!-- 2. Hộp thoại Hồ sơ cá nhân (Đã đưa Tên lên trên, Email làm văn bản phụ ở dưới) -->
+        <!-- 2. Hộp thoại Hồ sơ cá nhân / Fanpage CLB -->
         <div id="profile-container" style="display: none; max-width: 680px; margin: 30px auto;">
             
             <div class="profile-card-box" style="max-width: 100%; margin: 0 0 25px 0;">
@@ -144,13 +142,8 @@
                 </div>
                 <div class="profile-header-info">
                     <img id="user-display-avatar" src="./DIEU.png" alt="Avatar" class="profile-avatar-large">
-                    
-                    <!-- Tên chính nổi bật ở trên -->
                     <h1 id="user-display-name" class="profile-main-name">Tên Học Sinh</h1>
-                    
-                    <!-- Email chuyển thành văn bản phụ nhỏ gọn bên dưới -->
                     <p id="user-display-email" class="profile-sub-email">email@nqd.edu.vn</p>
-                    
                     <p id="user-display-class" class="user-class-badge">Học sinh trường NQD</p>
                     <div id="profile-role-tags" class="profile-role-tags" aria-label="Vai trò"></div>
                     <p id="user-display-bio" class="user-bio-text">Chào mừng đến với góc học tập của mình trên DIEUNW!</p>
@@ -175,7 +168,7 @@
                     <button id="btn-logout" class="btn-logout" style="margin-top: 0;">Đăng xuất</button>
                 </div>
 
-                <!-- Form chỉnh sửa thông tin (Cho phép đổi cả Tên và Email) -->
+                <!-- Form chỉnh sửa thông tin -->
                 <div id="edit-profile-form" class="edit-form-box" style="display: none;">
                     <h2 id="update">Cập nhật thông tin cá nhân</h2>
                     <div class="input-group">
@@ -271,11 +264,19 @@
                 </section>
             </div>
 
-            <!-- Danh sách bài viết cá nhân -->
+            <!-- Khung đăng bài cho Fanpage CLB (chỉ hiện với quản lý CLB) -->
+            <form id="club-post-composer" class="edit-form-box" style="display: none; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                <h3 style="margin: 0;">Đăng bài với tư cách Fanpage CLB</h3>
+                <textarea id="club-post-content" rows="3" maxlength="5000" placeholder="Chia sẻ hoạt động, sự kiện mới của CLB..." style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #d0d7de;" required></textarea>
+                <input id="club-post-image" type="text" placeholder="Link ảnh đính kèm (không bắt buộc)" style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #d0d7de;">
+                <button type="submit" class="btn-auth" style="width: auto; align-self: flex-end; padding: 10px 20px;">Đăng lên Fanpage</button>
+            </form>
+
+            <!-- Danh sách bài viết -->
             <div class="my-posts-section">
                 <h3 style="margin-bottom: 15px; color: #1c1e21;">Bài viết đã đăng của bạn</h3>
                 <div id="my-posts-container">
-                    <p style="text-align: center; color: #65676b;">Đang tải bài viết của bạn...</p>
+                    <p style="text-align: center; color: #65676b;">Đang tải bài viết...</p>
                 </div>
             </div>
 

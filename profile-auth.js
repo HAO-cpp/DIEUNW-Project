@@ -1,4 +1,5 @@
 const API_BASE = "https://dieunw.onrender.com";
+
 document.addEventListener("DOMContentLoaded", () => {
     const authContainer = document.getElementById("auth-container");
     const profileContainer = document.getElementById("profile-container");
@@ -6,6 +7,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const loginView = document.getElementById("login-view");
     const registerView = document.getElementById("register-view");
     const forgotView = document.getElementById("forgot-view");
+
+    function getAuthHeaders(extra = {}) {
+        const token = localStorage.getItem("session_token");
+        return {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...extra
+        };
+    }
 
     function requestErrorMessage(error, fallback) {
         if (location.protocol === "file:" || error instanceof TypeError) {
@@ -25,15 +34,19 @@ document.addEventListener("DOMContentLoaded", () => {
         return data;
     }
 
-    if (location.hash === "#register") {
+    if (location.hash === "#register" && loginView && registerView) {
         loginView.style.display = "none";
         registerView.style.display = "block";
     }
 
-        const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(window.location.search);
     const clubId = urlParams.get("clubId");
+    let activeClub = null;
 
-    fetch("https://dieunw.onrender.com/api/auth/me", { credentials: "include" })
+    fetch(`${API_BASE}/api/auth/me`, {
+        credentials: "include",
+        headers: getAuthHeaders()
+    })
         .then(response => response.json())
         .then(async data => {
             const currentUser = data.user || null;
@@ -59,9 +72,9 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         })
         .catch(() => {
-            // Nếu lỗi mạng khi đang mở trang CLB vẫn thử tải thông tin CLB cho khách xem
             if (clubId) loadClubProfile(clubId, null);
         });
+
     // CHUYỂN ĐỔI GIỮA CÁC TAB ĐĂNG NHẬP / ĐĂNG KÝ / QUÊN MẬT KHẨU
     document.getElementById("link-to-register")?.addEventListener("click", (e) => {
         e.preventDefault();
@@ -87,7 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // ==========================================
-    // CHỨC NĂNG 1: ĐĂNG NHẬP (KHÔNG TỐN EMAILJS)
+    // CHỨC NĂNG 1: ĐĂNG NHẬP
     // ==========================================
     document.getElementById("btn-login")?.addEventListener("click", async () => {
         const email = document.getElementById("login-email").value.trim().toLowerCase();
@@ -103,7 +116,7 @@ document.addEventListener("DOMContentLoaded", () => {
         btnLogin.disabled = true;
 
         try {
-            const response = await fetch("https://dieunw.onrender.com/api/auth/login", {
+            const response = await fetch(`${API_BASE}/api/auth/login`, {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
@@ -122,7 +135,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // ==========================================
-    // CHỨC NĂNG 2: ĐĂNG KÝ TÀI KHOẢN MỚI (CÓ GỬI OTP)
+    // CHỨC NĂNG 2: ĐĂNG KÝ TÀI KHOẢN MỚI
     // ==========================================
     document.getElementById("btn-reg-send-otp")?.addEventListener("click", async () => {
         const name = document.getElementById("reg-name").value.trim();
@@ -143,12 +156,11 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        btnSend.innerText = "Đang kiểm tra email...";
+        btnSend.innerText = "Đang gửi mã OTP...";
         btnSend.disabled = true;
 
         try {
-            btnSend.innerText = "Đang gửi mã OTP...";
-            const response = await fetch("https://dieunw.onrender.com/api/auth/register/start", {
+            const response = await fetch(`${API_BASE}/api/auth/register/start`, {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
@@ -170,7 +182,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Xác thực OTP và lưu tài khoản mới lên MockAPI
     document.getElementById("btn-reg-verify")?.addEventListener("click", async () => {
         const userOtp = document.getElementById("reg-otp-input").value.trim();
         const btnVerify = document.getElementById("btn-reg-verify");
@@ -179,7 +190,7 @@ document.addEventListener("DOMContentLoaded", () => {
         btnVerify.disabled = true;
 
         try {
-            const response = await fetch("https://dieunw.onrender.com/api/auth/register/verify", {
+            const response = await fetch(`${API_BASE}/api/auth/register/verify`, {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
@@ -203,7 +214,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // ==========================================
-    // CHỨC NĂNG 3: QUÊN MẬT KHẨU (CÓ GỬI OTP)
+    // CHỨC NĂNG 3: QUÊN MẬT KHẨU
     // ==========================================
     document.getElementById("btn-forgot-send-otp")?.addEventListener("click", async () => {
         const email = document.getElementById("forgot-email").value.trim().toLowerCase();
@@ -214,23 +225,22 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        btnSend.innerText = "Đang tìm tài khoản...";
+        btnSend.innerText = "Đang gửi mã khôi phục...";
         btnSend.disabled = true;
 
         try {
-            btnSend.innerText = "Đang gửi mã khôi phục...";
-			const response = await fetch("https://dieunw.onrender.com/api/auth/password/start", {
-				method: "POST",
-				credentials: "include",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ email })
+            const response = await fetch(`${API_BASE}/api/auth/password/start`, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email })
             });
             const data = await readApiResponse(response);
-			if (!response.ok) throw new Error(data.error || "Không thể gửi mã khôi phục.");
-			const notice = document.querySelector("#forgot-step-2 .otp-notice");
-			notice.textContent = data.devCode
-				? `Chế độ phát triển, mã xác nhận: ${data.devCode}`
-				: "Mã khôi phục đã được gửi đến email của bạn.";
+            if (!response.ok) throw new Error(data.error || "Không thể gửi mã khôi phục.");
+            const notice = document.querySelector("#forgot-step-2 .otp-notice");
+            notice.textContent = data.devCode
+                ? `Chế độ phát triển, mã xác nhận: ${data.devCode}`
+                : "Mã khôi phục đã được gửi đến email của bạn.";
             document.getElementById("forgot-step-1").style.display = "none";
             document.getElementById("forgot-step-2").style.display = "block";
         } catch (error) {
@@ -241,7 +251,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Đặt lại mật khẩu mới trên MockAPI
     document.getElementById("btn-forgot-reset")?.addEventListener("click", async () => {
         const userOtp = document.getElementById("forgot-otp-input").value.trim();
         const newPassword = document.getElementById("forgot-new-password").value;
@@ -256,7 +265,7 @@ document.addEventListener("DOMContentLoaded", () => {
         btnReset.disabled = true;
 
         try {
-            const response = await fetch("https://dieunw.onrender.com/api/auth/password/verify", {
+            const response = await fetch(`${API_BASE}/api/auth/password/verify`, {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
@@ -278,11 +287,16 @@ document.addEventListener("DOMContentLoaded", () => {
             btnReset.disabled = false;
         }
     });
-        // ==========================================
-    // HIỂN THỊ & CHỈNH SỬA HỒ SƠ CÁ NHÂN
+
+    // ==========================================
+    // HIỂN THỊ & CHỈNH SỬA HỒ SƠ / FANPAGE CLB
     // ==========================================
     document.getElementById("btn-logout")?.addEventListener("click", async () => {
-        await fetch("https://dieunw.onrender.com/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
+        await fetch(`${API_BASE}/api/auth/logout`, {
+            method: "POST",
+            credentials: "include",
+            headers: getAuthHeaders()
+        }).catch(() => {});
         localStorage.removeItem("dieuNwUser");
         localStorage.removeItem("session_token");
         location.reload();
@@ -292,14 +306,31 @@ document.addEventListener("DOMContentLoaded", () => {
     const editProfileForm = document.getElementById("edit-profile-form");
 
     btnEditProfile?.addEventListener("click", () => {
-        const currentUser = JSON.parse(localStorage.getItem("dieuNwUser")) || {};
-        document.getElementById("edit-name-input").value = currentUser.name || "";
-        document.getElementById("edit-email-input").value = currentUser.email || "";
-        document.getElementById("edit-class-input").value = currentUser.studentClass || "";
-        document.getElementById("edit-avatar-input").value = currentUser.avatar || "";
-        document.getElementById("edit-cover-input").value = currentUser.cover || "";
-        document.getElementById("edit-bio-input").value = currentUser.bio || "";
-        
+        const emailGroup = document.getElementById("edit-email-input")?.closest(".input-group");
+        const classGroup = document.getElementById("edit-class-input")?.closest(".input-group");
+        const updateTitle = document.getElementById("update");
+
+        if (activeClub) {
+            if (updateTitle) updateTitle.innerText = "Cập nhật Fanpage CLB";
+            if (emailGroup) emailGroup.style.display = "none";
+            if (classGroup) classGroup.style.display = "none";
+            document.getElementById("edit-name-input").value = activeClub.name || "";
+            document.getElementById("edit-avatar-input").value = activeClub.logo || "";
+            document.getElementById("edit-cover-input").value = activeClub.cover || "";
+            document.getElementById("edit-bio-input").value = activeClub.bio || "";
+        } else {
+            if (updateTitle) updateTitle.innerText = "Cập nhật thông tin cá nhân";
+            if (emailGroup) emailGroup.style.display = "block";
+            if (classGroup) classGroup.style.display = "block";
+            const currentUser = JSON.parse(localStorage.getItem("dieuNwUser")) || {};
+            document.getElementById("edit-name-input").value = currentUser.name || "";
+            document.getElementById("edit-email-input").value = currentUser.email || "";
+            document.getElementById("edit-class-input").value = currentUser.studentClass || "";
+            document.getElementById("edit-avatar-input").value = currentUser.avatar || "";
+            document.getElementById("edit-cover-input").value = currentUser.cover || "";
+            document.getElementById("edit-bio-input").value = currentUser.bio || "";
+        }
+
         editProfileForm.style.display = "block";
         btnEditProfile.style.display = "none";
     });
@@ -310,8 +341,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     document.getElementById("btn-save-profile")?.addEventListener("click", async () => {
-        const clubId = new URLSearchParams(window.location.search).get("clubId");
-        const currentUser = JSON.parse(localStorage.getItem("dieuNwUser")) || {};
         const newName = document.getElementById("edit-name-input").value.trim();
         const newEmail = document.getElementById("edit-email-input").value.trim().toLowerCase();
         const newClass = document.getElementById("edit-class-input").value.trim();
@@ -329,7 +358,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const response = await fetch(`${API_BASE}/api/clubs/${encodeURIComponent(clubId)}`, {
                     method: "PATCH",
                     credentials: "include",
-                    headers: { "Content-Type": "application/json" },
+                    headers: getAuthHeaders({ "Content-Type": "application/json" }),
                     body: JSON.stringify({ name: newName, logo: newAvatar, cover: newCover, bio: newBio })
                 });
                 const data = await readApiResponse(response);
@@ -338,13 +367,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 editProfileForm.style.display = "none";
                 btnEditProfile.style.display = "inline-block";
                 alert("Cập nhật Fanpage CLB thành công!");
-                const currentUser = JSON.parse(localStorage.getItem("dieuNwUser")) || null;
+                const currentUser = JSON.parse(localStorage.getItem("dieuNwUser") || "null");
                 await loadClubProfile(clubId, currentUser);
             } catch (error) {
                 alert(requestErrorMessage(error, "Lỗi khi lưu thông tin Fanpage CLB!"));
             }
             return;
         }
+
         const updatedFields = {
             name: newName,
             email: newEmail,
@@ -355,19 +385,19 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         try {
-            const response = await fetch("https://dieunw.onrender.com/api/users/me", {
+            const response = await fetch(`${API_BASE}/api/users/me`, {
                 method: "PATCH",
                 credentials: "include",
-                headers: { "Content-Type": "application/json" },
+                headers: getAuthHeaders({ "Content-Type": "application/json" }),
                 body: JSON.stringify(updatedFields)
             });
             const data = await readApiResponse(response);
             if (!response.ok) throw new Error(data.error || "Không thể cập nhật hồ sơ.");
             localStorage.setItem("dieuNwUser", JSON.stringify(data.user));
-            
+
             editProfileForm.style.display = "none";
             btnEditProfile.style.display = "inline-block";
-            
+
             alert("Cập nhật hồ sơ thành công!");
             showProfile(data.user);
         } catch (error) {
@@ -401,7 +431,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!user.isAdmin) return;
         const list = document.getElementById("admin-list");
         try {
-            const response = await fetch("https://dieunw.onrender.com/api/admins", { credentials: "include" });
+            const response = await fetch(`${API_BASE}/api/admins`, {
+                credentials: "include",
+                headers: getAuthHeaders()
+            });
             const data = await readApiResponse(response);
             if (!response.ok) throw new Error(data.error || "Không thể tải danh sách admin.");
             list.replaceChildren(...data.admins.map(email => {
@@ -422,10 +455,10 @@ document.addEventListener("DOMContentLoaded", () => {
         button.disabled = true;
         status.textContent = "Đang thêm admin...";
         try {
-            const response = await fetch("https://dieunw.onrender.com/api/admins", {
+            const response = await fetch(`${API_BASE}/api/admins`, {
                 method: "POST",
                 credentials: "include",
-                headers: { "Content-Type": "application/json" },
+                headers: getAuthHeaders({ "Content-Type": "application/json" }),
                 body: JSON.stringify({ email: emailInput.value.trim() })
             });
             const data = await readApiResponse(response);
@@ -444,18 +477,28 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     function showProfile(user) {
+        activeClub = null;
         window.updateNavAvatar?.(user);
         window.updateHomeAccess?.(user);
         if (authContainer) authContainer.style.display = "none";
         if (profileContainer) profileContainer.style.display = document.getElementById("newsfeed-container") ? "none" : "block";
-        
+
+        const extras = document.querySelector(".profile-extras");
+        if (extras) extras.style.display = "";
+
+        const btnLogout = document.getElementById("btn-logout");
+        if (btnLogout) btnLogout.style.display = "";
+
+        const verifiedBadge = document.querySelector(".verified-badge");
+        if (verifiedBadge) verifiedBadge.textContent = "✓ Đã xác thực học sinh trường NQD";
+
         document.getElementById("user-display-name").innerText = user.name;
         document.getElementById("user-display-email").innerText = user.email;
         document.getElementById("user-display-class").innerText = user.studentClass ? `Lớp ${user.studentClass}` : "Học sinh trường NQD";
         document.getElementById("user-display-bio").innerText = user.bio || "Chào mừng đến với góc học tập của mình trên DIEUNW!";
         renderProfileRoles(user);
         loadAdminTools(user);
-        
+
         const avatarEl = document.getElementById("user-display-avatar");
         if (avatarEl) avatarEl.src = user.avatar || "./DIEU.png";
 
@@ -480,57 +523,48 @@ document.addEventListener("DOMContentLoaded", () => {
         })[character]);
     }
 
-    async function loadMyPosts(userId, userAvatar) {
-        const myPostsContainer = document.getElementById("my-posts-container");
-        if (!myPostsContainer) return;
+    function renderPostsList(container, posts, fallbackAvatar, emptyText, canDeleteFn, onDeleted) {
+        document.getElementById("stat-posts").innerText = posts.length;
+        const totalLikes = posts.reduce((sum, post) => sum + (post.likes || 0), 0);
+        document.getElementById("stat-likes").innerText = totalLikes;
 
-        try {
-            const response = await fetch(API_BASE + "/api/clubs/" + encodeURIComponent(clubId), {
-                credentials: "include"
-            });
-            const data = await readApiResponse(response);
-            if (!response.ok) throw new Error(data.error || "Không thể tải bài viết.");
-            const myPosts = data.posts.filter(post => String(post.userId) === String(userId)).reverse();
+        container.innerHTML = "";
+        if (posts.length === 0) {
+            container.innerHTML = `<p style='text-align:center; color:#65676b; background:white; padding:20px; border-radius:12px;'>${emptyText}</p>`;
+            return;
+        }
 
-            document.getElementById("stat-posts").innerText = myPosts.length;
-            const totalLikes = myPosts.reduce((sum, post) => sum + (post.likes || 0), 0);
-            document.getElementById("stat-likes").innerText = totalLikes;
+        posts.forEach(post => {
+            const postEl = document.createElement("div");
+            postEl.classList.add("post-card");
+            const imgHtml = (post.image && post.image.trim() !== "") ? `<img src="${escapeHtml(post.image)}" class="post-card-image" loading="lazy">` : "";
+            const avatar = escapeHtml(post.avatar || fallbackAvatar || "./DIEU.png");
 
-            myPostsContainer.innerHTML = "";
-            if (myPosts.length === 0) {
-                myPostsContainer.innerHTML = "<p style='text-align:center; color:#65676b; background:white; padding:20px; border-radius:12px;'>Bạn chưa đăng bài viết nào trên DIEUNW.</p>";
-                return;
-            }
-
-            myPosts.forEach(post => {
-                const postEl = document.createElement("div");
-                postEl.classList.add("post-card");
-                const imgHtml = (post.image && post.image.trim() !== "") ? `<img src="${escapeHtml(post.image)}" class="post-card-image" loading="lazy">` : "";
-                const avatar = escapeHtml(userAvatar || "./DIEU.png");
-
-                postEl.innerHTML = `
-                    <div class="post-card-header">
-                        <img src="${avatar}" class="post-card-avatar" style="object-fit:cover;">
-                        <div>
-                            <h4 class="post-card-author">${escapeHtml(post.name || "")}</h4>
-                            <span class="post-card-time">${new Date(post.createdAt).toLocaleString('vi-VN')}</span>
-                        </div>
+            postEl.innerHTML = `
+                <div class="post-card-header">
+                    <img src="${avatar}" class="post-card-avatar" style="object-fit:cover;">
+                    <div>
+                        <h4 class="post-card-author">${escapeHtml(post.name || "")}</h4>
+                        <span class="post-card-time">${new Date(post.createdAt).toLocaleString("vi-VN")}</span>
                     </div>
-                    <div class="post-card-body">
-                        <p>${escapeHtml(post.content || "")}</p>
-                        ${imgHtml}
-                    </div>
-                    <div class="post-status-info">
-                        <span class="like-count-text">
-                            <img src="./icon-like.png" class="status-like-icon" alt="Like"> 
-                            <span class="count">${post.likes || 0}</span> lượt thích
-                        </span>
-                        <span class="comment-count-text">
-                            <img src="./icon-comment.png" class="status-comment-icon" alt="Comment"> 
-                            <span class="comment-count">${Array.isArray(post.comments) ? post.comments.length : 0}</span> bình luận
-                        </span>
-                    </div>
-                `;
+                </div>
+                <div class="post-card-body">
+                    <p>${escapeHtml(post.content || "")}</p>
+                    ${imgHtml}
+                </div>
+                <div class="post-status-info">
+                    <span class="like-count-text">
+                        <img src="./icon-like.png" class="status-like-icon" alt="Like">
+                        <span class="count">${post.likes || 0}</span> lượt thích
+                    </span>
+                    <span class="comment-count-text">
+                        <img src="./icon-comment.png" class="status-comment-icon" alt="Comment">
+                        <span class="comment-count">${Array.isArray(post.comments) ? post.comments.length : 0}</span> bình luận
+                    </span>
+                </div>
+            `;
+
+            if (canDeleteFn(post)) {
                 const actions = document.createElement("div");
                 actions.className = "post-card-actions";
                 const deleteButton = document.createElement("button");
@@ -541,13 +575,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (!window.confirm("Bạn có chắc muốn xóa bài viết này?")) return;
                     deleteButton.disabled = true;
                     try {
-                        const response = await fetch(`https://dieunw.onrender.com/api/posts/${encodeURIComponent(post.id)}`, {
+                        const response = await fetch(`${API_BASE}/api/posts/${encodeURIComponent(post.id)}`, {
                             method: "DELETE",
-                            credentials: "include"
+                            credentials: "include",
+                            headers: getAuthHeaders()
                         });
                         const data = await readApiResponse(response);
                         if (!response.ok) throw new Error(data.error || "Không thể xóa bài viết.");
-                        await loadMyPosts(userId, userAvatar);
+                        await onDeleted();
                     } catch (error) {
                         alert(requestErrorMessage(error, "Không thể xóa bài viết."));
                         deleteButton.disabled = false;
@@ -555,81 +590,161 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
                 actions.append(deleteButton);
                 postEl.append(actions);
-                myPostsContainer.appendChild(postEl);
+            }
+            container.appendChild(postEl);
+        });
+    }
+
+    async function loadMyPosts(userId, userAvatar) {
+        const myPostsContainer = document.getElementById("my-posts-container");
+        if (!myPostsContainer) return;
+
+        try {
+            const response = await fetch(`${API_BASE}/api/posts`, {
+                credentials: "include",
+                headers: getAuthHeaders()
             });
+            const data = await readApiResponse(response);
+            if (!response.ok) throw new Error(data.error || "Không thể tải bài viết.");
+            const myPosts = (data.posts || []).filter(
+                post => String(post.userId) === String(userId) && !post.clubId && post.type !== "study-resource"
+            );
+            renderPostsList(
+                myPostsContainer,
+                myPosts,
+                userAvatar,
+                "Bạn chưa đăng bài viết nào trên DIEUNW.",
+                () => true,
+                () => loadMyPosts(userId, userAvatar)
+            );
         } catch (error) {
             myPostsContainer.innerHTML = "<p style='color:red; text-align:center;'>Không thể tải lịch sử bài viết.</p>";
         }
     }
-    async function loadClubProfile(clubId, currentUser) {
-    if (authContainer) authContainer.style.display = "none";
-    if (profileContainer) profileContainer.style.display = "block";
 
-    try {
-        const response = await fetch(`https://dieunw.onrender.com{encodeURIComponent(clubId)}`, {
-            credentials: "include"
-        });
-        const data = await readApiResponse(response);
-        if (!response.ok) throw new Error(data.error || "Không tìm thấy CLB.");
-        const club = data.club;
+    async function loadClubProfile(targetClubId, currentUser) {
+        if (authContainer) authContainer.style.display = "none";
+        if (profileContainer) profileContainer.style.display = "block";
 
-        // 1. Đổ thông tin CLB lên giao diện Profile có sẵn
-        document.getElementById("user-display-name").innerText = club.name;
-        const managersList = Array.isArray(club.managerEmails) ? club.managerEmails : [club.managerEmail];
-        document.getElementById("user-display-email").innerText = `Quản lý: ${managersList.filter(Boolean).join(", ")}`;
-        document.getElementById("user-display-class").innerText = "Câu lạc bộ trực thuộc trường NQD";
-        document.getElementById("user-display-bio").innerText = club.bio || `Fanpage chính thức của ${club.name}`;
+        const extras = document.querySelector(".profile-extras");
+        if (extras) extras.style.display = "none";
 
-        const avatarEl = document.getElementById("user-display-avatar");
-        if (avatarEl) avatarEl.src = club.logo || "./DIEU.png";
+        try {
+            const response = await fetch(`${API_BASE}/api/clubs/${encodeURIComponent(targetClubId)}`, {
+                credentials: "include",
+                headers: getAuthHeaders()
+            });
+            const data = await readApiResponse(response);
+            if (!response.ok) throw new Error(data.error || "Không tìm thấy CLB.");
+            const club = data.club;
+            activeClub = club;
 
-        const coverEl = document.getElementById("profile-cover-image");
-        if (coverEl) {
-            coverEl.hidden = !club.cover;
-            if (club.cover) coverEl.src = club.cover;
-            else coverEl.removeAttribute("src");
-        }
+            document.title = `DIEUNW - ${club.name}`;
+            document.getElementById("user-display-name").innerText = club.name;
+            const managersList = Array.isArray(club.managerEmails) ? club.managerEmails : [club.managerEmail];
+            document.getElementById("user-display-email").innerText = `Quản lý: ${managersList.filter(Boolean).join(", ")}`;
+            document.getElementById("user-display-class").innerText = "Câu lạc bộ trực thuộc trường NQD";
+            document.getElementById("user-display-bio").innerText = club.bio || `Fanpage chính thức của ${club.name}`;
 
-        // 2. Gắn tag FANPAGE CLB
-        const roleContainer = document.getElementById("profile-role-tags");
-        if (roleContainer) {
-            roleContainer.replaceChildren();
-            const fanpageTag = document.createElement("span");
-            fanpageTag.className = "profile-role-tag";
-            fanpageTag.textContent = "✓ FANPAGE CLB";
-            fanpageTag.style.setProperty("--club-color", club.tagColor || "#1769aa");
-            roleContainer.append(fanpageTag);
-        }
+            const verifiedBadge = document.querySelector(".verified-badge");
+            if (verifiedBadge) verifiedBadge.textContent = "✓ Fanpage CLB chính thức";
 
-        // 3. Phân quyền Quản lý CLB (ẩn/hiện nút chỉnh sửa & đăng bài)
-        const normalizedManagers = managersList.map(e => String(e || "").toLowerCase());
-        const isManager = Boolean(
-            currentUser && (normalizedManagers.includes(currentUser.email.toLowerCase()) || currentUser.isAdmin)
-        );
+            const avatarEl = document.getElementById("user-display-avatar");
+            if (avatarEl) avatarEl.src = club.logo || "./DIEU.png";
 
-        const btnEdit = document.getElementById("btn-edit-profile");
-        const btnLogout = document.getElementById("btn-logout");
-        const adminTools = document.getElementById("admin-tools");
-        const clubComposer = document.getElementById("club-post-composer");
-
-        if (btnLogout) btnLogout.style.display = "none";
-        if (adminTools) adminTools.hidden = true;
-
-        if (isManager) {
-            if (btnEdit) {
-                btnEdit.style.display = "inline-block";
-                btnEdit.innerText = "Chỉnh sửa Fanpage";
+            const coverEl = document.getElementById("profile-cover-image");
+            if (coverEl) {
+                coverEl.hidden = !club.cover;
+                if (club.cover) coverEl.src = club.cover;
+                else coverEl.removeAttribute("src");
             }
-            if (clubComposer) clubComposer.style.display = "flex";
-        } else {
-            if (btnEdit) btnEdit.style.display = "none";
-            if (clubComposer) clubComposer.style.display = "none";
+
+            const roleContainer = document.getElementById("profile-role-tags");
+            if (roleContainer) {
+                roleContainer.replaceChildren();
+                const fanpageTag = document.createElement("span");
+                fanpageTag.className = "profile-role-tag";
+                fanpageTag.textContent = "✓ FANPAGE CLB";
+                fanpageTag.style.setProperty("--club-color", club.tagColor || "#1769aa");
+                roleContainer.append(fanpageTag);
+            }
+
+            const normalizedManagers = managersList.map(e => String(e || "").toLowerCase());
+            const isManager = Boolean(
+                currentUser && (normalizedManagers.includes(currentUser.email.toLowerCase()) || currentUser.isAdmin)
+            );
+
+            const btnEdit = document.getElementById("btn-edit-profile");
+            const btnLogout = document.getElementById("btn-logout");
+            const adminTools = document.getElementById("admin-tools");
+            const clubComposer = document.getElementById("club-post-composer");
+            const postsHeading = document.querySelector(".my-posts-section h3");
+
+            if (btnLogout) btnLogout.style.display = "none";
+            if (adminTools) adminTools.hidden = true;
+            if (postsHeading) postsHeading.textContent = `Bài viết của ${club.name}`;
+
+            if (isManager) {
+                if (btnEdit) {
+                    btnEdit.style.display = "inline-block";
+                    btnEdit.innerText = "Chỉnh sửa Fanpage";
+                }
+                if (clubComposer) clubComposer.style.display = "flex";
+            } else {
+                if (btnEdit) btnEdit.style.display = "none";
+                if (clubComposer) clubComposer.style.display = "none";
+            }
+
+            const myPostsContainer = document.getElementById("my-posts-container");
+            if (myPostsContainer) {
+                renderPostsList(
+                    myPostsContainer,
+                    data.posts || [],
+                    club.logo || "./DIEU.png",
+                    "Fanpage CLB chưa có bài viết nào.",
+                    post => Boolean(currentUser && (String(post.userId) === String(currentUser.id) || isManager)),
+                    () => loadClubProfile(targetClubId, currentUser)
+                );
+            }
+        } catch (error) {
+            alert(requestErrorMessage(error, "Lỗi tải dữ liệu Fanpage CLB."));
+        }
+    }
+
+    document.getElementById("club-post-composer")?.addEventListener("submit", async event => {
+        event.preventDefault();
+        if (!clubId) return;
+        const contentInput = document.getElementById("club-post-content");
+        const imageInput = document.getElementById("club-post-image");
+        const submitBtn = event.currentTarget.querySelector("button[type='submit']");
+        const content = contentInput.value.trim();
+        const image = imageInput ? imageInput.value.trim() : "";
+
+        if (!content) {
+            alert("Vui lòng nhập nội dung bài viết!");
+            return;
         }
 
-    } catch (error) {
-        alert(requestErrorMessage(error, "Lỗi tải dữ liệu Fanpage CLB."));
-    }
-}
+        submitBtn.disabled = true;
+        try {
+            const response = await fetch(`${API_BASE}/api/posts`, {
+                method: "POST",
+                credentials: "include",
+                headers: getAuthHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({ content, image, clubId, visibility: "public" })
+            });
+            const data = await readApiResponse(response);
+            if (!response.ok) throw new Error(data.error || "Không thể đăng bài cho CLB.");
+            contentInput.value = "";
+            if (imageInput) imageInput.value = "";
+            const currentUser = JSON.parse(localStorage.getItem("dieuNwUser") || "null");
+            await loadClubProfile(clubId, currentUser);
+        } catch (error) {
+            alert(requestErrorMessage(error, "Lỗi khi đăng bài cho Fanpage CLB."));
+        } finally {
+            submitBtn.disabled = false;
+        }
+    });
 });
 
 // --- BẬT / TẮT HIỂN THỊ MẬT KHẨU ---
@@ -638,23 +753,20 @@ const toggleBtn = document.getElementById("toggle-password");
 const eyeIcon = document.getElementById("eye-icon");
 
 if (passwordInput && toggleBtn && eyeIcon) {
-  toggleBtn.addEventListener("click", () => {
-    const isPassword = passwordInput.type === "password";
-    passwordInput.type = isPassword ? "text" : "password";
+    toggleBtn.addEventListener("click", () => {
+        const isPassword = passwordInput.type === "password";
+        passwordInput.type = isPassword ? "text" : "password";
 
-    if (isPassword) {
-      eyeIcon.innerHTML = `
-        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-        <line x1="1" y1="1" x2="23" y2="23"></line>
-      `;
-    } else {
-      eyeIcon.innerHTML = `
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-        <circle cx="12" cy="12" r="3"></circle>
-      `;
-    }
-  });
+        if (isPassword) {
+            eyeIcon.innerHTML = `
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                <line x1="1" y1="1" x2="23" y2="23"></line>
+            `;
+        } else {
+            eyeIcon.innerHTML = `
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+            `;
+        }
+    });
 }
-
-// Ngay bên dưới là đoạn code đăng nhập cũ của bạn:
-// document.getElementById("btn-login")?.addEventListener("click", async () => { ...

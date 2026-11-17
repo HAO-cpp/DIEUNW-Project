@@ -13,9 +13,15 @@ document.addEventListener("DOMContentLoaded", () => {
 	const btnAddManager = document.getElementById("btn-add-manager");
 
 	async function api(url, options = {}) {
+		const token = localStorage.getItem("session_token");
+		const headers = {
+			...(token ? { Authorization: `Bearer ${token}` } : {}),
+			...(options.headers || {})
+		};
 		const response = await fetch(`https://dieunw.onrender.com${url}`, {
 			credentials: "include",
-			...options
+			...options,
+			headers
 		});
 		const data = await response.json();
 		if (!response.ok) throw new Error(data.error || "Không thể hoàn tất yêu cầu.");
@@ -67,6 +73,13 @@ document.addEventListener("DOMContentLoaded", () => {
 		managerInput.value = "";
 		requestStatus.textContent = "";
 		renderManagersList();
+	});
+
+	managerInput?.addEventListener("keydown", event => {
+		if (event.key === "Enter") {
+			event.preventDefault();
+			btnAddManager?.click();
+		}
 	});
 
 	function renderClub(club) {
@@ -165,6 +178,10 @@ document.addEventListener("DOMContentLoaded", () => {
 	const logoPreview = document.getElementById("club-logo-preview");
 	logoInput.addEventListener("change", () => {
 		const file = logoInput.files?.[0];
+		if (logoPreview.dataset.objectUrl) {
+			URL.revokeObjectURL(logoPreview.dataset.objectUrl);
+			delete logoPreview.dataset.objectUrl;
+		}
 		if (!file) {
 			logoPreview.hidden = true;
 			return;
@@ -175,7 +192,9 @@ document.addEventListener("DOMContentLoaded", () => {
 			requestStatus.textContent = "Logo vượt quá 500 KB.";
 			return;
 		}
-		logoPreview.src = URL.createObjectURL(file);
+		const objectUrl = URL.createObjectURL(file);
+		logoPreview.dataset.objectUrl = objectUrl;
+		logoPreview.src = objectUrl;
 		logoPreview.hidden = false;
 		requestStatus.textContent = "";
 	});

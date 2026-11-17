@@ -29,6 +29,7 @@ const MIME_TYPES = {
 	".txt": "text/plain; charset=utf-8",
 	".webp": "image/webp"
 };
+
 function serializeCookie(name, value, { maxAge, secure }) {
 	const parts = [`${name}=${encodeURIComponent(value)}`, "HttpOnly", "Path=/"];
 	if (maxAge !== undefined) parts.push(`Max-Age=${maxAge}`);
@@ -137,13 +138,27 @@ function cleanUser(row) {
 
 function profileUser(db, row) {
 	if (!row) return null;
+	const allApprovedClubs = db.prepare(`
+		SELECT id, name, tag_color AS color, manager_id, manager_email, manager_emails
+		FROM clubs WHERE status = 'approved'
+		ORDER BY created_at
+	`).all();
+	const userEmail = String(row.email || "").toLowerCase();
+	const profileTitles = allApprovedClubs
+		.filter(club => {
+			if (club.manager_id === row.id) return true;
+			if (String(club.manager_email || "").toLowerCase() === userEmail) return true;
+			try {
+				const list = JSON.parse(club.manager_emails || "[]");
+				return Array.isArray(list) && list.some(e => String(e || "").toLowerCase() === userEmail);
+			} catch {
+				return false;
+			}
+		})
+		.map(({ id, name, color }) => ({ id, name, color }));
 	return {
 		...cleanUser(row),
-		profileTitles: db.prepare(`
-			SELECT clubs.id, clubs.name, clubs.tag_color AS color
-			FROM clubs WHERE clubs.manager_id = ? AND clubs.status = 'approved'
-			ORDER BY clubs.created_at
-		`).all(row.id)
+		profileTitles
 	};
 }
 
@@ -151,14 +166,12 @@ function syncDb(db) { if (process.env.TURSO_DATABASE_URL) db.sync(); }
 
 function initializeDatabase(dbPath) {
 	if (dbPath !== ":memory:") mkdirSync(path.dirname(dbPath), { recursive: true });
-	
-	// Khởi tạo kết nối libsql (Turso)
+
 	const db = new Database(dbPath, {
 		syncUrl: process.env.TURSO_DATABASE_URL,
 		authToken: process.env.TURSO_AUTH_TOKEN,
 	});
 
-	// Kéo dữ liệu mới nhất từ Turso về trước khi chạy lệnh tạo bảng
 	if (process.env.TURSO_DATABASE_URL) {
 		syncDb(db);
 	}
@@ -187,7 +200,10 @@ function initializeDatabase(dbPath) {
 			name TEXT NOT NULL,
 			manager_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			manager_email TEXT NOT NULL,
+			manager_emails TEXT NOT NULL DEFAULT '[]',
 			logo TEXT NOT NULL DEFAULT '',
+			cover TEXT NOT NULL DEFAULT '',
+			bio TEXT NOT NULL DEFAULT '',
 			tag_color TEXT NOT NULL,
 			status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected')),
 			requested_by TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -256,6 +272,7 @@ function initializeDatabase(dbPath) {
 		CREATE TABLE IF NOT EXISTS posts (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			club_id TEXT REFERENCES clubs(id) ON DELETE CASCADE,
 			content TEXT NOT NULL,
 			image TEXT NOT NULL DEFAULT '',
 			visibility TEXT NOT NULL CHECK(visibility IN ('public', 'private')),
@@ -300,11 +317,22 @@ function initializeDatabase(dbPath) {
 		CREATE INDEX IF NOT EXISTS conversation_members_user_idx ON conversation_members(user_id);
 		CREATE INDEX IF NOT EXISTS messages_conversation_idx ON messages(conversation_id, created_at);
 	`);
+
 	const userColumns = db.prepare("PRAGMA table_info(users)").all().map(column => column.name);
 	if (!userColumns.includes("is_admin")) db.exec("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0");
 
+	const clubColumns = db.prepare("PRAGMA table_info(clubs)").all().map(column => column.name);
+	const clubAlters = [];
+	if (!clubColumns.includes("manager_emails")) clubAlters.push("ADD COLUMN manager_emails TEXT NOT NULL DEFAULT '[]'");
+	if (!clubColumns.includes("cover")) clubAlters.push("ADD COLUMN cover TEXT NOT NULL DEFAULT ''");
+	if (!clubColumns.includes("bio")) clubAlters.push("ADD COLUMN bio TEXT NOT NULL DEFAULT ''");
+	for (const alter of clubAlters) {
+		db.exec(`ALTER TABLE clubs ${alter}`);
+	}
+
 	const postColumns = db.prepare("PRAGMA table_info(posts)").all().map(column => column.name);
 	const postAlters = [];
+	if (!postColumns.includes("club_id")) postAlters.push("ADD COLUMN club_id TEXT REFERENCES clubs(id) ON DELETE CASCADE");
 	if (!postColumns.includes("type")) postAlters.push("ADD COLUMN type TEXT NOT NULL DEFAULT \"post\"");
 	if (!postColumns.includes("resource_title")) postAlters.push("ADD COLUMN resource_title TEXT NOT NULL DEFAULT \"\"");
 	if (!postColumns.includes("resource_description")) postAlters.push("ADD COLUMN resource_description TEXT NOT NULL DEFAULT \"\"");
@@ -321,8 +349,6 @@ function initializeDatabase(dbPath) {
 		db.exec(`ALTER TABLE posts ${alter}`);
 	}
 
-
-	// Đẩy toàn bộ bảng vừa tạo lên đám mây Turso
 	if (process.env.TURSO_DATABASE_URL) {
 		syncDb(db);
 	}
@@ -353,6 +379,7 @@ function sendJson(response, statusCode, payload, headers = {}) {
 	response.writeHead(statusCode, { "Cache-Control": "no-store", "Content-Type": "application/json; charset=utf-8", ...headers });
 	response.end(JSON.stringify(payload));
 }
+
 function parseBoundary(contentType) {
 	const match = /boundary=([^;]+)/i.exec(contentType || "");
 	return match ? match[1].trim() : null;
@@ -386,7 +413,6 @@ function getUserForRequest(db, request) {
 
 	return profileUser(db, row);
 }
-
 
 function requireAdmin(user) {
 	if (!user.isAdmin) throw makeError(403, "Chỉ quản trị viên mới có thể thực hiện thao tác này.");
@@ -426,13 +452,13 @@ function requireUser(db, request) {
 }
 
 function setSession(db, userId, response, secure) {
-    const token = randomBytes(32).toString("hex");
-    const expiresAt = Date.now() + SESSION_DURATION;
+	const token = randomBytes(32).toString("hex");
+	const expiresAt = Date.now() + SESSION_DURATION;
 
-    db.prepare("INSERT INTO sessions(token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)")
-        .run(hashValue(token), userId, expiresAt, new Date().toISOString()); syncDb(db);
+	db.prepare("INSERT INTO sessions(token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)")
+		.run(hashValue(token), userId, expiresAt, new Date().toISOString()); syncDb(db);
 
-    return `${SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=None; Path=/; Max-Age=${SESSION_DURATION / 1000}; Secure`;
+	return `${SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=None; Path=/; Max-Age=${SESSION_DURATION / 1000}; Secure`;
 }
 
 function clearSession(db, request, secure) {
@@ -483,7 +509,6 @@ function canViewPost(db, post, userId) {
 
 function postForViewer(db, row, viewerId) {
 	const author = db.prepare("SELECT name, email, avatar FROM users WHERE id = ?").get(row.user_id);
-	// Kiểm tra xem bài viết có được đăng dưới tư cách Fanpage CLB không
 	const club = row.club_id ? db.prepare("SELECT id, name, logo FROM clubs WHERE id = ?").get(row.club_id) : null;
 
 	const comments = db.prepare(`
@@ -500,7 +525,6 @@ function postForViewer(db, row, viewerId) {
 		userId: row.user_id,
 		clubId: club ? club.id : null,
 		type: row.type || "post",
-		// Ưu tiên hiển thị Tên & Logo CLB nếu bài viết thuộc về Fanpage CLB
 		name: club ? club.name : (author?.name || author?.email || "Thành viên"),
 		authorEmail: author?.email || "",
 		avatar: club ? (club.logo || "./DIEU.png") : (author?.avatar || "./DIEU.png"),
@@ -523,7 +547,6 @@ function postForViewer(db, row, viewerId) {
 		resource_cover_color: row.resource_cover_color
 	};
 }
-
 
 async function sendOtp(email, code, purpose, env) {
 	if (env.EMAILJS_ENABLED === "0") return { sent: false, devCode: env.NODE_ENV === "production" ? undefined : code };
@@ -603,13 +626,22 @@ function createServer(options = {}) {
 				await handleApi({ request, response, url, db, env, secure });
 				return;
 			}
+			if (request.method === "GET" && url.pathname.startsWith("/uploads/")) {
+				const fileName = path.basename(decodeURIComponent(url.pathname.slice("/uploads/".length)));
+				const filePath = path.join(UPLOAD_DIR, fileName);
+				if (!existsSync(filePath) || !statSync(filePath).isFile()) throw makeError(404, "Không tìm thấy tệp.");
+				response.writeHead(200, { "Content-Type": MIME_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream" });
+				createReadStream(filePath).pipe(response);
+				return;
+			}
 			serveStatic(request, response, url);
 		} catch (error) {
-			if (!response.headersSent){ 
-				console.error("Chi tiết lỗi đăng nhập:", error);
+			if (!response.headersSent) {
+				console.error("Chi tiết lỗi máy chủ:", error);
 				sendJson(response, error.statusCode || 500, { error: error.statusCode ? error.message : "Lỗi máy chủ." });
+			} else {
+				response.destroy();
 			}
-			else response.destroy();
 		}
 	});
 	server.database = db;
@@ -635,7 +667,6 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		response.setHeader("Vary", "Origin");
 	}
 
-
 	if (method === "OPTIONS") {
 		response.writeHead(204);
 		response.end();
@@ -657,8 +688,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			throw makeError(401, "Email hoặc mật khẩu không chính xác.");
 		}
 		const cookie = setSession(db, user.id, response, secure);
-		// Trích xuất giá trị token từ chuỗi cookie (phần nằm sau dấu '=' và trước dấu ';')
-		const token = cookie.split(";")[0].split("=")[1]; 
+		const token = cookie.split(";")[0].split("=")[1];
 
 		sendJson(response, 200, { user: profileUser(db, user), token }, { "Set-Cookie": cookie });
 		return;
@@ -688,7 +718,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const email = validateEmail(body.email);
 		const challenge = db.prepare("SELECT * FROM email_challenges WHERE email = ? COLLATE NOCASE AND purpose = 'register'").get(email);
 		if (!challenge || challenge.expires_at < Date.now() || challenge.attempts >= 5 || challenge.code_hash !== hashValue(`${email}:${String(body.code || "")}`)) {
-			if (challenge) {db.prepare("UPDATE email_challenges SET attempts = attempts + 1 WHERE email = ? AND purpose = 'register'").run(email); syncDb(db);}
+			if (challenge) { db.prepare("UPDATE email_challenges SET attempts = attempts + 1 WHERE email = ? AND purpose = 'register'").run(email); syncDb(db); }
 			throw makeError(400, "Mã xác nhận không hợp lệ hoặc đã hết hạn.");
 		}
 		const pending = JSON.parse(challenge.payload);
@@ -730,7 +760,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		validatePassword(body.password);
 		const challenge = db.prepare("SELECT * FROM email_challenges WHERE email = ? COLLATE NOCASE AND purpose = 'password'").get(email);
 		if (!challenge || challenge.expires_at < Date.now() || challenge.attempts >= 5 || challenge.code_hash !== hashValue(`${email}:${String(body.code || "")}`)) {
-			if (challenge) db.prepare("UPDATE email_challenges SET attempts = attempts + 1 WHERE email = ? AND purpose = 'password'").run(email); syncDb(db);
+			if (challenge) { db.prepare("UPDATE email_challenges SET attempts = attempts + 1 WHERE email = ? AND purpose = 'password'").run(email); syncDb(db); }
 			throw makeError(400, "Mã xác nhận không hợp lệ hoặc đã hết hạn.");
 		}
 		const pending = JSON.parse(challenge.payload);
@@ -738,7 +768,9 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		db.prepare("UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?").run(password.hash, password.salt, pending.userId); syncDb(db);
 		db.prepare("DELETE FROM email_challenges WHERE email = ? AND purpose = 'password'").run(email); syncDb(db);
 		db.prepare("DELETE FROM sessions WHERE user_id = ?").run(pending.userId); syncDb(db);
-		sendJson(response, 200, { user: profileUser(db, db.prepare("SELECT * FROM users WHERE id = ?").get(pending.userId)) }, { "Set-Cookie": setSession(db, pending.userId, response, secure) });
+		const cookie = setSession(db, pending.userId, response, secure);
+		const token = cookie.split(";")[0].split("=")[1];
+		sendJson(response, 200, { user: profileUser(db, db.prepare("SELECT * FROM users WHERE id = ?").get(pending.userId)), token }, { "Set-Cookie": cookie });
 		return;
 	}
 
@@ -750,6 +782,31 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		sendJson(response, 200, { clubs: rows.map(row => clubForViewer(db, row)) });
 		return;
 	}
+
+	// LẤY CHI TIẾT 1 CLB CHO TRANG FANPAGE (Khách chưa đăng nhập cũng xem được CLB đã duyệt)
+	const clubDetailMatch = pathname.match(/^\/api\/clubs\/([^/]+)$/);
+	if (method === "GET" && clubDetailMatch) {
+		const clubId = decodeURIComponent(clubDetailMatch[1]);
+		const row = db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId);
+		if (!row) throw makeError(404, "Không tìm thấy CLB.");
+		const club = clubForViewer(db, row);
+		const canViewUnapproved = Boolean(
+			optionalUser && (
+				optionalUser.isAdmin
+				|| row.requested_by === optionalUser.id
+				|| club.managerEmails.some(e => String(e || "").toLowerCase() === optionalUser.email.toLowerCase())
+			)
+		);
+		if (row.status !== "approved" && !canViewUnapproved) {
+			throw makeError(404, "Không tìm thấy CLB.");
+		}
+		const clubPosts = db.prepare("SELECT * FROM posts WHERE club_id = ? AND visibility = 'public' ORDER BY created_at DESC LIMIT 100")
+			.all(clubId)
+			.map(post => postForViewer(db, post, optionalUser?.id || ""));
+		sendJson(response, 200, { club, posts: clubPosts });
+		return;
+	}
+
 	if (method === "GET" && pathname === "/api/announcements") {
 		const posts = db.prepare(`
 			SELECT club_posts.*, clubs.name AS club_name, clubs.logo AS club_logo, clubs.tag_color,
@@ -781,9 +838,10 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		});
 		return;
 	}
+
 	const user = optionalUser || requireUser(db, request);
-	if (!optionalUser && !(method === "GET" && pathname === "/api/auth/me")) throw makeError(401, "Đăng nhập để tiếp tục.");
 	if (!user) throw makeError(401, "Đăng nhập để tiếp tục.");
+
 	if (method === "GET" && pathname === "/api/profile/sections") {
 		const achievements = db.prepare("SELECT id, title, certificate_image AS certificateImage, created_at AS createdAt FROM profile_achievements WHERE user_id = ? ORDER BY created_at DESC").all(user.id);
 		const interests = db.prepare("SELECT id, name, created_at AS createdAt FROM profile_interests WHERE user_id = ? ORDER BY created_at DESC").all(user.id);
@@ -839,13 +897,13 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		sendJson(response, 200, { ok: true });
 		return;
 	}
+
 	if (method === "POST" && pathname === "/api/clubs") {
 		const body = await readJson(request);
 		const name = String(body.name || "").trim();
 		const tagColor = String(body.tagColor || "").trim();
 		const logo = String(body.logo || "").trim();
 
-		// Nhận danh sách nhiều email quản lý (vẫn hỗ trợ managerEmail đơn lẻ cũ)
 		const rawList = Array.isArray(body.managerEmails) ? body.managerEmails : [body.managerEmail];
 		const managerEmails = [...new Set(rawList.map(e => validateEmail(e)))];
 
@@ -856,40 +914,41 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			throw makeError(400, "Logo phải là ảnh PNG, JPG, WEBP hoặc GIF hợp lệ.");
 		}
 
-		// Kiểm tra tất cả email quản lý có tồn tại trong bảng users chưa
 		const managers = managerEmails.map(email => {
 			const m = db.prepare("SELECT id FROM users WHERE email = ? COLLATE NOCASE").get(email);
 			if (!m) throw makeError(404, `Email ${email} chưa có tài khoản DIEUNW.`);
 			return m;
-	});
-	// LẤY THÔNG TIN CHI TIẾT 1 CLB CHO TRANG FANPAGE
-	const clubDetailMatch = pathname.match(/^\/api\/clubs\/([^/]+)$/);
-	if (method === "GET" && clubDetailMatch) {
-		const clubId = decodeURIComponent(clubDetailMatch[1]);
-		const row = db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId);
-		if (!row) throw makeError(404, "Không tìm thấy CLB.");
-		sendJson(response, 200, { club: clubForViewer(db, row) });
+		});
+
+		const id = randomBytes(16).toString("hex");
+		const createdAt = new Date().toISOString();
+		const bio = `Fanpage chính thức của ${name}`;
+
+		db.prepare("INSERT INTO clubs(id, name, manager_id, manager_email, manager_emails, logo, cover, bio, tag_color, requested_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+			.run(id, name, managers[0].id, managerEmails[0], JSON.stringify(managerEmails), logo, "", bio, tagColor, user.id, createdAt);
+		syncDb(db);
+
+		sendJson(response, 201, { club: clubForViewer(db, db.prepare("SELECT * FROM clubs WHERE id = ?").get(id)) });
 		return;
 	}
 
 	// CẬP NHẬT FANPAGE CLB (Chỉ quản lý CLB hoặc Admin mới được sửa)
 	if (method === "PATCH" && clubDetailMatch) {
-		if (!user) throw makeError(401, "Vui lòng đăng nhập.");
 		const clubId = decodeURIComponent(clubDetailMatch[1]);
 		const row = db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId);
 		if (!row) throw makeError(404, "Không tìm thấy CLB.");
 
 		const currentClub = clubForViewer(db, row);
-		const isAllowed = currentClub.managerEmails.some(e => String(e).toLowerCase() === user.email.toLowerCase()) || user.isAdmin;
+		const isAllowed = currentClub.managerEmails.some(e => String(e || "").toLowerCase() === user.email.toLowerCase()) || user.isAdmin;
 		if (!isAllowed) {
 			throw makeError(403, "Bạn không có quyền chỉnh sửa Fanpage CLB này.");
 		}
 
 		const body = await readJson(request);
 		const newName = body.name !== undefined ? String(body.name).trim() : row.name;
-		const newLogo = body.logo !== undefined ? String(body.logo).trim() : row.logo;
-		const newCover = body.cover !== undefined ? String(body.cover).trim() : (row.cover || "");
-		const newBio = body.bio !== undefined ? String(body.bio).trim() : (row.bio || "");
+		const newLogo = body.logo !== undefined ? String(body.logo).trim().slice(0, 700000) : row.logo;
+		const newCover = body.cover !== undefined ? String(body.cover).trim().slice(0, 700000) : (row.cover || "");
+		const newBio = body.bio !== undefined ? String(body.bio).trim().slice(0, 500) : (row.bio || "");
 
 		if (!newName || newName.length > 80) throw makeError(400, "Tên CLB không hợp lệ.");
 
@@ -899,18 +958,6 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 		sendJson(response, 200, { club: clubForViewer(db, db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId)) });
 		return;
-	}
-
-	const id = randomBytes(16).toString("hex");
-	const createdAt = new Date().toISOString();
-	const bio = `Fanpage chính thức của ${name}`;
-
-	db.prepare("INSERT INTO clubs(id, name, manager_id, manager_email, manager_emails, logo, cover, bio, tag_color, requested_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-		.run(id, name, managers[0].id, managerEmails[0], JSON.stringify(managerEmails), logo, "", bio, tagColor, user.id, createdAt);
-	syncDb(db);
-
-	sendJson(response, 201, { club: clubForViewer(db, db.prepare("SELECT * FROM clubs WHERE id = ?").get(id)) });
-	return;
 	}
 
 	if (method === "GET" && pathname === "/api/admins") {
@@ -930,54 +977,6 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
-		// LẤY CHI TIẾT 1 CLB CHO TRANG FANPAGE
-	const clubDetailMatch = pathname.match(/^\/api\/clubs\/([^/]+)$/);
-	if (method === "GET" && clubDetailMatch) {
-		const clubId = decodeURIComponent(clubDetailMatch[1]);
-		const row = db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId);
-		if (!row) throw makeError(404, "Không tìm thấy CLB.");
-		const club = clubForViewer(db, row);
-		club.managerEmails = row.manager_emails ? JSON.parse(row.manager_emails) : [row.manager_email];
-		club.cover = row.cover || "";
-		club.bio = row.bio || "";
-		sendJson(response, 200, { club });
-		return;
-	}
-
-	// CẬP NHẬT FANPAGE CLB (Chỉ quản lý CLB hoặc Admin mới được sửa)
-	if (method === "PATCH" && clubDetailMatch) {
-		if (!user) throw makeError(401, "Vui lòng đăng nhập.");
-		const clubId = decodeURIComponent(clubDetailMatch[1]);
-		const row = db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId);
-		if (!row) throw makeError(404, "Không tìm thấy CLB.");
-
-		const managerEmails = (row.manager_emails ? JSON.parse(row.manager_emails) : [row.manager_email])
-			.map(e => String(e || "").toLowerCase());
-
-		if (!managerEmails.includes(user.email.toLowerCase()) && !user.isAdmin) {
-			throw makeError(403, "Bạn không có quyền chỉnh sửa Fanpage CLB này.");
-		}
-
-		const body = await readJson(request);
-		const newName = body.name !== undefined ? String(body.name).trim() : row.name;
-		const newLogo = body.logo !== undefined ? String(body.logo).trim() : row.logo;
-		const newCover = body.cover !== undefined ? String(body.cover).trim() : (row.cover || "");
-		const newBio = body.bio !== undefined ? String(body.bio).trim() : (row.bio || "");
-
-		if (!newName || newName.length > 80) throw makeError(400, "Tên CLB không hợp lệ.");
-
-		db.prepare("UPDATE clubs SET name = ?, logo = ?, cover = ?, bio = ? WHERE id = ?")
-			.run(newName, newLogo, newCover, newBio, clubId);
-		syncDb(db);
-
-		const updated = clubForViewer(db, db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId));
-		updated.managerEmails = managerEmails;
-		updated.cover = newCover;
-		updated.bio = newBio;
-		sendJson(response, 200, { club: updated });
-		return;
-	}
-
 	const clubDecision = pathname.match(/^\/api\/clubs\/([^/]+)\/decision$/);
 	if (method === "POST" && clubDecision) {
 		requireAdmin(user);
@@ -990,12 +989,15 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		sendJson(response, 200, { club: clubForViewer(db, db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId)) });
 		return;
 	}
+
 	const clubPost = pathname.match(/^\/api\/clubs\/([^/]+)\/posts$/);
 	if (method === "POST" && clubPost) {
 		const clubId = decodeURIComponent(clubPost[1]);
 		const club = db.prepare("SELECT * FROM clubs WHERE id = ? AND status = 'approved'").get(clubId);
 		if (!club) throw makeError(404, "Không tìm thấy CLB đã được duyệt.");
-		if (!user.isAdmin && club.manager_id !== user.id) throw makeError(403, "Chỉ quản lý CLB hoặc admin mới được đăng thông báo.");
+		const clubData = clubForViewer(db, club);
+		const isClubManager = club.manager_id === user.id || clubData.managerEmails.some(e => String(e || "").toLowerCase() === user.email.toLowerCase());
+		if (!user.isAdmin && !isClubManager) throw makeError(403, "Chỉ quản lý CLB hoặc admin mới được đăng thông báo.");
 		const body = await readJson(request);
 		const content = String(body.content || "").trim();
 		if (!content || content.length > 10000) throw makeError(400, "Nội dung thông báo không hợp lệ.");
@@ -1005,6 +1007,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		sendJson(response, 201, { ok: true, id, createdAt });
 		return;
 	}
+
 	if (method === "PATCH" && pathname === "/api/users/me") {
 		const body = await readJson(request);
 		const fields = {
@@ -1025,11 +1028,13 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		sendJson(response, 200, { user: profileUser(db, db.prepare("SELECT * FROM users WHERE id = ?").get(user.id)) });
 		return;
 	}
+
 	if (method === "GET" && pathname === "/api/posts") {
 		const posts = db.prepare("SELECT * FROM posts WHERE visibility = 'public' OR user_id = ? ORDER BY created_at DESC LIMIT 100").all(user.id);
 		sendJson(response, 200, { posts: posts.map(post => postForViewer(db, post, user.id)) });
 		return;
 	}
+
 	if (method === "POST" && pathname === "/api/posts") {
 		const contentType = request.headers["content-type"] || "";
 		let fields = {};
@@ -1048,6 +1053,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const isResource = contentType.startsWith("multipart/form-data")
 			|| fields.type === "study-resource"
 			|| Boolean(fields.resource_title);
+
 		const visibility = fields.visibility === "private" ? "private" : "public";
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
@@ -1098,12 +1104,11 @@ async function handleApi({ request, response, url, db, env, secure }) {
 				throw makeError(400, "Nội dung bài viết không hợp lệ.");
 			}
 
-			// Nếu đăng bài dưới tư cách Fanpage CLB -> kiểm tra quyền quản lý
 			if (clubId) {
 				const clubRow = db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId);
 				if (!clubRow) throw makeError(404, "CLB không tồn tại.");
 				const clubData = clubForViewer(db, clubRow);
-				const isAllowed = clubData.managerEmails.some(e => String(e).toLowerCase() === user.email.toLowerCase()) || user.isAdmin;
+				const isAllowed = clubData.managerEmails.some(e => String(e || "").toLowerCase() === user.email.toLowerCase()) || user.isAdmin;
 				if (!isAllowed) throw makeError(403, "Bạn không có quyền đăng bài cho CLB này.");
 			}
 
@@ -1117,11 +1122,20 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		sendJson(response, 201, { post: postForViewer(db, db.prepare("SELECT * FROM posts WHERE id = ?").get(id), user.id) });
 		return;
 	}
-const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
+
+	const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 	if (method === "DELETE" && deletePost) {
-		const post = db.prepare("SELECT user_id FROM posts WHERE id = ?").get(decodeURIComponent(deletePost[1]));
+		const post = db.prepare("SELECT user_id, club_id FROM posts WHERE id = ?").get(decodeURIComponent(deletePost[1]));
 		if (!post) throw makeError(404, "Không tìm thấy bài viết.");
-		if (post.user_id !== user.id) throw makeError(403, "Chỉ người đăng mới có thể xóa bài viết này.");
+		let canDelete = post.user_id === user.id || user.isAdmin;
+		if (!canDelete && post.club_id) {
+			const clubRow = db.prepare("SELECT * FROM clubs WHERE id = ?").get(post.club_id);
+			if (clubRow) {
+				const clubData = clubForViewer(db, clubRow);
+				canDelete = clubData.managerEmails.some(e => String(e || "").toLowerCase() === user.email.toLowerCase());
+			}
+		}
+		if (!canDelete) throw makeError(403, "Chỉ người đăng mới có thể xóa bài viết này.");
 		db.prepare("DELETE FROM posts WHERE id = ?").run(decodeURIComponent(deletePost[1])); syncDb(db);
 		sendJson(response, 200, { ok: true });
 		return;
@@ -1133,17 +1147,17 @@ const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 		if (!post || !canViewPost(db, post, user.id)) throw makeError(404, "Không tìm thấy bài viết.");
 		const body = await readJson(request);
 		if (body.liked) {
-			db.prepare("INSERT OR IGNORE INTO post_likes(post_id, user_id, created_at) VALUES (?, ?, ?)").run(post.id, user.id, new Date().toISOString()); 
+			db.prepare("INSERT OR IGNORE INTO post_likes(post_id, user_id, created_at) VALUES (?, ?, ?)").run(post.id, user.id, new Date().toISOString());
 			syncDb(db);
-		}
-		else {
+		} else {
 			db.prepare("DELETE FROM post_likes WHERE post_id = ? AND user_id = ?").run(post.id, user.id);
 			syncDb(db);
-		} 
+		}
 		const likes = db.prepare("SELECT COUNT(*) AS count FROM post_likes WHERE post_id = ?").get(post.id).count;
 		sendJson(response, 200, { likes });
 		return;
 	}
+
 	const commentsMatch = pathname.match(/^\/api\/posts\/([^/]+)\/comments$/);
 	if (method === "POST" && commentsMatch) {
 		const post = db.prepare("SELECT * FROM posts WHERE id = ?").get(decodeURIComponent(commentsMatch[1]));
@@ -1168,6 +1182,7 @@ const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 		sendJson(response, 200, { friends, incoming });
 		return;
 	}
+
 	const removeFriend = pathname.match(/^\/api\/friends\/([^/]+)$/);
 	if (method === "DELETE" && removeFriend) {
 		const friendId = decodeURIComponent(removeFriend[1]);
@@ -1187,6 +1202,7 @@ const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 		sendJson(response, 200, { ok: true });
 		return;
 	}
+
 	if (method === "POST" && pathname === "/api/friend-requests") {
 		const body = await readJson(request);
 		const targetId = String(body.userId || "");
@@ -1200,6 +1216,7 @@ const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 		sendJson(response, 201, { ok: true });
 		return;
 	}
+
 	const friendAction = pathname.match(/^\/api\/friend-requests\/([^/]+)\/(accept|reject)$/);
 	if (method === "POST" && friendAction) {
 		const senderId = decodeURIComponent(friendAction[1]);
@@ -1234,6 +1251,7 @@ const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 		sendJson(response, 200, { conversations: rows.map(row => serializeConversation(db, row, user.id)) });
 		return;
 	}
+
 	if (method === "POST" && pathname === "/api/conversations") {
 		const body = await readJson(request);
 		const name = String(body.name || "").trim();
@@ -1258,6 +1276,7 @@ const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 		sendJson(response, 201, { conversation: serializeConversation(db, db.prepare("SELECT * FROM conversations WHERE id = ?").get(id), user.id) });
 		return;
 	}
+
 	const deleteConversation = pathname.match(/^\/api\/conversations\/([^/]+)$/);
 	if (method === "DELETE" && deleteConversation) {
 		const conversationId = decodeURIComponent(deleteConversation[1]);
@@ -1268,6 +1287,7 @@ const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 		sendJson(response, 200, { ok: true });
 		return;
 	}
+
 	const messagesRoute = pathname.match(/^\/api\/conversations\/([^/]+)\/messages$/);
 	if (messagesRoute && ["GET", "POST"].includes(method)) {
 		const conversationId = decodeURIComponent(messagesRoute[1]);
@@ -1290,15 +1310,16 @@ const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 		sendJson(response, 201, { message: { id, text: content, fromId: user.id, name: user.name, avatar: user.avatar, createdAt } });
 		return;
 	}
+
 	if (method === "GET" && pathname.startsWith("/uploads/")) {
-	const fileName = decodeURIComponent(pathname.slice("/uploads/".length));
-	const filePath = path.join(UPLOAD_DIR, fileName);
-	if (!existsSync(filePath) || !statSync(filePath).isFile()) throw makeError(404, "Không tìm thấy tệp.");
-	response.writeHead(200, { "Content-Type": MIME_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream" });
-	createReadStream(filePath).pipe(response);
-	return;
-}
-throw makeError(404, "Không tìm thấy API.");
+		const fileName = path.basename(decodeURIComponent(pathname.slice("/uploads/".length)));
+		const filePath = path.join(UPLOAD_DIR, fileName);
+		if (!existsSync(filePath) || !statSync(filePath).isFile()) throw makeError(404, "Không tìm thấy tệp.");
+		response.writeHead(200, { "Content-Type": MIME_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream" });
+		createReadStream(filePath).pipe(response);
+		return;
+	}
+	throw makeError(404, "Không tìm thấy API.");
 }
 
 function serveStatic(request, response, url) {
