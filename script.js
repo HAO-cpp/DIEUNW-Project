@@ -105,11 +105,8 @@
         return template.innerHTML.trim();
     }
 
-    // Dự phòng bật/tắt menu nav trên Trang chủ (event delegation, chống double-toggle)
+    // Dự phòng bật/tắt menu nav trên Trang chủ (pha capture để không bị stopPropagation chặn)
     function ensureHomeNavMenuToggle() {
-        let preClickHidden = true;
-        let preClickExpanded = "false";
-
         const getNavEls = () => {
             const toggleBtn = document.querySelector(".nav-brand-toggle");
             const menu = document.getElementById("main-nav-menu") || document.querySelector(".nav-menu");
@@ -120,22 +117,13 @@
             menu.hidden = !open;
             if (open) {
                 menu.removeAttribute("hidden");
-                menu.style.display = "grid";
+                menu.style.setProperty("display", "grid", "important");
             } else {
                 menu.setAttribute("hidden", "");
-                menu.style.display = "";
+                menu.style.removeProperty("display");
             }
             toggleBtn.setAttribute("aria-expanded", String(open));
         };
-
-        document.addEventListener("click", e => {
-            const target = e.target instanceof Element ? e.target : null;
-            if (!target?.closest(".nav-brand-toggle")) return;
-            const { toggleBtn, menu } = getNavEls();
-            if (!toggleBtn || !menu) return;
-            preClickHidden = menu.hidden;
-            preClickExpanded = toggleBtn.getAttribute("aria-expanded");
-        }, true);
 
         document.addEventListener("click", e => {
             const target = e.target instanceof Element ? e.target : null;
@@ -143,12 +131,10 @@
             if (!toggleBtn || !menu) return;
 
             if (target?.closest(".nav-brand-toggle")) {
+                const wasHidden = menu.hidden;
                 setTimeout(() => {
-                    const handledByNavProfile =
-                        menu.hidden !== preClickHidden ||
-                        toggleBtn.getAttribute("aria-expanded") !== preClickExpanded;
-                    if (handledByNavProfile) return;
-                    setMenuOpen(toggleBtn, menu, preClickHidden);
+                    if (menu.hidden !== wasHidden) return;
+                    setMenuOpen(toggleBtn, menu, wasHidden);
                 }, 0);
                 return;
             }
@@ -156,10 +142,12 @@
             if (!menu.hidden) {
                 const header = toggleBtn.closest(".navbar");
                 if (header && !header.contains(target)) {
-                    setMenuOpen(toggleBtn, menu, false);
+                    setTimeout(() => {
+                        if (!menu.hidden) setMenuOpen(toggleBtn, menu, false);
+                    }, 0);
                 }
             }
-        });
+        }, true);
 
         document.addEventListener("keydown", e => {
             if (e.key !== "Escape") return;
