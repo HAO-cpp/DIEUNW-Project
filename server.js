@@ -835,7 +835,7 @@ function serializeStudySet(db, row) {
 		cards = JSON.parse(row.cards_json || "[]");
 	} catch {}
 	const author = db.prepare("SELECT id, name, email, avatar FROM users WHERE id = ?").get(row.user_id);
-	const leaderboard = row.kind === "quiz"
+	const rawLeaderboard = row.kind === "quiz"
 		? db.prepare(`
 			SELECT quiz_attempts.score, quiz_attempts.total, quiz_attempts.duration_ms AS durationMs,
 				quiz_attempts.created_at AS createdAt, users.id AS userId, users.name, users.avatar
@@ -845,6 +845,10 @@ function serializeStudySet(db, row) {
 			LIMIT 3
 		`).all(row.id)
 		: [];
+	const leaderboard = rawLeaderboard.map(entry => ({
+		...entry,
+		userName: entry.name
+	}));
 	return {
 		id: row.id,
 		userId: row.user_id,
@@ -852,12 +856,16 @@ function serializeStudySet(db, row) {
 		authorAvatar: author?.avatar || "./DIEU.png",
 		forkedFromId: row.forked_from_id || null,
 		kind: row.kind,
+		setType: row.kind,
 		title: row.title,
 		subject: row.subject || "Chung",
 		description: row.description || "",
 		cards,
+		items: cards,
 		pinned: Boolean(row.pinned),
+		isPinned: Boolean(row.pinned),
 		studyCount: Number(row.study_count || 0),
+		playCount: Number(row.study_count || 0),
 		leaderboard,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at
@@ -1035,30 +1043,43 @@ function getFullUserProfilePayload(db, targetRow, viewerId) {
 
 	const rawTags = db.prepare("SELECT id, subject, kind, created_at AS createdAt FROM study_tags WHERE user_id = ? ORDER BY created_at DESC").all(targetRow.id);
 	const studyTags = rawTags.map(tag => {
-		const endorsements = db.prepare(`
+		const rawEndorsements = db.prepare(`
 			SELECT e.id, e.comment, e.created_at AS createdAt, e.endorser_id AS endorserId, u.name AS endorserName, u.avatar AS endorserAvatar
 			FROM study_tag_endorsements e JOIN users u ON u.id = e.endorser_id
 			WHERE e.tag_id = ? ORDER BY e.created_at DESC LIMIT 20
 		`).all(tag.id);
+		const endorsements = rawEndorsements.map(e => ({
+			...e,
+			fromUserId: e.endorserId,
+			fromUserName: e.endorserName
+		}));
 		return {
 			...tag,
+			subjectTag: tag.subject,
+			tagType: tag.kind,
 			endorsementCount: endorsements.length,
 			endorsedByMe: Boolean(viewerId && endorsements.some(e => e.endorserId === viewerId)),
 			endorsements
 		};
 	});
 
-	const showcase = db.prepare("SELECT id, title, description, link, image, kind, created_at AS createdAt FROM profile_showcase WHERE user_id = ? ORDER BY created_at DESC").all(targetRow.id);
+	const showcase = db.prepare("SELECT id, title, description, link, image, kind, created_at AS createdAt FROM profile_showcase WHERE user_id = ? ORDER BY created_at DESC")
+		.all(targetRow.id)
+		.map(item => ({ ...item, url: item.link }));
 
 	const nowMs = Date.now();
 	const momentRow = db.prepare("SELECT * FROM user_moments WHERE user_id = ? AND expires_at > ? ORDER BY created_at DESC LIMIT 1").get(targetRow.id, nowMs);
 	let activeMoment = null;
 	if (momentRow) {
-		const reactions = db.prepare(`
+		const rawReactions = db.prepare(`
 			SELECT mr.emoji, mr.created_at AS createdAt, u.id AS userId, u.name, u.avatar
 			FROM moment_reactions mr JOIN users u ON u.id = mr.user_id
 			WHERE mr.moment_id = ? ORDER BY mr.created_at DESC
-		`).all(momentRow.id);
+		`).all(momentRow.id).map(r => ({
+			...r,
+			userName: r.name
+		}));
+		const visibleReactors = viewerId === targetRow.id ? rawReactions : rawReactions.slice(0, 3);
 		activeMoment = {
 			id: momentRow.id,
 			image: momentRow.image,
@@ -1067,13 +1088,24 @@ function getFullUserProfilePayload(db, targetRow, viewerId) {
 			gradTo: momentRow.grad_to,
 			expiresAt: Number(momentRow.expires_at),
 			createdAt: momentRow.created_at,
-			reactionCount: reactions.length,
-			myReaction: viewerId ? (reactions.find(r => r.userId === viewerId)?.emoji || "") : "",
-			reactors: viewerId === targetRow.id ? reactions : reactions.slice(0, 3)
+			reactionCount: rawReactions.length,
+			myReaction: viewerId ? (rawReactions.find(r => r.userId === viewerId)?.emoji || "") : "",
+			reactors: visibleReactors,
+			reactions: visibleReactors
 		};
 	}
 
-	const stories = db.prepare("SELECT id, media_url AS mediaUrl, media_type AS mediaType, caption, duration_hours AS durationHours, expires_at AS expiresAt, created_at AS createdAt FROM user_stories WHERE user_id = ? AND expires_at > ? ORDER BY created_at ASC").all(targetRow.id, nowMs);
+	const rawStories = db.prepare("SELECT id, media_url AS mediaUrl, media_type AS mediaType, caption, duration_hours AS durationHours, expires_at AS expiresAt, created_at AS createdAt FROM user_stories WHERE user_id = ? AND expires_at > ? ORDER BY created_at ASC").all(targetRow.id, nowMs);
+	const stories = rawStories.map(s => {
+		const viewCount = db.prepare("SELECT COUNT(*) AS count FROM story_views WHERE story_id = ?").get(s.id)?.count || 0;
+		return {
+			...s,
+			userId: targetRow.id,
+			userName: targetRow.name,
+			userAvatar: targetRow.avatar || "./DIEU.png",
+			viewCount
+		};
+	});
 	const studySets = db.prepare("SELECT * FROM study_sets WHERE user_id = ? ORDER BY pinned DESC, updated_at DESC").all(targetRow.id).map(s => serializeStudySet(db, s));
 
 	const postRows = db.prepare(`
@@ -1099,7 +1131,6 @@ function getFullUserProfilePayload(db, targetRow, viewerId) {
 		posts: postRows.map(p => postForViewer(db, p, viewerId || ""))
 	};
 }
-
 function createServer(options = {}) {
 	const env = options.env || process.env;
 	const dbPath = options.dbPath || env.DATABASE_PATH || path.join(ROOT, "data", "dieunw-turso.sqlite");
@@ -1580,8 +1611,9 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	// STUDY TAGS & ENDORSEMENTS (+1 XÁC NHẬN & NHẬN XÉT)
 	if (method === "POST" && pathname === "/api/profile/study-tags") {
 		const body = await readJson(request);
-		const subject = String(body.subject || "").trim().replace(/^#/, "").slice(0, 40);
-		const kind = body.kind === "need_help" ? "need_help" : "strength";
+		const subject = String(body.subject || body.subjectTag || "").trim().replace(/^#/, "").slice(0, 40);
+		const rawKind = body.kind || body.tagType;
+		const kind = rawKind === "need_help" ? "need_help" : "strength";
 		if (!subject) throw makeError(400, "Nhập tên môn học / kỹ năng.");
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
@@ -1591,7 +1623,18 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		} catch {
 			throw makeError(409, "Thẻ môn học này đã tồn tại.");
 		}
-		sendJson(response, 201, { tag: { id, subject, kind, endorsementCount: 0, endorsements: [], createdAt } });
+		sendJson(response, 201, {
+			tag: {
+				id,
+				subject,
+				subjectTag: subject,
+				kind,
+				tagType: kind,
+				endorsementCount: 0,
+				endorsements: [],
+				createdAt
+			}
+		});
 		return;
 	}
 	const delStudyTag = pathname.match(/^\/api\/profile\/study-tags\/([^/]+)$/);
@@ -1635,10 +1678,11 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
 		const image = validateProfileImage(body.image, false);
+		const linkValue = String(body.link || body.url || "").trim().slice(0, 500);
 		db.prepare("INSERT INTO profile_showcase(id, user_id, title, description, link, image, kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-			.run(id, user.id, title, String(body.description || "").trim().slice(0, 240), String(body.link || "").trim().slice(0, 500), image, String(body.kind || "product").slice(0, 30), createdAt);
+			.run(id, user.id, title, String(body.description || "").trim().slice(0, 240), linkValue, image, String(body.kind || "product").slice(0, 30), createdAt);
 		syncDb(db);
-		sendJson(response, 201, { ok: true, id });
+		sendJson(response, 201, { ok: true, id, item: { id, title, link: linkValue, url: linkValue, image, createdAt } });
 		return;
 	}
 	const delShowcase = pathname.match(/^\/api\/profile\/showcase\/([^/]+)$/);
@@ -1750,14 +1794,16 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 	if (method === "POST" && pathname === "/api/study-sets") {
 		const body = await readJson(request);
-		const kind = body.kind === "quiz" ? "quiz" : "flashcard";
+		const rawKind = body.kind || body.setType;
+		const kind = rawKind === "quiz" ? "quiz" : "flashcard";
 		const title = String(body.title || "").trim().slice(0, 120);
 		if (!title) throw makeError(400, "Nhập tiêu đề bộ thẻ / đề ôn tập.");
 		const subject = String(body.subject || "Chung").trim().slice(0, 60);
 		const description = String(body.description || "").trim().slice(0, 400);
-		const cards = Array.isArray(body.cards) ? body.cards.slice(0, 80) : [];
+		const rawCards = Array.isArray(body.cards) ? body.cards : (Array.isArray(body.items) ? body.items : []);
+		const cards = rawCards.slice(0, 80);
 		if (!cards.length) throw makeError(400, "Cần ít nhất 1 thẻ hoặc 1 câu hỏi.");
-		const pinned = body.pinned ? 1 : 0;
+		const pinned = (body.pinned ?? body.isPinned) ? 1 : 0;
 		const id = randomBytes(16).toString("hex");
 		const now = new Date().toISOString();
 		db.prepare("INSERT INTO study_sets(id, user_id, kind, title, subject, description, cards_json, pinned, study_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)")
@@ -1778,13 +1824,17 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const row = db.prepare("SELECT * FROM study_sets WHERE id = ? AND user_id = ?").get(setId, user.id);
 		if (!row) throw makeError(404, "Không tìm thấy bộ đề hoặc bạn không phải tác giả.");
 		const body = await readJson(request);
+		const rawKind = body.kind || body.setType;
+		const kind = rawKind ? (rawKind === "quiz" ? "quiz" : "flashcard") : row.kind;
 		const title = body.title !== undefined ? String(body.title).trim().slice(0, 120) : row.title;
 		const subject = body.subject !== undefined ? String(body.subject).trim().slice(0, 60) : row.subject;
 		const description = body.description !== undefined ? String(body.description).trim().slice(0, 400) : row.description;
-		const cardsJson = Array.isArray(body.cards) ? JSON.stringify(body.cards.slice(0, 80)) : row.cards_json;
-		const pinned = body.pinned !== undefined ? (body.pinned ? 1 : 0) : row.pinned;
-		db.prepare("UPDATE study_sets SET title = ?, subject = ?, description = ?, cards_json = ?, pinned = ?, updated_at = ? WHERE id = ?")
-			.run(title || row.title, subject, description, cardsJson, pinned, new Date().toISOString(), setId);
+		const incomingCards = Array.isArray(body.cards) ? body.cards : (Array.isArray(body.items) ? body.items : null);
+		const cardsJson = incomingCards ? JSON.stringify(incomingCards.slice(0, 80)) : row.cards_json;
+		const rawPinned = body.pinned !== undefined ? body.pinned : body.isPinned;
+		const pinned = rawPinned !== undefined ? (rawPinned ? 1 : 0) : row.pinned;
+		db.prepare("UPDATE study_sets SET kind = ?, title = ?, subject = ?, description = ?, cards_json = ?, pinned = ?, updated_at = ? WHERE id = ?")
+			.run(kind, title || row.title, subject, description, cardsJson, pinned, new Date().toISOString(), setId);
 		syncDb(db);
 		sendJson(response, 200, { studySet: serializeStudySet(db, db.prepare("SELECT * FROM study_sets WHERE id = ?").get(setId)) });
 		return;
@@ -1820,7 +1870,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 				.run(randomBytes(16).toString("hex"), setId, user.id, Math.max(0, Math.round(body.score)), Math.max(1, Math.round(body.total)), Math.max(100, Math.round(Number(body.durationMs || 1000))), new Date().toISOString());
 		}
 		syncDb(db);
-		sendJson(response, 200, { studySet: serializeStudySet(db, db.prepare("SELECT * FROM study_sets WHERE id = ?").get(setId)) });
+		const studySet = serializeStudySet(db, db.prepare("SELECT * FROM study_sets WHERE id = ?").get(setId));
+		sendJson(response, 200, { studySet, leaderboard: studySet?.leaderboard || [] });
 		return;
 	}
 
@@ -1863,12 +1914,20 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const clubStickers = clubIds.length
 			? db.prepare(`SELECT * FROM user_stickers WHERE owner_type = 'club' AND owner_id IN (${clubIds.map(() => "?").join(",")}) ORDER BY created_at DESC`).all(...clubIds)
 			: [];
-		sendJson(response, 200, { stickers: [...userStickers, ...clubStickers] });
+		const mapped = [...userStickers, ...clubStickers].map(s => ({
+			...s,
+			imageUrl: s.image,
+			ownerUserId: s.owner_id,
+			ownerType: s.owner_type,
+			ownerId: s.owner_id,
+			createdAt: s.created_at
+		}));
+		sendJson(response, 200, { stickers: mapped });
 		return;
 	}
 	if (method === "POST" && pathname === "/api/stickers") {
 		const body = await readJson(request);
-		const image = validateProfileImage(body.image, true);
+		const image = validateProfileImage(body.image || body.imageUrl, true);
 		const name = String(body.name || "Sticker").trim().slice(0, 40);
 		let ownerType = "user";
 		let ownerId = user.id;
@@ -1888,7 +1947,21 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const createdAt = new Date().toISOString();
 		db.prepare("INSERT INTO user_stickers(id, owner_type, owner_id, name, image, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(id, ownerType, ownerId, name, image, createdAt);
 		syncDb(db);
-		sendJson(response, 201, { sticker: { id, owner_type: ownerType, owner_id: ownerId, name, image, created_at: createdAt } });
+		sendJson(response, 201, {
+			sticker: {
+				id,
+				owner_type: ownerType,
+				owner_id: ownerId,
+				ownerType,
+				ownerId,
+				ownerUserId: ownerId,
+				name,
+				image,
+				imageUrl: image,
+				created_at: createdAt,
+				createdAt
+			}
+		});
 		return;
 	}
 	const delSticker = pathname.match(/^\/api\/stickers\/([^/]+)$/);
@@ -2043,7 +2116,15 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			const postRow = db.prepare("SELECT * FROM posts WHERE id = ?").get(g.target_id);
 			if (!postRow) return null;
 			const reasons = db.prepare("SELECT r.reason, r.created_at AS createdAt, u.name AS reporterName FROM reports r JOIN users u ON u.id = r.reporter_id WHERE r.target_type = 'post' AND r.target_id = ? AND r.status = 'open' ORDER BY r.created_at DESC").all(g.target_id);
-			return { targetId: g.target_id, reportCount: g.report_count, post: postForViewer(db, postRow, user.id), reasons };
+			const postObj = postForViewer(db, postRow, user.id);
+			return {
+				targetId: g.target_id,
+				reportCount: g.report_count,
+				targetTitle: `${postObj.name} (${postObj.authorEmail || "Thành viên"})`,
+				targetPreview: String(postRow.content || "").replace(/<[^>]+>/g, " ").trim().slice(0, 140),
+				post: postObj,
+				reasons
+			};
 		}).filter(Boolean);
 
 		const userReportGroups = db.prepare(`
@@ -2055,10 +2136,30 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			const uRow = db.prepare("SELECT * FROM users WHERE id = ?").get(g.target_id);
 			if (!uRow) return null;
 			const reasons = db.prepare("SELECT r.reason, r.created_at AS createdAt, u.name AS reporterName FROM reports r JOIN users u ON u.id = r.reporter_id WHERE r.target_type = 'user' AND r.target_id = ? AND r.status = 'open' ORDER BY r.created_at DESC").all(g.target_id);
-			return { targetId: g.target_id, reportCount: g.report_count, account: cleanUser(db, uRow, user.id), reasons };
+			const accObj = cleanUser(db, uRow, user.id);
+			return {
+				targetId: g.target_id,
+				reportCount: g.report_count,
+				targetTitle: `${accObj.name} (${accObj.email})`,
+				targetPreview: accObj.studentClass || "Tài khoản DIEUNW",
+				account: accObj,
+				reasons
+			};
 		}).filter(Boolean);
 
-		const auditLogs = db.prepare("SELECT * FROM moderation_audit_logs ORDER BY created_at DESC LIMIT 60").all();
+		const rawLogs = db.prepare("SELECT * FROM moderation_audit_logs ORDER BY created_at DESC LIMIT 60").all();
+		const auditLogs = rawLogs.map(log => ({
+			...log,
+			actorId: log.actor_id,
+			actorName: log.actor_name,
+			actorEmail: log.actor_email,
+			actionLabel: log.action,
+			targetType: log.target_type,
+			targetId: log.target_id,
+			targetLabel: log.target_label,
+			detail: log.details || log.target_label || "",
+			createdAt: log.created_at
+		}));
 		sendJson(response, 200, {
 			isAdmin: user.isAdmin,
 			isModerator: user.isModerator,

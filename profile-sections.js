@@ -56,6 +56,14 @@
         })[ch]);
     }
 
+    function safeUploadUrl(rawUrl) {
+        const url = String(rawUrl || "").trim();
+        if (!url) return "";
+        if (url.startsWith("/uploads/")) return `${API_BASE}${url}`;
+        if (/^https?:\/\//i.test(url)) return url;
+        return "";
+    }
+
     function makeEl(tag, className, text) {
         const el = document.createElement(tag);
         if (className) el.className = className;
@@ -86,7 +94,6 @@
         if (el) el.hidden = true;
     }
 
-    // Wire all close buttons via data-close-modal
     document.addEventListener("click", event => {
         const closeBtn = event.target.closest("[data-close-modal]");
         if (closeBtn) {
@@ -108,8 +115,6 @@
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, size, size);
 
-        // Deterministic scannable-style QR fallback + structured Reed-Solomon-like Finder/Timing/Data Matrix
-        // Using genuine QR Version 4 (33x33) Byte-mode structure when <= 78 bytes or clean high-density matrix
         const matrix = buildQrMatrix(text);
         const dim = matrix.length;
         const quiet = 2;
@@ -127,7 +132,6 @@
     }
 
     function buildQrMatrix(text) {
-        // Real compact QR Code generator (Byte mode, ECC Level L, Versions 1..6)
         const bytes = Array.from(new TextEncoder().encode(text));
         const caps = [0, 17, 32, 53, 78, 106, 134];
         const eccPerBlock = [0, 7, 10, 15, 20, 26, 18];
@@ -177,7 +181,6 @@
         }
         setMod(dim - 8, 8, 1, true);
 
-        // Reserve format bits
         for (let i = 0; i < 9; i++) {
             if (i !== 6) {
                 isFunc[8][i] = true;
@@ -189,7 +192,6 @@
             isFunc[i][8] = true;
         }
 
-        // Encode bit stream (Mode 0100 + Len + Bytes + Terminator + Pad)
         const bits = [];
         const pushBits = (val, len) => {
             for (let i = len - 1; i >= 0; i--) bits.push((val >> i) & 1);
@@ -214,7 +216,6 @@
             dataCw.push(v);
         }
 
-        // GF(256) Reed-Solomon ECC
         const gfExp = new Array(512);
         const gfLog = new Array(256).fill(0);
         let x = 1;
@@ -277,7 +278,6 @@
                     const c = right - lr;
                     if (!isFunc[r][c]) {
                         let bit = bitIdx < outBits.length ? outBits[bitIdx++] : 0;
-                        // Mask 0: (r + c) % 2 === 0
                         if ((r + c) % 2 === 0) bit ^= 1;
                         mat[r][c] = bit;
                     }
@@ -286,7 +286,6 @@
             up = !up;
         }
 
-        // Format info for ECC L (01) + Mask 0 (000) -> 01000 -> BCH 111011111000100
         const fmt = 0b111011111000100;
         for (let i = 0; i < 15; i++) {
             const bit = (fmt >> i) & 1;
@@ -336,7 +335,6 @@
             }
         }
 
-        // Social Links
         const socialWrap = document.getElementById("profile-social-links");
         if (socialWrap) {
             socialWrap.replaceChildren();
@@ -356,7 +354,6 @@
             });
         }
 
-        // Study Metrics
         const hoursEl = document.getElementById("metric-weekly-hours");
         const streakEl = document.getElementById("metric-study-streak");
         const setStatsEl = document.getElementById("metric-studyset-stats");
@@ -376,7 +373,6 @@
             }
         }
 
-        // Joined Clubs
         const clubsWrap = document.getElementById("profile-joined-clubs");
         if (clubsWrap) {
             clubsWrap.replaceChildren();
@@ -401,7 +397,6 @@
             }
         }
 
-        // Owner-only buttons visibility
         const ownerControls = [
             "btn-toggle-study-tag-form",
             "btn-open-note-modal",
@@ -459,12 +454,12 @@
         const footer = makeEl("div", "moment-footer");
         const reactBar = makeEl("div", "moment-reactions-bar");
         const emojis = ["❤️", "🔥", "👏", "😂", "🎯"];
-        const reactions = moment.reactions || [];
+        const reactions = moment.reactions || moment.reactors || [];
         const myId = state.viewerUser?.id;
 
         emojis.forEach(emoji => {
             const matching = reactions.filter(r => r.emoji === emoji);
-            const active = myId && matching.some(r => String(r.userId) === String(myId));
+            const active = (myId && matching.some(r => String(r.userId) === String(myId))) || moment.myReaction === emoji;
             const btn = makeEl("button", `moment-react-btn${active ? " active" : ""}`, `${emoji} ${matching.length || ""}`.trim());
             btn.type = "button";
             btn.addEventListener("click", async () => {
@@ -484,12 +479,11 @@
         footer.append(reactBar);
 
         const reactorsSummary = reactions.length
-            ? reactions.slice(0, 6).map(r => `${r.userName} ${r.emoji}`).join(", ") + (reactions.length > 6 ? ` +${reactions.length - 6}` : "")
-            : "Chưa có tương tác";
+            ? reactions.slice(0, 6).map(r => `${r.userName || r.name || "Bạn"} ${r.emoji}`).join(", ") + (reactions.length > 6 ? ` +${reactions.length - 6}` : "")
+            : (moment.reactionCount ? `${moment.reactionCount} tương tác` : "Chưa có tương tác");
         const rightMeta = makeEl("div", "", "");
         rightMeta.style.cssText = "display:flex; align-items:center; gap:8px; flex-wrap:wrap;";
-        const reactorSpan = makeEl("span", "profile-extra-hint", reactorsSummary);
-        rightMeta.append(reactorSpan);
+        rightMeta.append(makeEl("span", "profile-extra-hint", reactorsSummary));
 
         if (isOwner) {
             const delBtn = makeEl("button", "profile-extra-delete", "Xóa Moment");
@@ -527,15 +521,17 @@
             return seg;
         }));
 
-        document.getElementById("story-viewer-avatar").src = story.userAvatar || "./DIEU.png";
-        document.getElementById("story-viewer-name").textContent = story.userName || "Học sinh NQD";
+        const profileOwner = state.profileData?.user;
+        document.getElementById("story-viewer-avatar").src = story.userAvatar || profileOwner?.avatar || "./DIEU.png";
+        document.getElementById("story-viewer-name").textContent = story.userName || profileOwner?.name || "Học sinh NQD";
         document.getElementById("story-viewer-time").textContent = new Date(story.createdAt).toLocaleString("vi-VN");
         document.getElementById("story-viewer-caption").textContent = story.caption || "";
         document.getElementById("story-viewer-views").textContent = `${story.viewCount || 0} lượt xem`;
         document.getElementById("story-viewer-expiry").textContent = `Hết hạn: ${new Date(story.expiresAt).toLocaleString("vi-VN")}`;
 
+        const storyOwnerId = story.userId || profileOwner?.id;
         const delBtn = document.getElementById("story-viewer-delete");
-        const isOwner = state.viewerUser && (String(state.viewerUser.id) === String(story.userId) || state.viewerUser.isAdmin);
+        const isOwner = state.viewerUser && (String(state.viewerUser.id) === String(storyOwnerId) || state.viewerUser.isAdmin);
         delBtn.hidden = !isOwner;
         delBtn.onclick = async () => {
             if (!confirm("Xóa Story này?")) return;
@@ -549,9 +545,10 @@
         const nextBtn = document.getElementById("story-next-btn");
         stage.querySelectorAll("img, video").forEach(n => n.remove());
 
-        const isVideo = story.mediaType === "video" || /\.(mp4|webm)(\?|$)/i.test(story.mediaUrl || "");
+        const resolvedUrl = safeUploadUrl(story.mediaUrl) || story.mediaUrl;
+        const isVideo = story.mediaType === "video" || /\.(mp4|webm)(\?|$)/i.test(resolvedUrl || "");
         const mediaEl = document.createElement(isVideo ? "video" : "img");
-        mediaEl.src = story.mediaUrl;
+        mediaEl.src = resolvedUrl;
         if (isVideo) {
             mediaEl.controls = true;
             mediaEl.autoplay = true;
@@ -596,8 +593,11 @@
         strWrap.replaceChildren();
         helpWrap.replaceChildren();
 
-        const strengthTags = tags.filter(t => t.tagType !== "need_help");
-        const helpTags = tags.filter(t => t.tagType === "need_help");
+        const getTagKind = t => t.kind || t.tagType || "strength";
+        const getTagLabel = t => t.subject || t.subjectTag || "";
+
+        const strengthTags = tags.filter(t => getTagKind(t) !== "need_help");
+        const helpTags = tags.filter(t => getTagKind(t) === "need_help");
 
         const renderGroup = (list, container, emptyMsg) => {
             if (!list.length) {
@@ -605,12 +605,16 @@
                 return;
             }
             list.forEach(tag => {
-                const chip = makeEl("div", `study-tag-chip ${tag.tagType === "need_help" ? "is-need-help" : "is-strength"}`);
-                chip.append(makeEl("span", "", tag.subjectTag));
+                const kind = getTagKind(tag);
+                const chip = makeEl("div", `study-tag-chip ${kind === "need_help" ? "is-need-help" : "is-strength"}`);
+                chip.append(makeEl("span", "", `#${getTagLabel(tag).replace(/^#/, "")}`));
 
-                if (tag.tagType !== "need_help") {
-                    const count = tag.endorsements?.length || tag.endorsementCount || 0;
-                    const endorsed = state.viewerUser && (tag.endorsements || []).some(e => String(e.fromUserId) === String(state.viewerUser.id));
+                if (kind !== "need_help") {
+                    const count = tag.endorsements?.length ?? tag.endorsementCount ?? 0;
+                    const endorsed = Boolean(
+                        tag.endorsedByMe ||
+                        (state.viewerUser && (tag.endorsements || []).some(e => String(e.endorserId || e.fromUserId) === String(state.viewerUser.id)))
+                    );
                     const btn = makeEl("button", `btn-endorse-tag${endorsed ? " is-endorsed" : ""}`, `+1 (${count})`);
                     btn.type = "button";
                     btn.title = "Xem nhận xét & Xác nhận thế mạnh";
@@ -638,7 +642,7 @@
 
     function openEndorseModal(tag) {
         state.activeEndorseTag = tag;
-        document.getElementById("endorse-tag-label").textContent = `Thẻ môn: ${tag.subjectTag}`;
+        document.getElementById("endorse-tag-label").textContent = `Thẻ môn: #${(tag.subject || tag.subjectTag || "").replace(/^#/, "")}`;
         const listEl = document.getElementById("endorse-existing-comments");
         listEl.replaceChildren();
         const comments = (tag.endorsements || []).filter(e => e.comment);
@@ -646,7 +650,7 @@
             listEl.append(makeEl("p", "profile-extra-empty", "Chưa có nhận xét nào."));
         } else {
             comments.forEach(e => {
-                listEl.append(makeEl("div", "", `• ${e.fromUserName}: "${e.comment}"`));
+                listEl.append(makeEl("div", "", `• ${e.endorserName || e.fromUserName || "Bạn học"}: "${e.comment}"`));
             });
         }
         const canSubmit = state.viewerUser && !state.isSelf;
@@ -704,9 +708,10 @@
             if (item.description) body.append(makeEl("p", "profile-extra-hint", item.description));
             const row = makeEl("div", "", "");
             row.style.cssText = "display:flex; justify-content:space-between; align-items:center; gap:6px; margin-top:4px;";
-            if (item.url) {
+            const itemLink = item.link || item.url;
+            if (itemLink) {
                 const a = makeEl("a", "study-set-btn primary", "Mở liên kết");
-                a.href = item.url;
+                a.href = itemLink;
                 a.target = "_blank";
                 a.rel = "noopener noreferrer";
                 a.style.textDecoration = "none";
@@ -743,9 +748,8 @@
         rem.onclick = () => row.remove();
         top.append(rem);
 
-        const front = makeEl("input", "");
+        const front = makeEl("input", "sb-front");
         front.type = "text";
-        front.className = "sb-front";
         front.placeholder = setType === "quiz" ? "Nội dung câu hỏi..." : "Mặt trước (Thuật ngữ / Câu hỏi)...";
         front.value = data.front || "";
 
@@ -768,7 +772,8 @@
         if (setType === "quiz") {
             const optsGrid = makeEl("div", "", "");
             optsGrid.style.cssText = "display:grid; grid-template-columns:1fr 1fr; gap:6px;";
-            const opts = Array.isArray(data.options) && data.options.length === 4 ? data.options : ["", "", "", ""];
+            const existingOpts = Array.isArray(data.options) ? data.options : [];
+            const opts = [0, 1, 2, 3].map(i => existingOpts[i] || "");
             ["A", "B", "C", "D"].forEach((lbl, idx) => {
                 const oi = makeEl("input", `sb-opt-${idx}`);
                 oi.type = "text";
@@ -798,10 +803,33 @@
         container.append(row);
     }
 
+    function openStudySetBuilderForEdit(studySet) {
+        const kind = studySet.kind || studySet.setType || "flashcard";
+        state.editingStudySetId = studySet.id;
+        document.getElementById("studyset-builder-title").textContent = "Chỉnh sửa Bộ thẻ / Đề ôn tập";
+        document.getElementById("studyset-builder-form").reset();
+        document.getElementById("studyset-builder-status").textContent = "";
+        document.getElementById("studyset-title-input").value = studySet.title || "";
+        document.getElementById("studyset-subject-input").value = studySet.subject || "";
+        document.getElementById("studyset-type-select").value = kind;
+        document.getElementById("studyset-pin-checkbox").checked = Boolean(studySet.pinned ?? studySet.isPinned);
+
+        const builder = document.getElementById("studyset-items-builder");
+        builder.replaceChildren();
+        const cards = Array.isArray(studySet.cards) ? studySet.cards : (Array.isArray(studySet.items) ? studySet.items : []);
+        if (cards.length) {
+            cards.forEach(c => addBuilderItemRow(c));
+        } else {
+            addBuilderItemRow();
+        }
+        openModal("studyset-builder-overlay");
+    }
+
     document.getElementById("btn-open-studyset-builder")?.addEventListener("click", () => {
         state.editingStudySetId = null;
         document.getElementById("studyset-builder-title").textContent = "Tạo Bộ thẻ / Đề ôn tập";
         document.getElementById("studyset-builder-form").reset();
+        document.getElementById("studyset-builder-status").textContent = "";
         document.getElementById("studyset-items-builder").replaceChildren();
         addBuilderItemRow();
         addBuilderItemRow();
@@ -809,7 +837,9 @@
     });
 
     document.getElementById("studyset-type-select")?.addEventListener("change", () => {
+        document.getElementById("studyset-builder-status").textContent = "";
         document.getElementById("studyset-items-builder").replaceChildren();
+        addBuilderItemRow();
         addBuilderItemRow();
     });
 
@@ -817,49 +847,97 @@
 
     document.getElementById("studyset-builder-form")?.addEventListener("submit", async event => {
         event.preventDefault();
+        const form = event.currentTarget;
+        const submitBtn = form.querySelector("button[type='submit']");
         const status = document.getElementById("studyset-builder-status");
         const title = document.getElementById("studyset-title-input").value.trim();
-        const subject = document.getElementById("studyset-subject-input").value.trim();
-        const setType = document.getElementById("studyset-type-select").value;
-        const isPinned = document.getElementById("studyset-pin-checkbox").checked;
+        const subject = document.getElementById("studyset-subject-input").value.trim() || "Chung";
+        const kind = document.getElementById("studyset-type-select").value === "quiz" ? "quiz" : "flashcard";
+        const pinned = document.getElementById("studyset-pin-checkbox").checked;
 
-        status.textContent = "Đang xử lý ảnh & lưu...";
+        if (!title) {
+            status.textContent = "Vui lòng nhập tên bộ thẻ / đề ôn tập.";
+            return;
+        }
+
+        if (submitBtn) submitBtn.disabled = true;
+        status.textContent = "Đang kiểm tra & lưu bộ ôn tập...";
         try {
             const rows = Array.from(document.querySelectorAll("#studyset-items-builder .study-builder-item"));
-            const items = [];
-            for (const row of rows) {
+            const cards = [];
+            for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+                const row = rows[rowIdx];
                 const front = row.querySelector(".sb-front")?.value.trim() || "";
                 const back = row.querySelector(".sb-back")?.value.trim() || "";
                 const textColor = row.querySelector(".sb-color")?.value || "#173853";
                 const fileInput = row.querySelector(".sb-image-file");
                 let image = fileInput?.dataset.existingImage || "";
                 if (fileInput?.files?.[0]) image = await toOptimizedImage(fileInput.files[0], 720);
-                if (!front) continue;
-                if (setType === "quiz") {
-                    const options = [0, 1, 2, 3].map(i => row.querySelector(`.sb-opt-${i}`)?.value.trim() || "");
-                    const correctIndex = Number(row.querySelector(".sb-correct")?.value || 0);
-                    items.push({ front, options, correctIndex, explanation: back, textColor, image });
+
+                if (kind === "quiz") {
+                    const rawOpts = [0, 1, 2, 3].map(i => row.querySelector(`.sb-opt-${i}`)?.value.trim() || "");
+                    const hasAnyInput = Boolean(front || back || image || rawOpts.some(Boolean));
+                    if (!hasAnyInput) continue;
+                    if (!front) throw new Error(`Câu hỏi số ${rowIdx + 1} chưa có nội dung câu hỏi.`);
+
+                    const rawCorrect = Number(row.querySelector(".sb-correct")?.value || 0);
+                    if (!rawOpts[rawCorrect]) {
+                        throw new Error(`Câu hỏi số ${rowIdx + 1}: Đáp án đúng (${["A", "B", "C", "D"][rawCorrect]}) đang để trống.`);
+                    }
+                    const options = [];
+                    let correctIndex = 0;
+                    rawOpts.forEach((optText, i) => {
+                        if (!optText) return;
+                        if (i === rawCorrect) correctIndex = options.length;
+                        options.push(optText);
+                    });
+                    if (options.length < 2) {
+                        throw new Error(`Câu hỏi số ${rowIdx + 1} cần nhập ít nhất 2 đáp án.`);
+                    }
+                    cards.push({ front, options, correctIndex, explanation: back, textColor, image });
                 } else {
-                    items.push({ front, back, textColor, image });
+                    const hasAnyInput = Boolean(front || back || image);
+                    if (!hasAnyInput) continue;
+                    if (!front) throw new Error(`Thẻ số ${rowIdx + 1} chưa nhập Mặt trước.`);
+                    if (!back && !image) throw new Error(`Thẻ số ${rowIdx + 1} chưa nhập Mặt sau.`);
+                    cards.push({ front, back, textColor, image });
                 }
             }
-            if (!items.length) throw new Error("Hãy nhập ít nhất 1 thẻ hoặc câu hỏi.");
+            if (!cards.length) {
+                throw new Error(kind === "quiz"
+                    ? "Hãy nhập đầy đủ ít nhất 1 câu hỏi trắc nghiệm."
+                    : "Hãy nhập đầy đủ ít nhất 1 thẻ Flashcard (cả Mặt trước và Mặt sau).");
+            }
+
+            const payload = {
+                title,
+                subject,
+                kind,
+                setType: kind,
+                cards,
+                items: cards,
+                pinned,
+                isPinned: pinned
+            };
 
             if (state.editingStudySetId) {
                 await api(`/api/study-sets/${encodeURIComponent(state.editingStudySetId)}`, {
                     method: "PATCH",
-                    body: JSON.stringify({ title, subject, setType, items, isPinned })
+                    body: JSON.stringify(payload)
                 });
             } else {
                 await api("/api/study-sets", {
                     method: "POST",
-                    body: JSON.stringify({ title, subject, setType, items, isPinned })
+                    body: JSON.stringify(payload)
                 });
             }
+            status.textContent = "";
             closeModal("studyset-builder-overlay");
             await loadFullProfile();
         } catch (err) {
-            status.textContent = err.message;
+            status.textContent = err.message || "Không thể lưu bộ ôn tập.";
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
         }
     });
 
@@ -869,14 +947,18 @@
         if (!titleEl || !bodyEl) return;
         titleEl.textContent = studySet.title;
 
-        const items = Array.isArray(studySet.items) ? studySet.items : [];
+        const items = Array.isArray(studySet.cards)
+            ? studySet.cards
+            : (Array.isArray(studySet.items) ? studySet.items : []);
+        const kind = studySet.kind || studySet.setType || "flashcard";
+
         if (!items.length) {
             bodyEl.innerHTML = `<p class="profile-extra-empty">Bộ học liệu này chưa có thẻ nào.</p>`;
             openModal("studyset-player-overlay");
             return;
         }
 
-        if (studySet.setType === "quiz") {
+        if (kind === "quiz") {
             runQuizPlayer(studySet, items, bodyEl, startChallenge);
         } else {
             runFlashcardPlayer(studySet, items, bodyEl);
@@ -885,7 +967,6 @@
     }
 
     function runFlashcardPlayer(studySet, items, bodyEl) {
-        // Spaced Repetition Queue: indices into items; "Cần ôn lại" re-queues 3 positions ahead!
         const queue = items.map((_, i) => i);
         let mastered = 0;
 
@@ -975,7 +1056,7 @@
                     method: "POST",
                     body: JSON.stringify({ score, total: items.length, durationMs })
                 }).then(res => {
-                    const top3 = res.leaderboard || studySet.leaderboard || [];
+                    const top3 = res.leaderboard || res.studySet?.leaderboard || studySet.leaderboard || [];
                     if (top3.length) renderLeaderboard(top3, bodyEl);
                 }).catch(() => {});
                 return;
@@ -1014,9 +1095,9 @@
             nextBtn.hidden = true;
             nextBtn.onclick = () => { idx++; renderQuestion(); };
 
-            (q.options || []).forEach((optText, oIdx) => {
-                if (!optText) return;
-                const btn = makeEl("button", "quiz-option-btn", `${["A", "B", "C", "D"][oIdx]}. ${optText}`);
+            const validOptions = (q.options || []).filter(Boolean);
+            validOptions.forEach((optText, oIdx) => {
+                const btn = makeEl("button", "quiz-option-btn", `${["A", "B", "C", "D"][oIdx] || oIdx + 1}. ${optText}`);
                 btn.type = "button";
                 btn.onclick = () => {
                     optsList.querySelectorAll("button").forEach(b => { b.disabled = true; });
@@ -1047,7 +1128,7 @@
         box.append(makeEl("strong", "", "BXH Top 3 Thách đấu"));
         top3.slice(0, 3).forEach((row, i) => {
             const r = makeEl("div", "leaderboard-row");
-            r.innerHTML = `<span>#${i + 1} ${escapeHtml(row.userName || "Bạn học")}</span><strong>${row.score}/${row.total} (${((row.durationMs || 0) / 1000).toFixed(1)}s)</strong>`;
+            r.innerHTML = `<span>#${i + 1} ${escapeHtml(row.name || row.userName || "Bạn học")}</span><strong>${row.score}/${row.total} (${((row.durationMs || 0) / 1000).toFixed(1)}s)</strong>`;
             box.append(r);
         });
         container.append(box);
@@ -1069,18 +1150,23 @@
             return;
         }
         sets.forEach(s => {
+            const kind = s.kind || s.setType || "flashcard";
+            const cards = Array.isArray(s.cards) ? s.cards : (Array.isArray(s.items) ? s.items : []);
+            const pinned = Boolean(s.pinned ?? s.isPinned);
+            const plays = Number(s.studyCount ?? s.playCount ?? 0);
+
             const card = makeEl("article", "study-set-card");
-            const badge = makeEl("span", "study-set-badge", `${s.setType === "quiz" ? "Quiz" : "Flashcard"} · ${s.subject || "Tổng hợp"}`);
-            const title = makeEl("strong", "", `${s.isPinned ? "[Đã ghim] " : ""}${s.title}`);
-            const meta = makeEl("p", "profile-extra-hint", `${(s.items || []).length} thẻ/câu · ${s.playCount || 0} lượt học`);
+            const badge = makeEl("span", "study-set-badge", `${kind === "quiz" ? "Quiz" : "Flashcard"} · ${s.subject || "Tổng hợp"}`);
+            const title = makeEl("strong", "", `${pinned ? "[Đã ghim] " : ""}${s.title}`);
+            const meta = makeEl("p", "profile-extra-hint", `${cards.length} thẻ/câu · ${plays} lượt học`);
 
             const actions = makeEl("div", "study-set-actions");
-            const btnStudy = makeEl("button", "study-set-btn primary", s.setType === "quiz" ? "Làm bài" : "Học Flashcard");
+            const btnStudy = makeEl("button", "study-set-btn primary", kind === "quiz" ? "Làm bài" : "Học Flashcard");
             btnStudy.type = "button";
             btnStudy.onclick = () => openStudySetPlayer(s, false);
             actions.append(btnStudy);
 
-            if (s.setType === "quiz") {
+            if (kind === "quiz") {
                 const btnChal = makeEl("button", "study-set-btn challenge", "Thách đấu");
                 btnChal.type = "button";
                 btnChal.onclick = () => openStudySetPlayer(s, true);
@@ -1098,13 +1184,17 @@
             }
 
             if (isOwner) {
+                const btnEdit = makeEl("button", "study-set-btn", "Sửa");
+                btnEdit.type = "button";
+                btnEdit.onclick = () => openStudySetBuilderForEdit(s);
+
                 const btnPost = makeEl("button", "study-set-btn", "Đăng lên Feed");
                 btnPost.type = "button";
                 btnPost.onclick = async () => {
                     await api("/api/posts", {
                         method: "POST",
                         body: JSON.stringify({
-                            content: `Mình vừa chia sẻ bộ ôn tập "${s.title}" (${(s.items || []).length} câu/thẻ). Vào thử sức ngay nhé!`,
+                            content: `Mình vừa chia sẻ bộ ôn tập "${s.title}" (${cards.length} câu/thẻ). Vào thử sức ngay nhé!`,
                             studySetId: s.id,
                             visibility: "public"
                         })
@@ -1118,7 +1208,7 @@
                     await api(`/api/study-sets/${encodeURIComponent(s.id)}`, { method: "DELETE" });
                     await loadFullProfile();
                 };
-                actions.append(btnPost, btnDel);
+                actions.append(btnEdit, btnPost, btnDel);
             }
             card.append(badge, title, meta, actions);
             list.append(card);
@@ -1158,13 +1248,18 @@
                 return;
             }
             combined.forEach(res => {
+                const titleText = res.resource_title || res.title || "Tài liệu học tập";
+                const descText = res.resource_description || res.description || "";
+                const subjText = res.resource_subject || res.subject || "Tài liệu";
+                const linkHref = safeUploadUrl(res.resource_file_url || res.fileUrl) || safeUploadUrl(res.resource_link || res.resourceUrl);
+
                 const card = makeEl("article", "study-set-card");
-                card.append(makeEl("span", "study-set-badge", `${res._tag} · ${res.subject || "Tài liệu"}`));
-                card.append(makeEl("strong", "", res.title || "Tài liệu học tập"));
-                if (res.description) card.append(makeEl("p", "profile-extra-hint", res.description));
-                if (res.resourceUrl || res.fileUrl) {
+                card.append(makeEl("span", "study-set-badge", `${res._tag} · ${subjText}`));
+                card.append(makeEl("strong", "", titleText));
+                if (descText) card.append(makeEl("p", "profile-extra-hint", descText));
+                if (linkHref) {
                     const link = makeEl("a", "study-set-btn primary", "Mở tài liệu");
-                    link.href = res.fileUrl || res.resourceUrl;
+                    link.href = linkHref;
                     link.target = "_blank";
                     link.rel = "noopener noreferrer";
                     link.style.width = "max-content";
@@ -1179,7 +1274,7 @@
     }
 
     // =========================================================
-    // ACHIEVEMENTS, INTERESTS & ALBUM (WITH PRIVACY LOCK & COLLAPSED FORMS)
+    // ACHIEVEMENTS, INTERESTS & ALBUM
     // =========================================================
     function renderAchievements(list, locked, isOwner) {
         const container = document.getElementById("profile-achievements-list");
@@ -1383,10 +1478,11 @@
                 const box = makeEl("div", "sticker-thumb-btn");
                 box.style.position = "relative";
                 const im = makeEl("img");
-                im.src = st.imageUrl;
+                im.src = st.image || st.imageUrl;
                 im.alt = st.name || "Sticker";
                 box.append(im);
-                if (state.viewerUser && String(st.ownerUserId) === String(state.viewerUser.id)) {
+                const ownerId = st.owner_id || st.ownerUserId;
+                if (state.viewerUser && String(ownerId) === String(state.viewerUser.id)) {
                     const x = makeEl("button", "admin-remove-btn", "×");
                     x.type = "button";
                     x.style.cssText = "position:absolute; top:2px; right:3px; background:rgba(255,255,255,0.9); border-radius:50%; width:16px; height:16px; font-size:11px;";
@@ -1426,10 +1522,10 @@
         }
         try {
             status.textContent = "Đang tải sticker...";
-            const imageUrl = await toOptimizedImage(file, 256);
+            const image = await toOptimizedImage(file, 256);
             await api("/api/stickers", {
                 method: "POST",
-                body: JSON.stringify({ name, imageUrl })
+                body: JSON.stringify({ name, image, imageUrl: image })
             });
             document.getElementById("plus-sticker-name").value = "";
             document.getElementById("plus-sticker-file").value = "";
@@ -1484,7 +1580,6 @@
             state.modWorkspaceData = data;
             renderPrivilegedWorkspace(mount, data);
         } catch {
-            // 403 or unauthorized: keep #privileged-workspace-mount completely empty!
             mount.replaceChildren();
         }
     }
@@ -1564,7 +1659,6 @@
             };
         }
 
-        // Moderation Queue & Audit Logs
         const modSec = makeEl("section", "moderation-panel");
         modSec.style.marginTop = "16px";
         const postCount = (data.reportQueuePosts || []).length;
@@ -1600,8 +1694,12 @@
             } else {
                 const list = makeEl("div", "audit-log-list");
                 logs.forEach(log => {
+                    const actor = log.actorName || log.actor_name || log.actorEmail || log.actor_email || "Kiểm duyệt viên";
+                    const act = log.actionLabel || log.action || "Xử lý";
+                    const det = log.detail || log.target_label || log.details || "";
+                    const created = log.createdAt || log.created_at;
                     const item = makeEl("div", "audit-log-item");
-                    item.innerHTML = `<strong>${escapeHtml(log.actorName || log.actorEmail)} · ${escapeHtml(log.actionLabel)}</strong><span class="audit-log-meta">${escapeHtml(log.detail || "")} • ${new Date(log.createdAt).toLocaleString("vi-VN")}</span>`;
+                    item.innerHTML = `<strong>${escapeHtml(actor)} · ${escapeHtml(act)}</strong><span class="audit-log-meta">${escapeHtml(det)}${created ? ` • ${new Date(created).toLocaleString("vi-VN")}` : ""}</span>`;
                     list.append(item);
                 });
                 content.append(list);
@@ -1616,14 +1714,24 @@
         }
 
         queue.forEach(entry => {
+            const titleText = entry.targetTitle
+                || entry.post?.name
+                || entry.account?.name
+                || entry.account?.email
+                || entry.targetId;
+            const previewText = entry.targetPreview
+                || entry.post?.content?.slice(0, 90)
+                || entry.account?.email
+                || `${entry.reportCount} báo cáo đang chờ duyệt`;
+
             const card = makeEl("button", "mod-queue-card");
             card.type = "button";
             const info = makeEl("div", "mod-queue-info");
-            info.append(makeEl("strong", "", entry.targetTitle || entry.targetId));
-            info.append(makeEl("p", "", entry.targetPreview || `${entry.reportCount} báo cáo đang chờ duyệt`));
+            info.append(makeEl("strong", "", titleText));
+            info.append(makeEl("p", "", previewText));
             const badge = makeEl("span", "mod-count-badge", `${entry.reportCount} báo cáo`);
             card.append(info, badge);
-            card.onclick = () => openModInspectModal(entry, state.modTab === "users" ? "user" : "post");
+            card.onclick = () => openModInspectModal({ ...entry, targetTitle: titleText }, state.modTab === "users" ? "user" : "post");
             content.append(card);
         });
     }
@@ -1773,12 +1881,14 @@
             status.textContent = "Đang lưu...";
             const file = document.getElementById("showcase-image-file").files[0];
             const image = file ? await toOptimizedImage(file, 900) : "";
+            const urlVal = document.getElementById("showcase-url-input").value.trim();
             await api("/api/profile/showcase", {
                 method: "POST",
                 body: JSON.stringify({
                     title: document.getElementById("showcase-title-input").value.trim(),
                     description: document.getElementById("showcase-desc-input").value.trim(),
-                    url: document.getElementById("showcase-url-input").value.trim(),
+                    link: urlVal,
+                    url: urlVal,
                     image
                 })
             });
@@ -1794,13 +1904,17 @@
     document.getElementById("study-tag-form")?.addEventListener("submit", async e => {
         e.preventDefault();
         const status = document.getElementById("study-tag-status");
+        const val = document.getElementById("study-tag-input").value.trim();
+        const kind = document.getElementById("study-tag-type").value;
         try {
             status.textContent = "Đang thêm...";
             await api("/api/profile/study-tags", {
                 method: "POST",
                 body: JSON.stringify({
-                    subjectTag: document.getElementById("study-tag-input").value.trim(),
-                    tagType: document.getElementById("study-tag-type").value
+                    subject: val,
+                    subjectTag: val,
+                    kind,
+                    tagType: kind
                 })
             });
             e.currentTarget.reset();
