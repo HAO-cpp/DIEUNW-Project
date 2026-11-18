@@ -40,7 +40,7 @@
 		<picture>
 			<source srcset="./DIEUNW.avif" type="image/avif">
 			<source srcset="./DIEUNW.webp" type="image/webp">
-			<img src="./DIEUNW.png" alt="DIEUNW Banner">
+			<img src="./DIEU.png" alt="DIEUNW Banner">
 		</picture>
 	</div>
 
@@ -646,119 +646,100 @@
 		</section>
 	</div>
 
-	<!-- MODAL: Thẻ Học Sinh Điện Tử QR (Custom nền trái -> gần giữa + phần Custom thu gọn riêng) -->
+	<!-- MODAL: Thẻ Học Sinh Điện Tử QR (Nền trái-giữa custom + phần tùy chỉnh thu gọn + QR vừa khung) -->
 	<div id="ecard-modal-overlay" class="report-modal-overlay" hidden>
-		<section class="report-modal-box ecard-modal-shell" role="dialog" aria-modal="true" aria-labelledby="ecard-modal-title">
+		<section class="report-modal-box ecard-modal-box" style="width:min(560px, 100%);" role="dialog" aria-modal="true" aria-labelledby="ecard-modal-title">
 			<div class="report-modal-header">
 				<h3 id="ecard-modal-title">Thẻ Học Sinh Điện Tử NQD</h3>
 				<button type="button" class="close-badge" data-close-modal="ecard-modal-overlay">&times;</button>
 			</div>
 
 			<div class="ecard-preview" id="ecard-preview-card" data-tone="light">
-				<div class="ecard-custom-bg" id="ecard-custom-bg" aria-hidden="true">
-					<div class="ecard-custom-bg-photo" id="ecard-custom-bg-photo"></div>
-					<div class="ecard-custom-bg-overlay" id="ecard-custom-bg-overlay"></div>
+				<div class="ecard-custom-bg" aria-hidden="true">
+					<div id="ecard-custom-bg-photo"></div>
+					<div id="ecard-custom-bg-overlay"></div>
 				</div>
-
-				<div class="ecard-content-layer">
-					<div class="ecard-header">
-						<span class="ecard-brand-badge">DIEUNW · E-STUDENT CARD</span>
-						<span id="ecard-cohort-label" class="ecard-cohort-pill">NQD</span>
+				<div class="ecard-header">
+					<span>DIEUNW · E-STUDENT CARD</span>
+					<span id="ecard-cohort-label">NQD</span>
+				</div>
+				<div class="ecard-body">
+					<div class="ecard-identity">
+						<img id="ecard-avatar-img" src="./DIEU.png" alt="Avatar" class="ecard-avatar-thumb">
+						<strong id="ecard-name-label" class="ecard-student-name">Tên Học Sinh</strong>
+						<span id="ecard-class-label" class="ecard-student-class">Lớp</span>
+						<span id="ecard-email-label" class="ecard-student-email"></span>
+						<span id="ecard-tagline-label" class="ecard-tagline-chip" hidden></span>
 					</div>
-					<div class="ecard-body">
-						<div class="ecard-info-zone">
-							<img id="ecard-avatar-img" src="./DIEU.png" alt="Avatar" class="ecard-avatar-img">
-							<strong id="ecard-name-label" class="ecard-name-text">Tên Học Sinh</strong>
-							<span id="ecard-class-label" class="ecard-meta-text">Lớp</span>
-							<span id="ecard-email-label" class="ecard-email-text"></span>
-							<p id="ecard-tagline-label" class="ecard-tagline-pill" hidden></p>
-						</div>
-						<div class="ecard-qr-box" title="Quét để mở hồ sơ bạn học">
-							<canvas id="ecard-qr-canvas" width="140" height="140"></canvas>
-						</div>
+					<div class="ecard-qr-box" title="Quét để mở hồ sơ bạn học">
+						<canvas id="ecard-qr-canvas" width="140" height="140"></canvas>
 					</div>
 				</div>
 			</div>
 
 			<div class="mod-actions-row">
 				<button type="button" id="btn-copy-profile-link" class="btn-auth outline" style="width:auto;">Sao chép liên kết hồ sơ</button>
-				<button type="button" id="btn-download-ecard" class="btn-auth" style="width:auto;">Tải thẻ học sinh PNG</button>
+				<button type="button" id="btn-download-ecard" class="btn-auth" style="width:auto;">Tải Thẻ HS (PNG)</button>
 			</div>
 
-			<!-- Phần Custom Thẻ học sinh điện tử tách riêng thành một mục thu gọn -->
-			<section id="ecard-custom-section" class="ecard-custom-section" hidden>
-				<button type="button" id="btn-toggle-ecard-custom" class="ecard-custom-toggle" aria-expanded="false" aria-controls="ecard-custom-accordion">
-					<span>Tùy chỉnh Thẻ học sinh điện tử (Nền trái–giữa &amp; Ảnh)</span>
-					<span class="ecard-toggle-caret" aria-hidden="true">▾</span>
+			<!-- Phần Custom nền Thẻ học sinh điện tử (tách riêng, thu gọn mặc định) -->
+			<div id="ecard-custom-section" class="ecard-custom-section">
+				<button type="button" id="btn-toggle-ecard-custom" class="ecard-custom-toggle-btn" aria-expanded="false" aria-controls="ecard-custom-accordion">
+					Tùy chỉnh nền &amp; giao diện thẻ ▾
 				</button>
-
 				<div id="ecard-custom-accordion" class="ecard-custom-accordion" hidden>
 					<div class="ecard-custom-grid">
-						<div>
-							<label class="input-group-label">Ảnh nền vùng trái – gần giữa</label>
-							<div class="image-upload-box" style="margin-top:4px;">
-								<div class="image-upload-row">
-									<label class="image-upload-label" for="ecard-bg-file">Chọn ảnh nền</label>
-									<input id="ecard-bg-file" type="file" accept="image/*" class="sr-only">
-									<span id="ecard-bg-filename" class="image-upload-filename">Chưa chọn ảnh (đang dùng gradient)</span>
-									<button type="button" id="btn-clear-ecard-bg" class="btn-clear-upload" hidden>Xóa ảnh</button>
-								</div>
+						<div class="ecard-custom-field full">
+							<label for="ecard-bg-file">Ảnh nền vùng trái đến giữa thẻ</label>
+							<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+								<input type="file" id="ecard-bg-file" accept="image/*" style="flex:1; min-width:180px;">
+								<button type="button" id="btn-clear-ecard-bg" class="btn-clear-upload" hidden>Gỡ ảnh nền</button>
 							</div>
 						</div>
-
-						<div class="ecard-custom-two-col">
-							<div>
-								<label class="input-group-label" for="ecard-bg-pos">Trọng tâm ảnh</label>
-								<select id="ecard-bg-pos" class="group-input">
-									<option value="center center">Chính giữa</option>
-									<option value="center top">Canh trên</option>
-									<option value="center bottom">Canh dưới</option>
-									<option value="left center">Canh trái</option>
-								</select>
-							</div>
-							<div>
-								<label class="input-group-label" for="ecard-text-tone">Màu chữ vùng trái</label>
-								<select id="ecard-text-tone" class="group-input">
-									<option value="light">Chữ trắng (nền đậm / ảnh)</option>
-									<option value="dark">Chữ xanh đậm (nền sáng)</option>
-								</select>
-							</div>
+						<div class="ecard-custom-field">
+							<label for="ecard-bg-pos">Canh vị trí ảnh</label>
+							<select id="ecard-bg-pos">
+								<option value="center center">Giữa trung tâm</option>
+								<option value="left center">Canh trái</option>
+								<option value="right center">Canh phải</option>
+								<option value="center top">Canh trên</option>
+								<option value="center bottom">Canh dưới</option>
+							</select>
 						</div>
-
-						<div>
-							<label class="input-group-label">Màu nền Gradient trái – giữa (hoặc làm nền chuyển tiếp)</label>
-							<div class="ecard-color-presets">
-								<input type="color" id="ecard-c1" value="#1769aa" title="Màu bắt đầu (bên trái)">
-								<input type="color" id="ecard-c2" value="#2298f8" title="Màu chuyển tiếp (gần giữa)">
-								<button type="button" class="gradient-swatch-btn ecard-swatch-btn" data-c1="#1769aa" data-c2="#2298f8" style="background:linear-gradient(135deg,#1769aa,#2298f8);" title="Xanh NQD"></button>
-								<button type="button" class="gradient-swatch-btn ecard-swatch-btn" data-c1="#102a43" data-c2="#1d4ed8" style="background:linear-gradient(135deg,#102a43,#1d4ed8);" title="Đêm Đại Dương"></button>
-								<button type="button" class="gradient-swatch-btn ecard-swatch-btn" data-c1="#0f766e" data-c2="#10b981" style="background:linear-gradient(135deg,#0f766e,#10b981);" title="Xanh Ngọc"></button>
-								<button type="button" class="gradient-swatch-btn ecard-swatch-btn" data-c1="#4338ca" data-c2="#ec4899" style="background:linear-gradient(135deg,#4338ca,#ec4899);" title="Cực Quang"></button>
-								<button type="button" class="gradient-swatch-btn ecard-swatch-btn" data-c1="#dbeafe" data-c2="#e0f2fe" style="background:linear-gradient(135deg,#dbeafe,#e0f2fe);" title="Bầu Trời Nhạt"></button>
+						<div class="ecard-custom-field">
+							<label for="ecard-text-tone">Màu chữ trên thẻ</label>
+							<select id="ecard-text-tone">
+								<option value="light">Chữ trắng (nền tối/đậm)</option>
+								<option value="dark">Chữ tối (nền sáng)</option>
+							</select>
+						</div>
+						<div class="ecard-custom-field full">
+							<label>Màu Gradient nền (Trái → Giữa)</label>
+							<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+								<input type="color" id="ecard-c1" value="#1769aa" aria-label="Màu gradient 1">
+								<input type="color" id="ecard-c2" value="#2298f8" aria-label="Màu gradient 2">
+								<button type="button" class="ecard-swatch-btn" data-ec1="#1769aa" data-ec2="#2298f8" style="background:linear-gradient(135deg,#1769aa,#2298f8);" title="Xanh NQD"></button>
+								<button type="button" class="ecard-swatch-btn" data-ec1="#0f766e" data-ec2="#10b981" style="background:linear-gradient(135deg,#0f766e,#10b981);" title="Xanh Ngọc"></button>
+								<button type="button" class="ecard-swatch-btn" data-ec1="#4338ca" data-ec2="#ec4899" style="background:linear-gradient(135deg,#4338ca,#ec4899);" title="Cực quang"></button>
+								<button type="button" class="ecard-swatch-btn" data-ec1="#c2410c" data-ec2="#f59e0b" style="background:linear-gradient(135deg,#c2410c,#f59e0b);" title="Hoàng hôn"></button>
 							</div>
 						</div>
-
-						<div>
-							<div style="display:flex; justify-content:space-between; align-items:center;">
-								<label class="input-group-label" for="ecard-overlay-range" style="margin:0;">Lớp phủ tăng độ rõ chữ</label>
-								<span id="ecard-overlay-label" class="profile-extra-hint" style="min-height:auto; font-weight:700;">25%</span>
-							</div>
-							<input type="range" id="ecard-overlay-range" min="0" max="75" step="5" value="25" style="width:100%; margin-top:4px; accent-color:#1769aa;">
+						<div class="ecard-custom-field full">
+							<label for="ecard-overlay-range">Độ tối lớp phủ (<span id="ecard-overlay-label">25%</span>)</label>
+							<input type="range" id="ecard-overlay-range" min="0" max="80" value="25">
 						</div>
-
-						<div>
-							<label class="input-group-label" for="ecard-tagline-input">Dòng khẩu hiệu / Ghi chú ngắn trên thẻ</label>
-							<input type="text" id="ecard-tagline-input" maxlength="48" placeholder="VD: Học hết mình · Tự tin tỏa sáng" class="group-input">
-						</div>
-
-						<p id="ecard-custom-status" class="profile-extra-status"></p>
-						<div class="mod-actions-row" style="margin-top:0;">
-							<button type="button" id="btn-reset-ecard-custom" class="btn-auth outline" style="width:auto;">Mặc định</button>
-							<button type="button" id="btn-save-ecard-custom" class="btn-auth" style="width:auto;">Lưu tùy chỉnh thẻ</button>
+						<div class="ecard-custom-field full">
+							<label for="ecard-tagline-input">Khẩu hiệu / Tagline nhỏ trên thẻ</label>
+							<input type="text" id="ecard-tagline-input" maxlength="60" placeholder="VD: Mục tiêu 27+ THPTQG · K18 NQD">
 						</div>
 					</div>
+					<p id="ecard-custom-status" class="profile-extra-status"></p>
+					<div class="ecard-custom-actions">
+						<button type="button" id="btn-reset-ecard-custom" class="btn-auth outline" style="width:auto;">Khôi phục mặc định</button>
+						<button type="button" id="btn-save-ecard-custom" class="btn-auth" style="width:auto;">Lưu mẫu thẻ</button>
+					</div>
 				</div>
-			</section>
+			</div>
 		</section>
 	</div>
 
@@ -897,6 +878,6 @@
 	</script>
 	<script src="./nav-profile.js?v=3" defer></script>
 	<script src="./profile-auth.js?v=3" defer></script>
-	<script src="./profile-sections.js?v=4" defer></script>
+	<script src="./profile-sections.js?v=5" defer></script>
 </body>
 </html>
