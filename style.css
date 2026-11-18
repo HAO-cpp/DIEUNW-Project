@@ -4059,7 +4059,6 @@ body.dark-mode .ecard-custom-accordion {
 	}
 }
 
-/* Bổ sung cho .btn-auth.outline và .subfilter-btn trên profile.html */
 .btn-auth.outline {
 	background: #ffffff;
 	color: var(--dnw-primary);
@@ -4106,4 +4105,22 @@ html[data-theme="dark"] .subfilter-btn:not(.active) {
 	background: #1c2a3a;
 	border-color: #35506d;
 	color: #e4effa;
+}
+
+#btn-toggle-ecard-custom{
+     min-height: 36px; 
+     width: max-content; 
+     max-width: 100%; 
+     padding: 8px 14px; 
+     border: 1px solid #1769aa; 
+     border-radius: 6px; 
+     background: #1769aa; 
+     color: #fff; 
+     cursor: pointer; 
+     font-size: 12px; 
+     font-weight: 700; 
+     transition: background-color 0.25s ease, color 0.25s ease;
+}
+#btn-toggle-ecard-custom:hover{
+     background: var(--brand-soft); 
 }
