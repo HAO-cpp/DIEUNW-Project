@@ -1010,3 +1010,135 @@
         });
     }
 })();
+
+/* ===== SẮP XẾP LẠI MENU DROPDOWN CÂN ĐỐI THEO NHÓM ===== */
+(() => {
+    const GROUP_LAYOUT = [
+        {
+            label: "Khám phá & Giải trí",
+            items: [
+                { href: "index.html", span: "nav-span-2" },
+                { href: "videos.html", span: "nav-span-2" },
+                { href: "music.html", span: "nav-span-2" }
+            ]
+        },
+        {
+            label: "Góc học tập",
+            items: [
+                { href: "tu-hoc.html", span: "nav-span-3" },
+                { href: "hoc-nhom.html", span: "nav-span-3" }
+            ]
+        },
+        {
+            label: "Kết nối bạn bè",
+            items: [
+                { href: "friends.html", span: "nav-span-3" },
+                { href: "messages.html", span: "nav-span-3" },
+                { href: "tro-chuyen.html", span: "nav-span-6" }
+            ]
+        },
+        {
+            label: "Câu lạc bộ & Tin tức",
+            items: [
+                { href: "clubs.html", span: "nav-span-3" },
+                { href: "announcements.html", span: "nav-span-3" }
+            ]
+        }
+    ];
+
+    function syncMenuGridMode(menu) {
+        if (!menu) return;
+        const style = getComputedStyle(menu);
+        const isGridOrDropdown = style.display === "grid" || menu.classList.contains("open") || menu.closest(".mobile-nav-popover, .nav-dropdown, .nav-drawer");
+        menu.classList.toggle("dieunw-grouped-grid", Boolean(isGridOrDropdown));
+    }
+
+    function enhanceMenuStructure() {
+        document.querySelectorAll(".nav-menu").forEach(menu => {
+            if (menu.dataset.gridBeautified === "1") {
+                syncMenuGridMode(menu);
+                return;
+            }
+            const existingLinks = Array.from(menu.querySelectorAll("a.nav-item"));
+            if (!existingLinks.length) return;
+
+            menu.dataset.gridBeautified = "1";
+
+            // Xóa divider cũ gây lỗ trống nếu có
+            menu.querySelectorAll(".nav-group-divider, .nav-group-label").forEach(el => el.remove());
+
+            const findLink = (targetFile) => existingLinks.find(a => {
+                const href = (a.getAttribute("href") || "").toLowerCase();
+                return href.endsWith(targetFile);
+            });
+
+            const fragment = document.createDocumentFragment();
+            const placed = new Set();
+
+            GROUP_LAYOUT.forEach((group, groupIdx) => {
+                const matchedInGroup = [];
+                group.items.forEach(spec => {
+                    const link = findLink(spec.href);
+                    if (link && !placed.has(link)) {
+                        link.classList.remove("nav-span-2", "nav-span-3", "nav-span-6");
+                        link.classList.add(spec.span);
+                        matchedInGroup.push(link);
+                        placed.add(link);
+                    }
+                });
+
+                if (!matchedInGroup.length) return;
+
+                if (groupIdx > 0) {
+                    const sep = document.createElement("span");
+                    sep.className = "nav-group-divider";
+                    sep.setAttribute("aria-hidden", "true");
+                    fragment.appendChild(sep);
+                }
+
+                const labelEl = document.createElement("div");
+                labelEl.className = "nav-group-label";
+                labelEl.textContent = group.label;
+                fragment.appendChild(labelEl);
+
+                matchedInGroup.forEach(link => fragment.appendChild(link));
+            });
+
+            // Giữ lại các mục ngoài danh sách (nếu có)
+            existingLinks.forEach(link => {
+                if (!placed.has(link)) {
+                    link.classList.add("nav-span-3");
+                    fragment.appendChild(link);
+                }
+            });
+
+            menu.innerHTML = "";
+            menu.appendChild(fragment);
+            syncMenuGridMode(menu);
+        });
+    }
+
+    const runAll = () => {
+        enhanceMenuStructure();
+        document.querySelectorAll(".nav-menu").forEach(syncMenuGridMode);
+    };
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", () => setTimeout(runAll, 0));
+    } else {
+        setTimeout(runAll, 0);
+    }
+
+    window.addEventListener("resize", () => {
+        document.querySelectorAll(".nav-menu").forEach(syncMenuGridMode);
+    });
+
+    const obs = new MutationObserver(() => runAll());
+    if (document.body) {
+        obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "hidden", "style"] });
+    } else {
+        document.addEventListener("DOMContentLoaded", () => {
+            obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "hidden", "style"] });
+        });
+    }
+})();
