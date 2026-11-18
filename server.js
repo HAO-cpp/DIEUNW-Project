@@ -242,7 +242,7 @@ function cleanUser(db, row, viewerId = "") {
 		email: row.email,
 		studentClass: row.student_class,
 		cohort: row.cohort || "",
-		avatar: row.avatar || "./DIEU.png",
+		avatar: row.avatar || "./DIEU.avif",
 		cover: row.cover || "",
 		bio: row.bio || "",
 		isAdmin: Boolean(row.is_admin),
@@ -344,7 +344,7 @@ function initializeDatabase(dbPath) {
 			password_hash TEXT NOT NULL,
 			password_salt TEXT NOT NULL,
 			student_class TEXT NOT NULL DEFAULT 'Học sinh NQD',
-			avatar TEXT NOT NULL DEFAULT './DIEU.png',
+			avatar TEXT NOT NULL DEFAULT './DIEU.avif',
 			cover TEXT NOT NULL DEFAULT '',
 			bio TEXT NOT NULL DEFAULT '',
 			is_admin INTEGER NOT NULL DEFAULT 0,
@@ -890,7 +890,7 @@ function serializeStudySet(db, row) {
 		id: row.id,
 		userId: row.user_id,
 		authorName: author?.name || author?.email || "Thành viên",
-		authorAvatar: author?.avatar || "./DIEU.png",
+		authorAvatar: author?.avatar || "./DIEU.avif",
 		forkedFromId: row.forked_from_id || null,
 		kind: row.kind,
 		title: row.title,
@@ -933,7 +933,7 @@ function postForViewer(db, row, viewerId) {
 		type: row.type || "post",
 		name: club ? club.name : (author?.name || author?.email || "Thành viên"),
 		authorEmail: author?.email || "",
-		avatar: club ? (club.logo || "./DIEU.png") : (author?.avatar || "./DIEU.png"),
+		avatar: club ? (club.logo || "./DIEU.avif") : (author?.avatar || "./DIEU.avif"),
 		authorFrame: club ? "none" : (author?.active_avatar_frame || "none"),
 		authorPresence: club ? "offline" : authorPresence,
 		authorHasStory: club ? false : hasActiveStory,
@@ -1288,7 +1288,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const now = new Date().toISOString();
 		db.prepare(`
 			INSERT INTO users(id, name, email, password_hash, password_salt, student_class, avatar, cover, bio, is_admin, is_moderator, last_seen_at, created_at)
-			VALUES (?, ?, ?, ?, ?, 'Học sinh NQD', './DIEU.png', '', 'Chào mừng đến với góc học tập của mình trên DIEUNW!',
+			VALUES (?, ?, ?, ?, ?, 'Học sinh NQD', './DIEU.avif', '', 'Chào mừng đến với góc học tập của mình trên DIEUNW!',
 				EXISTS(SELECT 1 FROM admin_emails WHERE email = ? COLLATE NOCASE),
 				EXISTS(SELECT 1 FROM moderator_emails WHERE email = ? COLLATE NOCASE), ?, ?)
 		`).run(userId, pending.name, email, pending.password_hash, pending.password_salt, email, email, Date.now(), now);
@@ -1439,7 +1439,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 				byUser.set(row.user_id, {
 					userId: row.user_id,
 					userName: row.user_name,
-					userAvatar: row.user_avatar || "./DIEU.png",
+					userAvatar: row.user_avatar || "./DIEU.avif",
 					userClass: row.user_class,
 					stories: []
 				});
@@ -1482,7 +1482,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const email = body.email !== undefined ? validateEmail(body.email) : currentRow.email;
 		const studentClass = body.studentClass !== undefined ? String(body.studentClass || "Học sinh NQD").trim().slice(0, 80) : currentRow.student_class;
 		const cohort = body.cohort !== undefined ? String(body.cohort || "").trim().slice(0, 40) : (currentRow.cohort || "");
-		const avatar = body.avatar !== undefined ? (body.avatar ? validateProfileImage(body.avatar, false) : "./DIEU.png") : currentRow.avatar;
+		const avatar = body.avatar !== undefined ? (body.avatar ? validateProfileImage(body.avatar, false) : "./DIEU.avif") : currentRow.avatar;
 		const cover = body.cover !== undefined ? (body.cover ? validateProfileImage(body.cover, false, 1200000) : "") : currentRow.cover;
 		const bio = body.bio !== undefined ? String(body.bio || "").trim().slice(0, 500) : currentRow.bio;
 		const socialFb = body.socialFacebook !== undefined ? String(body.socialFacebook || "").trim().slice(0, 250) : currentRow.social_facebook;

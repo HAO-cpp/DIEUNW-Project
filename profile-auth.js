@@ -151,7 +151,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     const opt = document.createElement("button");
                     opt.type = "button";
                     opt.className = "mention-option";
-                    opt.innerHTML = `<img src="${escapeHtml(u.avatar || "./DIEU.png")}" alt=""><div class="mention-option-meta"><strong>${escapeHtml(u.name)}</strong><span>${escapeHtml(u.email)}</span></div>`;
+                    opt.innerHTML = `<img src="${escapeHtml(u.avatar || "./DIEU.avif")}" alt=""><div class="mention-option-meta"><strong>${escapeHtml(u.name)}</strong><span>${escapeHtml(u.email)}</span></div>`;
                     opt.onclick = () => {
                         const sel = window.getSelection();
                         if (sel && sel.rangeCount) {
@@ -708,7 +708,7 @@ document.addEventListener("DOMContentLoaded", () => {
         renderProfileRoles(user);
 
         const avatarEl = document.getElementById("user-display-avatar");
-        if (avatarEl) avatarEl.src = user.avatar || "./DIEU.png";
+        if (avatarEl) avatarEl.src = user.avatar || "./DIEU.avif";
 
         const coverEl = document.getElementById("profile-cover-image");
         if (coverEl) {
@@ -746,7 +746,7 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("user-display-bio").innerText = friend.bio || "Học sinh trường NQD";
             renderProfileRoles(friend);
 
-            document.getElementById("user-display-avatar").src = friend.avatar || "./DIEU.png";
+            document.getElementById("user-display-avatar").src = friend.avatar || "./DIEU.avif";
             const coverEl = document.getElementById("profile-cover-image");
             if (coverEl) {
                 coverEl.hidden = !friend.cover;
@@ -808,7 +808,7 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("user-display-bio").innerText = club.bio || `Fanpage chính thức của ${club.name}`;
             document.querySelector(".verified-badge").textContent = "✓ Fanpage CLB chính thức";
 
-            document.getElementById("user-display-avatar").src = club.logo || "./DIEU.png";
+            document.getElementById("user-display-avatar").src = club.logo || "./DIEU.avif";
             const coverEl = document.getElementById("profile-cover-image");
             if (coverEl) {
                 coverEl.hidden = !club.cover;
@@ -848,7 +848,7 @@ document.addEventListener("DOMContentLoaded", () => {
             renderPostsList(
                 document.getElementById("my-posts-container"),
                 data.posts || [],
-                club.logo || "./DIEU.png",
+                club.logo || "./DIEU.avif",
                 "Fanpage CLB chưa có bài viết nào.",
                 post => Boolean(viewer && (String(post.userId) === String(viewer.id) || isManager)),
                 () => loadClubProfile(targetClubId, viewer)
@@ -926,7 +926,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const imgHtml = post.image && post.image.trim() !== ""
                 ? `<img src="${escapeHtml(post.image)}" class="post-card-image" loading="lazy" alt="Ảnh bài viết">`
                 : "";
-            const avatar = escapeHtml(post.avatar || fallbackAvatar || "./DIEU.png");
+            const avatar = escapeHtml(post.avatar || fallbackAvatar || "./DIEU.avif");
             const bodyHtml = post.isRichHtml
                 ? `<div class="post-rich-content">${sanitizeRichHtml(post.content || "")}</div>`
                 : `<p>${escapeHtml(post.content || "")}</p>`;
@@ -937,7 +937,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const stImg = cmt.stickerUrl ? `<img src="${escapeHtml(cmt.stickerUrl)}" class="comment-sticker-img" alt="Sticker">` : "";
                 return `
                     <div class="comment-item">
-                        <img src="${escapeHtml(cmt.avatar || "./DIEU.png")}" class="post-card-avatar" style="width:32px !important; height:32px !important;">
+                        <img src="${escapeHtml(cmt.avatar || "./DIEU.avif")}" class="post-card-avatar" style="width:32px !important; height:32px !important;">
                         <div class="comment-content-box">
                             <h5>${escapeHtml(cmt.name || "Thành viên")}</h5>
                             ${cmt.text ? `<p>${escapeHtml(cmt.text)}</p>` : ""}

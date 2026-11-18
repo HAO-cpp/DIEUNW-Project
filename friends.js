@@ -362,7 +362,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		if (cover) coverImage.src = cover;
 		else coverImage.removeAttribute("src");
 
-		document.getElementById("friend-avatar-image").src = friend.avatar || "./DIEU.png";
+		document.getElementById("friend-avatar-image").src = friend.avatar || "./DIEU.avif";
 		const nameHeading = document.getElementById("friend-profile-name");
 		nameHeading.textContent = friend.name || "Thành viên DIEUNW";
 		const badgesHtml = buildRoleBadgesHtml(friend);

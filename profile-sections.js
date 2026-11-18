@@ -521,7 +521,7 @@
             ...s,
             userId: s.userId || ownerUser?.id || "",
             userName: s.userName || ownerUser?.name || "Học sinh NQD",
-            userAvatar: resolveMediaUrl(s.userAvatar || ownerUser?.avatar || "./DIEU.png"),
+            userAvatar: resolveMediaUrl(s.userAvatar || ownerUser?.avatar || "./DIEU.avif"),
             mediaUrl: resolveMediaUrl(s.mediaUrl)
         }));
         state.storyIndex = Math.max(0, Math.min(startIdx, state.storiesList.length - 1));
@@ -543,7 +543,7 @@
             return seg;
         }));
 
-        document.getElementById("story-viewer-avatar").src = story.userAvatar || "./DIEU.png";
+        document.getElementById("story-viewer-avatar").src = story.userAvatar || "./DIEU.avif";
         document.getElementById("story-viewer-name").textContent = story.userName || "Học sinh NQD";
         document.getElementById("story-viewer-time").textContent = new Date(story.createdAt).toLocaleString("vi-VN");
         document.getElementById("story-viewer-caption").textContent = story.caption || "";
@@ -1456,7 +1456,7 @@
     document.getElementById("btn-ecard-open")?.addEventListener("click", () => {
         const user = state.profileData?.user || state.viewerUser;
         if (!user) return;
-        document.getElementById("ecard-avatar-img").src = resolveMediaUrl(user.avatar || "./DIEU.png");
+        document.getElementById("ecard-avatar-img").src = resolveMediaUrl(user.avatar || "./DIEU.avif");
         document.getElementById("ecard-name-label").textContent = user.name || "Học sinh NQD";
         document.getElementById("ecard-class-label").textContent = user.studentClass ? `Lớp ${user.studentClass}` : "Học sinh trường NQD";
         document.getElementById("ecard-cohort-label").textContent = user.cohort || "NQD";
@@ -1738,7 +1738,7 @@
             ctx.textAlign = "left";
 
             // Avatar circle
-            const avImg = await loadCanvasImage(resolveMediaUrl(user.avatar || "./DIEU.png")).catch(() => null);
+            const avImg = await loadCanvasImage(resolveMediaUrl(user.avatar || "./DIEU.avif")).catch(() => null);
             ctx.save();
             ctx.beginPath();
             ctx.arc(76, 134, 40, 0, Math.PI * 2);
@@ -2215,7 +2215,7 @@
                 const left = makeEl("div", "", "");
                 left.style.cssText = "display:flex; align-items:center; gap:10px;";
                 const av = makeEl("img", "post-avatar");
-                av.src = resolveMediaUrl(p.avatar || "./DIEU.png");
+                av.src = resolveMediaUrl(p.avatar || "./DIEU.avif");
                 av.alt = p.name || "Thành viên";
                 const meta = makeEl("div", "", "");
                 meta.append(makeEl("strong", "", p.name || "Thành viên"));

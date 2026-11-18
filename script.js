@@ -87,8 +87,8 @@ function updateHomeAccess(user = null) {
         const triggerAvatar = document.getElementById("feed-trigger-avatar");
         const triggerText = document.getElementById("trigger-modal-input");
         if (authorName) authorName.textContent = name;
-        if (authorAvatar) authorAvatar.src = user.avatar || "./DIEU.png";
-        if (triggerAvatar) triggerAvatar.src = user.avatar || "./DIEU.png";
+        if (authorAvatar) authorAvatar.src = user.avatar || "./DIEU.avif";
+        if (triggerAvatar) triggerAvatar.src = user.avatar || "./DIEU.avif";
         if (triggerText) triggerText.textContent = `${name} ơi, bạn đang nghĩ gì thế?`;
         if (!homeAccessEnabled) {
             loadStoriesBar();
@@ -137,7 +137,7 @@ async function loadStoriesBar() {
         addBtn.className = "story-item";
         addBtn.innerHTML = `
             <span class="story-ring is-add">
-                <img src="${escapeHtml(currentHomeUser.avatar || "./DIEU.png")}" alt="">
+                <img src="${escapeHtml(currentHomeUser.avatar || "./DIEU.avif")}" alt="">
                 <span class="story-add-plus">+</span>
             </span>
             <span class="story-item-label">Đăng Story</span>
@@ -162,7 +162,7 @@ async function loadStoriesBar() {
             btn.className = "story-item";
             btn.innerHTML = `
                 <span class="story-ring${first.viewedByMe ? " is-seen" : ""}">
-                    <img src="${escapeHtml(first.userAvatar || "./DIEU.png")}" alt="${escapeHtml(first.userName)}">
+                    <img src="${escapeHtml(first.userAvatar || "./DIEU.avif")}" alt="${escapeHtml(first.userName)}">
                 </span>
                 <span class="story-item-label">${escapeHtml(first.userName)}</span>
             `;
@@ -197,7 +197,7 @@ function renderHomeStory() {
         seg.append(fill);
         return seg;
     }));
-    document.getElementById("home-story-viewer-avatar").src = s.userAvatar || "./DIEU.png";
+    document.getElementById("home-story-viewer-avatar").src = s.userAvatar || "./DIEU.avif";
     document.getElementById("home-story-viewer-name").textContent = s.userName || "Bạn học";
     document.getElementById("home-story-viewer-time").textContent = new Date(s.createdAt).toLocaleString("vi-VN");
     document.getElementById("home-story-viewer-caption").textContent = s.caption || "";
@@ -356,7 +356,7 @@ modalOverlay?.addEventListener("click", e => { if (e.target === modalOverlay) cl
                 const btn = document.createElement("button");
                 btn.type = "button";
                 btn.className = "mention-option";
-                btn.innerHTML = `<img src="${escapeHtml(u.avatar || "./DIEU.png")}" alt=""><div class="mention-option-meta"><strong>${escapeHtml(u.name)}</strong><span>${escapeHtml(u.email)}</span></div>`;
+                btn.innerHTML = `<img src="${escapeHtml(u.avatar || "./DIEU.avif")}" alt=""><div class="mention-option-meta"><strong>${escapeHtml(u.name)}</strong><span>${escapeHtml(u.email)}</span></div>`;
                 btn.onclick = () => {
                     const sel = window.getSelection();
                     if (sel && sel.rangeCount) {
@@ -650,7 +650,7 @@ function renderPosts(posts) {
             const stHtml = cmt.stickerUrl ? `<img src="${escapeHtml(cmt.stickerUrl)}" class="comment-sticker-img" alt="Sticker">` : "";
             return `
                 <div class="comment-item">
-                    <img src="${escapeHtml(cmt.avatar || "./DIEU.png")}" class="post-card-avatar" style="width:32px !important; height:32px !important;">
+                    <img src="${escapeHtml(cmt.avatar || "./DIEU.avif")}" class="post-card-avatar" style="width:32px !important; height:32px !important;">
                     <div class="comment-content-box">
                         <h5>${escapeHtml(cmt.name || "Thành viên")}</h5>
                         ${cmt.text ? `<p>${escapeHtml(cmt.text)}</p>` : ""}
@@ -664,7 +664,7 @@ function renderPosts(posts) {
             <div class="post-card-header">
                 <div class="post-avatar-wrap">
                     <a href="${profileHref}">
-                        <img src="${escapeHtml(post.avatar || "./DIEU.png")}" class="post-card-avatar" alt="Avatar">
+                        <img src="${escapeHtml(post.avatar || "./DIEU.avif")}" class="post-card-avatar" alt="Avatar">
                     </a>
                     ${post.presenceStatus ? `<span class="nav-status-dot" data-status="${escapeHtml(post.presenceStatus)}"></span>` : ""}
                 </div>
@@ -702,7 +702,7 @@ function renderPosts(posts) {
             </div>
             <div class="comment-section" style="display:none;">
                 <div class="comment-input-group">
-                    <img src="${escapeHtml(viewer.avatar || "./DIEU.png")}" class="user-avatar-mini" style="width:32px; height:32px;">
+                    <img src="${escapeHtml(viewer.avatar || "./DIEU.avif")}" class="user-avatar-mini" style="width:32px; height:32px;">
                     <input type="text" class="comment-field" placeholder="Viết bình luận công khai hoặc chọn Sticker...">
                 </div>
                 <div class="comments-list">${commentsHtml}</div>

@@ -77,7 +77,7 @@
 	function updateNavAvatar(user = getSavedUser()) {
 		const avatarUrl = typeof user?.avatar === "string" && user.avatar.trim()
 			? user.avatar.trim()
-			: "./DIEU.png";
+			: "./DIEU.avif";
 		const label = user?.name ? `Trang cá nhân của ${user.name}` : "Trang cá nhân";
 
 		document.querySelectorAll(".nav-avatar-link").forEach(link => {
@@ -88,7 +88,7 @@
 			image.src = avatarUrl;
 			image.onerror = () => {
 				image.onerror = null;
-				image.src = "./DIEU.png";
+				image.src = "./DIEU.avif";
 			};
 
 			// Chấm trạng thái góc dưới ảnh đại diện
@@ -129,7 +129,7 @@
 			<picture class="nav-brand-picture">
 				<source srcset="./DIEU.avif" type="image/avif">
 				<source srcset="./DIEU.webp" type="image/webp">
-				<img src="./DIEU.png" alt="DIEUNW" class="nav-brand-icon">
+				<img src="./DIEU.avif" alt="DIEUNW" class="nav-brand-icon">
 			</picture>
 			<span class="nav-brand-label">DIEUNW</span>
 			<span class="nav-brand-caret" aria-hidden="true">▾</span>
