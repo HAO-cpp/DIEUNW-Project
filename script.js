@@ -105,7 +105,6 @@
         return template.innerHTML.trim();
     }
 
-    // Dự phòng bật/tắt menu nav trên Trang chủ (chống double-toggle với nav-profile.js)
     // Dự phòng bật/tắt menu nav trên Trang chủ (event delegation, chống double-toggle)
     function ensureHomeNavMenuToggle() {
         let preClickHidden = true;
@@ -190,6 +189,7 @@
         const postImageClear = document.getElementById("post-image-clear");
         const postImagePreviewWrap = document.getElementById("post-image-preview-wrap");
         const postImagePreview = document.getElementById("post-image-preview");
+        const musicPickerEl = document.getElementById("post-music-picker");
         const uploadProgressHost = document.getElementById("post-upload-progress");
         const newsfeedContainer = document.getElementById("newsfeed-container");
         const feedAuthGate = document.getElementById("feed-auth-gate");
@@ -204,9 +204,16 @@
             reportOverlay.hidden = true;
         }
 
-        const musicWidget = typeof window.dieunwCreateMusicAttachmentWidget === "function"
-            ? window.dieunwCreateMusicAttachmentWidget("post-music-picker")
-            : null;
+        // Truyền đúng DOM element (#post-music-picker) và bọc try/catch an toàn
+        let musicWidget = null;
+        if (musicPickerEl && typeof window.dieunwCreateMusicAttachmentWidget === "function") {
+            try {
+                musicWidget = window.dieunwCreateMusicAttachmentWidget(musicPickerEl);
+            } catch (err) {
+                console.warn("Không thể khởi tạo khung đính kèm nhạc:", err);
+                musicWidget = null;
+            }
+        }
 
         try {
             window.dieunwApplySiteBg?.();
@@ -884,6 +891,28 @@
             }
         }
 
+        async function resolveAttachedMusic() {
+            if (!musicWidget) return { audioUrl: "", audioTitle: "" };
+            if (typeof musicWidget.resolveAudio === "function") {
+                return await musicWidget.resolveAudio();
+            }
+            if (typeof musicWidget.getValue === "function") {
+                return await musicWidget.getValue();
+            }
+            if (typeof musicWidget.getSelection === "function") {
+                return await musicWidget.getSelection();
+            }
+            const select = musicPickerEl?.querySelector(".music-attach-select");
+            if (select?.value) {
+                const selectedOpt = select.options?.[select.selectedIndex];
+                return {
+                    audioUrl: select.value,
+                    audioTitle: selectedOpt?.textContent || "Nhạc đính kèm"
+                };
+            }
+            return { audioUrl: "", audioTitle: "" };
+        }
+
         btnSubmit?.addEventListener("click", async () => {
             if (!homeAccessEnabled || !currentHomeUser) {
                 updateHomeAccess(null);
@@ -895,13 +924,11 @@
             const cleanHtml = sanitizePostHtml(rawHtml);
 
             let attachedMusic = { audioUrl: "", audioTitle: "" };
-            if (musicWidget?.resolveAudio) {
-                try {
-                    attachedMusic = await musicWidget.resolveAudio();
-                } catch (err) {
-                    notify(err.message || "Không thể xử lý tệp nhạc đính kèm.", "error");
-                    return;
-                }
+            try {
+                attachedMusic = (await resolveAttachedMusic()) || { audioUrl: "", audioTitle: "" };
+            } catch (err) {
+                notify(err.message || "Không thể xử lý tệp nhạc đính kèm.", "error");
+                return;
             }
 
             if (!plainText && !pendingImageDataUrl && !attachedMusic.audioUrl) {
@@ -954,6 +981,7 @@
                 if (richEditor) richEditor.innerHTML = "";
                 clearSelectedImage();
                 musicWidget?.reset?.();
+                musicWidget?.clear?.();
                 closeModal();
 
                 if (data?.post && newsfeedContainer) {
