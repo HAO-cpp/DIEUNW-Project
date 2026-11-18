@@ -1011,49 +1011,182 @@
     }
 })();
 
-/* ===== SẮP XẾP LẠI MENU DROPDOWN CÂN ĐỐI THEO NHÓM ===== */
+/* ===== CHUẨN HÓA NAVBAR DOCK + MENU PHÂN NHÓM CÂN ĐỐI CHO TẤT CẢ TRANG ===== */
 (() => {
     const GROUP_LAYOUT = [
         {
             label: "Khám phá & Giải trí",
             items: [
-                { href: "index.html", span: "nav-span-2" },
-                { href: "videos.html", span: "nav-span-2" },
-                { href: "music.html", span: "nav-span-2" }
+                { href: "index.html", text: "Trang chủ", span: "nav-span-2" },
+                { href: "videos.html", text: "Video", span: "nav-span-2" },
+                { href: "music.html", text: "Kho nhạc", span: "nav-span-2" }
             ]
         },
         {
             label: "Góc học tập",
             items: [
-                { href: "tu-hoc.html", span: "nav-span-3" },
-                { href: "hoc-nhom.html", span: "nav-span-3" }
+                { href: "tu-hoc.html", text: "Phòng tự học", span: "nav-span-3" },
+                { href: "hoc-nhom.html", text: "Học nhóm", span: "nav-span-3" }
             ]
         },
         {
             label: "Kết nối bạn bè",
             items: [
-                { href: "friends.html", span: "nav-span-3" },
-                { href: "messages.html", span: "nav-span-3" },
-                { href: "tro-chuyen.html", span: "nav-span-6" }
+                { href: "friends.html", text: "Bạn bè", span: "nav-span-3" },
+                { href: "messages.html", text: "Tin nhắn", span: "nav-span-3" },
+                { href: "tro-chuyen.html", text: "Phòng trò chuyện", span: "nav-span-6" }
             ]
         },
         {
             label: "Câu lạc bộ & Tin tức",
             items: [
-                { href: "clubs.html", span: "nav-span-3" },
-                { href: "announcements.html", span: "nav-span-3" }
+                { href: "clubs.html", text: "CLB", span: "nav-span-3" },
+                { href: "announcements.html", text: "Thông báo", span: "nav-span-3" }
             ]
         }
     ];
 
+    function detectCurrentPageFile() {
+        const path = (window.location.pathname || "").split("/").pop() || "index.html";
+        return path.toLowerCase() || "index.html";
+    }
+
+    function upgradeLegacyHeaderToDock() {
+        const header = document.querySelector("header.navbar");
+        if (!header) return;
+
+        // Nếu header đang dùng kiểu cũ (.nav-left / logo-banner.png) thì chuyển sang .nav-corner-dock giống profile.html
+        if (!header.querySelector(".nav-corner-dock")) {
+            const existingMusicWrap = header.querySelector("#nav-music-wrap, .nav-music-wrap");
+            const existingMusicBtn = header.querySelector("#nav-music-btn");
+            const existingThemeBtn = header.querySelector("#nav-theme-toggle, .nav-theme-toggle");
+            const existingAvatarImg = header.querySelector(".nav-user-avatar");
+            const currentAvatarSrc = existingAvatarImg?.getAttribute("src") || "./DIEU.png";
+            const currentFile = detectCurrentPageFile();
+            const isProfilePage = currentFile === "profile.html";
+
+            header.className = "navbar nav-scroll";
+            header.innerHTML = "";
+
+            const dock = document.createElement("div");
+            dock.className = "nav-corner-dock";
+
+            const brandBtn = document.createElement("button");
+            brandBtn.type = "button";
+            brandBtn.className = "nav-brand-toggle";
+            brandBtn.setAttribute("aria-expanded", "false");
+            brandBtn.setAttribute("aria-controls", "main-nav-menu");
+            brandBtn.setAttribute("aria-label", "Mở menu điều hướng DIEUNW");
+            brandBtn.innerHTML = `
+                <picture>
+                    <source srcset="./DIEU.avif" type="image/avif">
+                    <source srcset="./DIEU.webp" type="image/webp">
+                    <img src="./DIEU.png" alt="DIEUNW" class="nav-brand-icon">
+                </picture>
+                <span class="nav-brand-caret">▾</span>
+            `;
+            dock.appendChild(brandBtn);
+
+            if (existingMusicWrap) {
+                dock.appendChild(existingMusicWrap);
+            } else if (existingMusicBtn) {
+                dock.appendChild(existingMusicBtn);
+            }
+
+            const avatarLink = document.createElement("a");
+            avatarLink.href = "./profile.html";
+            avatarLink.className = `nav-avatar-link${isProfilePage ? " active" : ""}`;
+            avatarLink.setAttribute("aria-label", "Trang cá nhân");
+            avatarLink.title = "Trang cá nhân";
+            if (isProfilePage) avatarLink.setAttribute("aria-current", "page");
+            avatarLink.innerHTML = `
+                <img class="nav-user-avatar" src="${currentAvatarSrc}" alt="Trang cá nhân">
+                <span class="nav-status-dot" data-status="offline" aria-hidden="true"></span>
+            `;
+            dock.appendChild(avatarLink);
+
+            if (existingThemeBtn) {
+                dock.appendChild(existingThemeBtn);
+            } else {
+                const themeBtn = document.createElement("button");
+                themeBtn.type = "button";
+                themeBtn.className = "nav-theme-toggle";
+                themeBtn.id = "nav-theme-toggle";
+                themeBtn.setAttribute("aria-label", "Bật/tắt chế độ tối");
+                themeBtn.title = "Chế độ Sáng / Tối";
+                themeBtn.textContent = document.body.classList.contains("dark-mode") ? "☀️" : "🌙";
+                dock.appendChild(themeBtn);
+            }
+
+            const nav = document.createElement("nav");
+            nav.id = "main-nav-menu";
+            nav.className = "nav-menu nav-dropdown-panel";
+            nav.setAttribute("aria-label", "Điều hướng chính");
+            nav.hidden = true;
+
+            GROUP_LAYOUT.forEach(group => {
+                group.items.forEach(item => {
+                    const a = document.createElement("a");
+                    a.href = `./${item.href}`;
+                    a.className = `nav-item${currentFile === item.href ? " active" : ""}`;
+                    if (currentFile === item.href) a.setAttribute("aria-current", "page");
+                    a.textContent = item.text;
+                    nav.appendChild(a);
+                });
+            });
+
+            header.append(dock, nav);
+
+            // Gắn sự kiện mở/đóng menu dropdown nếu trang chưa có script riêng điều khiển
+            brandBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const willOpen = nav.hidden;
+                nav.hidden = !willOpen;
+                brandBtn.setAttribute("aria-expanded", String(willOpen));
+                syncMenuGridMode(nav);
+            });
+            document.addEventListener("click", (e) => {
+                if (!nav.hidden && !nav.contains(e.target) && !brandBtn.contains(e.target)) {
+                    nav.hidden = true;
+                    brandBtn.setAttribute("aria-expanded", "false");
+                }
+            });
+
+            // Gắn nút Sáng/Tối nếu trang chưa gắn listener
+            const themeToggle = dock.querySelector("#nav-theme-toggle");
+            if (themeToggle && themeToggle.dataset.themeBound !== "1") {
+                themeToggle.dataset.themeBound = "1";
+                const savedDark = localStorage.getItem("dieunw_dark_mode") === "1";
+                if (savedDark) {
+                    document.body.classList.add("dark-mode");
+                    themeToggle.textContent = "☀️";
+                }
+                themeToggle.addEventListener("click", () => {
+                    const isDark = document.body.classList.toggle("dark-mode");
+                    localStorage.setItem("dieunw_dark_mode", isDark ? "1" : "0");
+                    themeToggle.textContent = isDark ? "☀️" : "🌙";
+                });
+            }
+
+            if (typeof window.updateNavAvatar === "function") {
+                window.updateNavAvatar();
+            }
+        }
+    }
+
     function syncMenuGridMode(menu) {
         if (!menu) return;
-        const style = getComputedStyle(menu);
-        const isGridOrDropdown = style.display === "grid" || menu.classList.contains("open") || menu.closest(".mobile-nav-popover, .nav-dropdown, .nav-drawer");
-        menu.classList.toggle("dieunw-grouped-grid", Boolean(isGridOrDropdown));
+        const isDropdown = menu.classList.contains("nav-dropdown-panel") || getComputedStyle(menu).display === "grid";
+        if (menu.hidden) {
+            menu.classList.remove("dieunw-grouped-grid");
+        } else {
+            menu.classList.toggle("dieunw-grouped-grid", Boolean(isDropdown));
+        }
     }
 
     function enhanceMenuStructure() {
+        upgradeLegacyHeaderToDock();
+
         document.querySelectorAll(".nav-menu").forEach(menu => {
             if (menu.dataset.gridBeautified === "1") {
                 syncMenuGridMode(menu);
@@ -1063,8 +1196,6 @@
             if (!existingLinks.length) return;
 
             menu.dataset.gridBeautified = "1";
-
-            // Xóa divider cũ gây lỗ trống nếu có
             menu.querySelectorAll(".nav-group-divider, .nav-group-label").forEach(el => el.remove());
 
             const findLink = (targetFile) => existingLinks.find(a => {
@@ -1104,7 +1235,6 @@
                 matchedInGroup.forEach(link => fragment.appendChild(link));
             });
 
-            // Giữ lại các mục ngoài danh sách (nếu có)
             existingLinks.forEach(link => {
                 if (!placed.has(link)) {
                     link.classList.add("nav-span-3");

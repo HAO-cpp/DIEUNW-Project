@@ -5687,13 +5687,22 @@ body.theme-dark .nav-music-popover {
 }
 
 /* ===== MENU ĐIỀU HƯỚNG PHÂN NHÓM CÂN ĐỐI (KHÔNG BỊ LÕM Ô) ===== */
-.nav-menu.dieunw-grouped-grid {
+/* ===== MENU ĐIỀU HƯỚNG PHÂN NHÓM CÂN ĐỐI (FIX HIDDEN & FIX MỌI MÀN HÌNH) ===== */
+.nav-menu[hidden],
+.nav-menu.nav-dropdown-panel[hidden],
+.nav-menu.dieunw-grouped-grid[hidden] {
+    display: none !important;
+}
+
+.nav-menu.nav-dropdown-panel:not([hidden]).dieunw-grouped-grid {
     display: grid !important;
     grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
     gap: 8px !important;
+    width: min(360px, calc(100vw - 20px)) !important;
     padding: 14px !important;
     align-items: stretch !important;
 }
+
 .nav-menu.dieunw-grouped-grid .nav-group-label {
     grid-column: 1 / -1 !important;
     display: flex !important;
@@ -5712,18 +5721,22 @@ body.theme-dark .nav-music-popover {
     color: #5a738a;
     user-select: none;
 }
+
 .nav-menu.dieunw-grouped-grid .nav-group-label:first-child {
     margin-top: 0 !important;
 }
+
 .nav-menu.dieunw-grouped-grid .nav-group-label::after {
     content: "";
     flex: 1;
     height: 1px;
     background: #dce6f0;
 }
+
 .nav-menu.dieunw-grouped-grid .nav-group-divider {
     display: none !important;
 }
+
 .nav-menu.dieunw-grouped-grid .nav-item {
     width: 100% !important;
     min-width: 0 !important;
@@ -5741,25 +5754,34 @@ body.theme-dark .nav-music-popover {
     text-overflow: ellipsis;
     box-sizing: border-box !important;
 }
+
 .nav-menu.dieunw-grouped-grid .nav-item.nav-span-2 {
     grid-column: span 2 !important;
 }
+
 .nav-menu.dieunw-grouped-grid .nav-item.nav-span-3 {
     grid-column: span 3 !important;
 }
+
 .nav-menu.dieunw-grouped-grid .nav-item.nav-span-6 {
     grid-column: 1 / -1 !important;
 }
 
-/* Trên thanh menu ngang ở desktop: ẩn nhãn chữ, chỉ giữ vạch phân cách mảnh */
 .nav-menu:not(.dieunw-grouped-grid) .nav-group-label {
     display: none !important;
 }
+
 body.dark-mode .nav-menu.dieunw-grouped-grid .nav-group-label,
 body.theme-dark .nav-menu.dieunw-grouped-grid .nav-group-label {
     color: #94a3b8;
 }
+
 body.dark-mode .nav-menu.dieunw-grouped-grid .nav-group-label::after,
 body.theme-dark .nav-menu.dieunw-grouped-grid .nav-group-label::after {
     background: rgba(255, 255, 255, 0.14);
+}
+
+/* Tránh đè góc trên trái ở trang Video */
+.videos-top-floating {
+    justify-content: flex-end !important;
 }
