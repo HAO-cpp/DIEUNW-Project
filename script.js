@@ -106,22 +106,18 @@
     }
 
     // Dự phòng bật/tắt menu nav trên Trang chủ (chống double-toggle với nav-profile.js)
+    // Dự phòng bật/tắt menu nav trên Trang chủ (event delegation, chống double-toggle)
     function ensureHomeNavMenuToggle() {
-        const toggleBtn = document.querySelector(".nav-brand-toggle");
-        const menu = document.getElementById("main-nav-menu") || document.querySelector(".nav-menu");
-        if (!toggleBtn || !menu) return;
+        let preClickHidden = true;
+        let preClickExpanded = "false";
 
-        let preClickHidden = menu.hidden;
-        let preClickExpanded = toggleBtn.getAttribute("aria-expanded");
+        const getNavEls = () => {
+            const toggleBtn = document.querySelector(".nav-brand-toggle");
+            const menu = document.getElementById("main-nav-menu") || document.querySelector(".nav-menu");
+            return { toggleBtn, menu };
+        };
 
-        document.addEventListener("click", e => {
-            if (e.target.closest(".nav-brand-toggle")) {
-                preClickHidden = menu.hidden;
-                preClickExpanded = toggleBtn.getAttribute("aria-expanded");
-            }
-        }, true);
-
-        const setMenuOpen = open => {
+        const setMenuOpen = (toggleBtn, menu, open) => {
             menu.hidden = !open;
             if (open) {
                 menu.removeAttribute("hidden");
@@ -133,27 +129,44 @@
             toggleBtn.setAttribute("aria-expanded", String(open));
         };
 
-        toggleBtn.addEventListener("click", () => {
-            setTimeout(() => {
-                const handledByNavProfile =
-                    menu.hidden !== preClickHidden ||
-                    toggleBtn.getAttribute("aria-expanded") !== preClickExpanded;
-                if (handledByNavProfile) return;
-                setMenuOpen(preClickHidden);
-            }, 0);
-        });
+        document.addEventListener("click", e => {
+            const target = e.target instanceof Element ? e.target : null;
+            if (!target?.closest(".nav-brand-toggle")) return;
+            const { toggleBtn, menu } = getNavEls();
+            if (!toggleBtn || !menu) return;
+            preClickHidden = menu.hidden;
+            preClickExpanded = toggleBtn.getAttribute("aria-expanded");
+        }, true);
 
         document.addEventListener("click", e => {
-            if (menu.hidden) return;
-            const header = toggleBtn.closest(".navbar");
-            if (header && !header.contains(e.target)) {
-                setMenuOpen(false);
+            const target = e.target instanceof Element ? e.target : null;
+            const { toggleBtn, menu } = getNavEls();
+            if (!toggleBtn || !menu) return;
+
+            if (target?.closest(".nav-brand-toggle")) {
+                setTimeout(() => {
+                    const handledByNavProfile =
+                        menu.hidden !== preClickHidden ||
+                        toggleBtn.getAttribute("aria-expanded") !== preClickExpanded;
+                    if (handledByNavProfile) return;
+                    setMenuOpen(toggleBtn, menu, preClickHidden);
+                }, 0);
+                return;
+            }
+
+            if (!menu.hidden) {
+                const header = toggleBtn.closest(".navbar");
+                if (header && !header.contains(target)) {
+                    setMenuOpen(toggleBtn, menu, false);
+                }
             }
         });
 
         document.addEventListener("keydown", e => {
-            if (e.key === "Escape" && !menu.hidden) {
-                setMenuOpen(false);
+            if (e.key !== "Escape") return;
+            const { toggleBtn, menu } = getNavEls();
+            if (toggleBtn && menu && !menu.hidden) {
+                setMenuOpen(toggleBtn, menu, false);
             }
         });
     }
