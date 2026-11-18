@@ -5785,3 +5785,12 @@ body.theme-dark .nav-menu.dieunw-grouped-grid .nav-group-label::after {
 .videos-top-floating {
     justify-content: flex-end !important;
 }
+
+img.custom-brand-logo {
+    width: auto !important;
+    height: 36px !important;
+    max-width: 140px !important;
+    max-height: 40px !important;
+    object-fit: contain !important;
+    display: block;
+}

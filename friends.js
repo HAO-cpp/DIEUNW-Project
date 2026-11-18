@@ -1,12 +1,13 @@
 document.addEventListener("DOMContentLoaded", () => {
 	const API_BASE = "https://dieunw.onrender.com";
+	const FALLBACK_AVATAR = "./DIEU.avif";
+
 	const list = document.getElementById("friends-list");
 	const searchInput = document.getElementById("friends-search-input");
 	const status = document.getElementById("friends-status");
 	const filterButtons = [...document.querySelectorAll("[data-friends-filter]")];
 	const emptyState = document.getElementById("friends-empty");
 	const profilePanel = document.getElementById("friends-profile");
-	const profileFullLink = document.getElementById("friend-profile-full-link");
 	const profileMessageButton = document.getElementById("friend-profile-message");
 	const profileMeetingButton = document.getElementById("friend-profile-meeting");
 	const meeting = document.getElementById("friends-meeting");
@@ -22,47 +23,74 @@ document.addEventListener("DOMContentLoaded", () => {
 	let activeFilter = location.hash === "#messages" ? "friends" : "discover";
 
 	function getAuthHeaders(extra = {}) {
-		const token = localStorage.getItem("session_token") || localStorage.getItem("dieuNwToken") || "";
-		return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra };
+		const token = localStorage.getItem("session_token");
+		return {
+			...(token ? { Authorization: `Bearer ${token}` } : {}),
+			...extra
+		};
 	}
 
-	function buildSkeletonMarkup(count = 4) {
-		if (window.DIEUNW && typeof window.DIEUNW.createSkeletonCardsHtml === "function") {
-			return window.DIEUNW.createSkeletonCardsHtml(count);
-		}
-		return Array.from({ length: count }, () => `
-			<div class="skeleton-card" aria-hidden="true">
-				<div class="skeleton-line short"></div>
-				<div class="skeleton-line"></div>
-			</div>
-		`).join("");
+	function normalizeAvatar(src) {
+		const raw = typeof src === "string" ? src.trim() : "";
+		if (!raw || raw === "./DIEU.png" || raw === "DIEU.png") return FALLBACK_AVATAR;
+		return raw;
 	}
 
-	function resolveStatusDotClass(user) {
-		if (window.DIEUNW && typeof window.DIEUNW.getStatusDotClass === "function") {
-			return window.DIEUNW.getStatusDotClass(user);
-		}
-		const st = String(user.presenceStatus || user.status || "").toLowerCase();
-		if (st === "studying") return "studying";
-		if (st === "online" || user.isOnline) return "online";
-		return "offline";
+	function ensureNavMenuToggle() {
+		const getNavEls = () => ({
+			toggleBtn: document.querySelector(".nav-brand-toggle"),
+			menu: document.getElementById("main-nav-menu") || document.querySelector(".nav-menu")
+		});
+
+		const setMenuOpen = (toggleBtn, menu, open) => {
+			menu.hidden = !open;
+			if (open) {
+				menu.removeAttribute("hidden");
+				menu.style.setProperty("display", "grid", "important");
+			} else {
+				menu.setAttribute("hidden", "");
+				menu.style.removeProperty("display");
+			}
+			toggleBtn.setAttribute("aria-expanded", String(open));
+		};
+
+		document.addEventListener("click", e => {
+			const target = e.target instanceof Element ? e.target : null;
+			const { toggleBtn, menu } = getNavEls();
+			if (!toggleBtn || !menu) return;
+
+			if (target?.closest(".nav-brand-toggle")) {
+				const wasHidden = menu.hidden;
+				setTimeout(() => {
+					if (menu.hidden !== wasHidden) return;
+					setMenuOpen(toggleBtn, menu, wasHidden);
+				}, 0);
+				return;
+			}
+
+			if (!menu.hidden) {
+				const header = toggleBtn.closest(".navbar");
+				if (header && !header.contains(target)) {
+					setTimeout(() => {
+						if (!menu.hidden) setMenuOpen(toggleBtn, menu, false);
+					}, 0);
+				}
+			}
+		}, true);
+
+		document.addEventListener("keydown", e => {
+			if (e.key !== "Escape") return;
+			const { toggleBtn, menu } = getNavEls();
+			if (toggleBtn && menu && !menu.hidden) setMenuOpen(toggleBtn, menu, false);
+		});
 	}
 
-	function buildRoleBadgesHtml(user) {
-		if (window.DIEUNW && typeof window.DIEUNW.renderRoleBadges === "function") {
-			return window.DIEUNW.renderRoleBadges(user);
-		}
-		const role = String(user.role || "").toLowerCase();
-		const badges = [];
-		if (role === "super_admin" || role === "admin") {
-			badges.push(`<span class="role-badge admin">Admin</span>`);
-		} else if (role === "moderator") {
-			badges.push(`<span class="role-badge moderator">Ban duyệt bài</span>`);
-		}
-		if (user.isPlus || user.dieunwPlus) {
-			badges.push(`<span class="role-badge plus">DIEUNW+</span>`);
-		}
-		return badges.length ? `<span class="role-badges-inline">${badges.join("")}</span>` : "";
+	ensureNavMenuToggle();
+
+	try {
+		window.dieunwApplySiteBg?.();
+	} catch {
+		// bỏ qua nếu chưa sẵn sàng
 	}
 
 	function setStatus(message, isError = false) {
@@ -90,9 +118,6 @@ document.addEventListener("DOMContentLoaded", () => {
 	}
 
 	async function fetchUsers() {
-		if (!users.length) {
-			list.innerHTML = buildSkeletonMarkup(4);
-		}
 		const response = await fetch(`${API_BASE}/api/users`, {
 			credentials: "include",
 			headers: getAuthHeaders()
@@ -113,10 +138,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		button.className = className;
 		button.textContent = label;
 		button.disabled = disabled;
-		button.addEventListener("click", event => {
-			event.stopPropagation();
-			action(event);
-		});
+		button.addEventListener("click", action);
 		return button;
 	}
 
@@ -129,47 +151,33 @@ document.addEventListener("DOMContentLoaded", () => {
 		const card = document.createElement("article");
 		card.className = "friends-person";
 		if (!reducedMotion) card.style.animationDelay = `${Math.min(index * 45, 315)}ms`;
-		card.addEventListener("click", () => openFriendProfilePreview(user));
 
-		const avatarWrap = document.createElement("div");
-		avatarWrap.className = "friends-avatar";
-		avatarWrap.style.position = "relative";
-		avatarWrap.style.overflow = "visible";
-
-		if (user.avatar) {
+		const avatar = document.createElement("div");
+		avatar.className = "friends-avatar";
+		avatar.setAttribute("aria-hidden", "true");
+		if (user.avatar && user.avatar.trim()) {
 			const img = document.createElement("img");
-			img.src = user.avatar;
-			img.alt = user.name || "Thành viên";
+			img.src = normalizeAvatar(user.avatar);
+			img.alt = "";
 			img.style.width = "100%";
 			img.style.height = "100%";
 			img.style.objectFit = "cover";
-			img.style.borderRadius = "50%";
-			avatarWrap.appendChild(img);
+			img.addEventListener("error", () => {
+				avatar.replaceChildren();
+				avatar.textContent = initials(user);
+			}, { once: true });
+			avatar.append(img);
 		} else {
-			avatarWrap.textContent = initials(user);
+			avatar.textContent = initials(user);
 		}
-
-		const dot = document.createElement("span");
-		dot.className = `nav-status-dot ${resolveStatusDotClass(user)}`;
-		dot.setAttribute("aria-hidden", "true");
-		avatarWrap.appendChild(dot);
 
 		const details = document.createElement("div");
 		details.className = "friends-person-details";
-		const nameEl = document.createElement("h3");
-		nameEl.textContent = user.name || user.email || "Thành viên DIEUNW";
-		const badgesHtml = buildRoleBadgesHtml(user);
-		if (badgesHtml) {
-			const badgeWrap = document.createElement("span");
-			badgeWrap.innerHTML = badgesHtml;
-			nameEl.appendChild(document.createTextNode(" "));
-			nameEl.appendChild(badgeWrap);
-		}
-
-		const subInfo = document.createElement("p");
-		const classText = user.studentClass ? `Lớp ${user.studentClass}` : "";
-		subInfo.textContent = [classText, user.email || ""].filter(Boolean).join(" · ");
-		details.append(nameEl, subInfo);
+		const name = document.createElement("h3");
+		name.textContent = user.name || user.email || "Thành viên DIEUNW";
+		const email = document.createElement("p");
+		email.textContent = user.email || "";
+		details.append(name, email);
 
 		const actions = document.createElement("div");
 		actions.className = "friends-person-actions";
@@ -190,24 +198,13 @@ document.addEventListener("DOMContentLoaded", () => {
 				makeButton("Nhắn tin", "friends-secondary-button", () => openAuthPrompt("message"))
 			);
 		} else if (relation === "friend") {
-			actions.append(
-				makeButton("Nhắn tin", "friends-primary-button", () => {
-					location.href = `./messages.html?with=${encodeURIComponent(user.id)}`;
-				}),
-				makeButton("Hủy kết bạn", "friends-remove-button", () => removeFriend(user))
-			);
+			actions.append(makeButton("Hủy kết bạn", "friends-remove-button", () => removeFriend(user)));
 		} else {
 			actions.append(makeButton("Kết bạn", "friends-primary-button", () => sendRequest(user)));
 		}
+		actions.append(makeButton("Hồ sơ", "friends-secondary-button", () => openFriendProfile(user)));
 
-		// Bấm "Hồ sơ" đi thẳng sang trang cá nhân riêng của người dùng đó
-		actions.append(
-			makeButton("Hồ sơ", "friends-secondary-button", () => {
-				location.href = `./profile.html?userId=${encodeURIComponent(user.id)}`;
-			})
-		);
-
-		card.append(avatarWrap, details, actions);
+		card.append(avatar, details, actions);
 		return card;
 	}
 
@@ -222,11 +219,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 
 		const term = searchInput.value.trim().toLocaleLowerCase("vi");
-		if (term) {
-			result = result.filter(user =>
-				`${user.name || ""} ${user.email || ""} ${user.studentClass || ""}`.toLocaleLowerCase("vi").includes(term)
-			);
-		}
+		if (term) result = result.filter(user => `${user.name || ""} ${user.email || ""}`.toLocaleLowerCase("vi").includes(term));
 		return result;
 	}
 
@@ -254,7 +247,7 @@ document.addEventListener("DOMContentLoaded", () => {
 			const message = document.createElement("p");
 			message.className = "friends-list-state";
 			message.textContent = searchInput.value.trim()
-				? "Không tìm thấy người phù hợp với từ khóa này."
+				? "Không tìm thấy người phù hợp với tên hoặc email này."
 				: activeFilter === "friends"
 					? "Bạn chưa có bạn bè. Tìm người quen trong mục Khám phá."
 					: activeFilter === "requests"
@@ -265,7 +258,7 @@ document.addEventListener("DOMContentLoaded", () => {
 			filteredUsers.forEach((user, index) => list.append(makePersonCard(user, index)));
 		}
 
-		if (selectedFriend) openFriendProfilePreview(selectedFriend);
+		if (selectedFriend) openFriendProfile(selectedFriend);
 	}
 
 	function selectFilter(filter) {
@@ -327,7 +320,11 @@ document.addEventListener("DOMContentLoaded", () => {
 	}
 
 	async function removeFriend(friend) {
-		if (!window.confirm(`Hủy kết bạn với ${friend.name || friend.email}? Lịch sử tin nhắn riêng sẽ được giữ lại.`)) return;
+		const ok = typeof window.dieunwConfirm === "function"
+			? await window.dieunwConfirm(`Hủy kết bạn với ${friend.name || friend.email}? Lịch sử tin nhắn riêng sẽ được giữ lại.`, "Hủy kết bạn", true)
+			: window.confirm(`Hủy kết bạn với ${friend.name || friend.email}? Lịch sử tin nhắn riêng sẽ được giữ lại.`);
+		if (!ok) return;
+
 		setStatus("Đang cập nhật danh sách bạn bè...");
 		try {
 			const response = await fetch(`${API_BASE}/api/friends/${encodeURIComponent(friend.id)}`, {
@@ -349,7 +346,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 	}
 
-	function openFriendProfilePreview(friend) {
+	function openFriendProfile(friend) {
 		selectedFriend = friend;
 		emptyState.hidden = true;
 		profilePanel.hidden = false;
@@ -362,24 +359,14 @@ document.addEventListener("DOMContentLoaded", () => {
 		if (cover) coverImage.src = cover;
 		else coverImage.removeAttribute("src");
 
-		document.getElementById("friend-avatar-image").src = friend.avatar || "./DIEU.avif";
-		const nameHeading = document.getElementById("friend-profile-name");
-		nameHeading.textContent = friend.name || "Thành viên DIEUNW";
-		const badgesHtml = buildRoleBadgesHtml(friend);
-		if (badgesHtml) {
-			const wrap = document.createElement("span");
-			wrap.innerHTML = badgesHtml;
-			nameHeading.appendChild(document.createTextNode(" "));
-			nameHeading.appendChild(wrap);
+		const avatarImg = document.getElementById("friend-avatar-image");
+		if (avatarImg) {
+			avatarImg.src = normalizeAvatar(friend.avatar);
 		}
-
+		document.getElementById("friend-profile-name").textContent = friend.name || "Thành viên DIEUNW";
 		document.getElementById("friend-profile-email").textContent = friend.email || "";
 		document.getElementById("friend-profile-class").textContent = friend.studentClass ? `Lớp ${friend.studentClass}` : "Học sinh trường NQD";
 		document.getElementById("friend-profile-bio").textContent = friend.bio || "Chưa có lời giới thiệu.";
-
-		if (profileFullLink) {
-			profileFullLink.href = `./profile.html?userId=${encodeURIComponent(friend.id)}`;
-		}
 
 		const isFriend = friend.relationship === "friend";
 		profileMessageButton.disabled = Boolean(currentUser && !isFriend);
@@ -432,7 +419,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		if (event.key === "Escape" && !authModal.hidden) closeAuthPrompt();
 	});
 	window.addEventListener("storage", event => {
-		if (event.key === "dieuNwUser" || event.key === "session_token") fetchUsers().catch(() => {});
+		if (event.key === "dieuNwUser") fetchUsers().catch(() => {});
 	});
 	window.addEventListener("focus", () => fetchUsers().catch(() => {}));
 	window.addEventListener("hashchange", () => {

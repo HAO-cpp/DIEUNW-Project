@@ -4,57 +4,52 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta name="theme-color" content="#1769aa">
-	<link rel="stylesheet" href="./style.css?v=11">
-	<link rel="icon" type="image/png" href="./DIEU.avif?v=1">
+	<link rel="stylesheet" href="./style.css?v=13">
+	<link rel="icon" type="image/avif" href="./DIEU.avif?v=6">
+	<link rel="alternate icon" type="image/png" href="./DIEU.png?v=6">
 	<title>Bạn bè - DIEUNW</title>
 </head>
 <body class="chat-page friends-page">
 	<header class="navbar nav-scroll">
 		<div class="nav-corner-dock">
-			<button class="nav-brand-toggle" type="button" aria-expanded="false" aria-controls="main-nav-menu" aria-label="Mở menu điều hướng">
+			<button type="button" class="nav-brand-toggle" aria-expanded="false" aria-controls="main-nav-menu" aria-label="Mở menu điều hướng DIEUNW">
 				<picture>
 					<source srcset="./DIEU.avif" type="image/avif">
 					<source srcset="./DIEU.webp" type="image/webp">
-					<img src="./DIEU.avif" alt="DIEUNW" class="nav-brand-badge">
+					<img src="./DIEU.png" alt="DIEUNW" class="nav-brand-icon">
 				</picture>
+				<span class="nav-brand-caret">▾</span>
 			</button>
 			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
-				<img class="nav-user-avatar" src="./DIEU.avif" alt="">
-				<span class="nav-status-dot" aria-hidden="true"></span>
+				<img class="nav-user-avatar" src="./DIEU.avif" alt="Trang cá nhân">
+				<span class="nav-status-dot" data-status="offline" aria-hidden="true"></span>
 			</a>
-			<button id="nav-theme-toggle" class="nav-theme-toggle" type="button" aria-label="Chuyển chế độ sáng tối" title="Chuyển chế độ sáng / tối">⏾</button>
+			<button type="button" class="nav-theme-toggle" id="nav-theme-toggle" aria-label="Bật/tắt chế độ tối" title="Chế độ Sáng / Tối">🌙</button>
 		</div>
 		<nav id="main-nav-menu" class="nav-menu nav-dropdown-panel" aria-label="Điều hướng chính" hidden>
 			<a href="./index.html" class="nav-item">Trang chủ</a>
+			<a href="./videos.html" class="nav-item">Video</a>
+			<a href="./music.html" class="nav-item">Kho nhạc</a>
 			<a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
 			<a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
-			<a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
 			<a href="./friends.html" class="nav-item active" aria-current="page">Bạn bè</a>
 			<a href="./messages.html" class="nav-item">Tin nhắn</a>
+			<a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
 			<a href="./clubs.html" class="nav-item">CLB</a>
 			<a href="./announcements.html" class="nav-item">Thông báo</a>
 		</nav>
 	</header>
 
-	<section id="hero-banner" class="hero-banner" aria-label="DIEUNW Banner">
-		<picture>
-			<source srcset="./DIEUNW.avif" type="image/avif">
-			<source srcset="./DIEUNW.webp" type="image/webp">
-			<img src="./DIEUNW.png" alt="DIEUNW" class="hero-banner-img" loading="eager">
-		</picture>
-		<div class="hero-banner-fade" aria-hidden="true"></div>
-	</section>
-
-	<main class="friends-main page-enter">
+	<main class="friends-main">
 		<header class="friends-heading">
 			<div>
-				<p class="friends-eyebrow"><span></span> KẾT NỐI VỚI CÁC DIEUER</p>
+				<p class="friends-eyebrow"><span></span> KẾT NỐI CỘNG ĐỒNG NQD</p>
 				<h1>Bạn bè</h1>
-				<p class="friends-subtitle">Tìm bạn bè, xem trang cá nhân, trò chuyện riêng hoặc cùng vào một phòng gọi.</p>
+				<p class="friends-subtitle">Tìm bạn học, trò chuyện riêng hoặc cùng vào một phòng gọi.</p>
 			</div>
 			<div class="friends-count" aria-live="polite">
 				<strong id="friends-count">0</strong>
-				<span>Bạn bè</span>
+				<span>bạn bè</span>
 			</div>
 		</header>
 
@@ -63,9 +58,9 @@
 		<div class="friends-workspace">
 			<aside class="friends-browser" aria-label="Tìm và quản lý bạn bè">
 				<form class="friends-search" id="friends-search-form" role="search">
-					<label for="friends-search-input">Tìm theo tên, lớp hoặc email</label>
+					<label for="friends-search-input">Tìm theo tên hoặc email</label>
 					<div class="friends-search-row">
-						<input id="friends-search-input" type="search" placeholder="Ví dụ: tên, 12A1 hoặc @nqd.edu.vn" autocomplete="off">
+						<input id="friends-search-input" type="search" placeholder="Ví dụ: tên hoặc @nqd.edu.vn" autocomplete="off">
 						<button type="submit" aria-label="Tìm kiếm">Tìm</button>
 					</div>
 				</form>
@@ -89,8 +84,8 @@
 				<div class="friends-empty" id="friends-empty">
 					<div class="friends-empty-mark" aria-hidden="true"><span></span><i></i></div>
 					<p class="friends-eyebrow">HỒ SƠ CỘNG ĐỒNG</p>
-					<h2>Chọn một người để xem nhanh hoặc gọi video</h2>
-					<p>Bấm nút <strong>Hồ sơ</strong> trên thẻ bạn bè để mở đầy đủ trang cá nhân của người đó.</p>
+					<h2>Chọn một người để xem hồ sơ</h2>
+					<p>Thông tin cá nhân và ảnh bìa của người đó sẽ hiện ở đây.</p>
 				</div>
 
 				<section class="friends-profile" id="friends-profile" aria-label="Hồ sơ người dùng" hidden>
@@ -105,9 +100,8 @@
 						<p class="friends-profile-class" id="friend-profile-class"></p>
 						<p class="friends-profile-bio" id="friend-profile-bio"></p>
 						<div class="friends-profile-actions">
-							<a class="friends-secondary-button" id="friend-profile-full-link" href="./profile.html">Mở trang cá nhân</a>
 							<button class="friends-primary-button" id="friend-profile-message" type="button">Nhắn tin</button>
-							<button class="friends-secondary-button" id="friend-profile-meeting" type="button">Gọi ngay</button>
+							<button class="friends-secondary-button" id="friend-profile-meeting" type="button">Tạo phòng Jitsi</button>
 						</div>
 					</div>
 				</section>
@@ -118,10 +112,10 @@
 							<p class="friends-eyebrow">PHÒNG GỌI</p>
 							<h2 id="friends-meeting-title">Jitsi Meet</h2>
 						</div>
-						<button id="friends-meeting-close" type="button" aria-label="Đóng phòng gọi" title="Đóng phòng gọi">×</button>
+						<button id="friends-meeting-close" type="button" aria-label="Đóng phòng gọi" title="Đóng phòng gọi">&times;</button>
 					</header>
 					<iframe id="friends-meeting-frame" title="Phòng gọi Jitsi với bạn bè" allow="camera; microphone; fullscreen; display-capture; autoplay" referrerpolicy="strict-origin-when-cross-origin" hidden></iframe>
-					<p class="friends-meeting-note" id="friends-meeting-note">Đang gọi...</p>
+					<p class="friends-meeting-note" id="friends-meeting-note">Đang kết nối với Jitsi Meet...</p>
 				</section>
 			</section>
 		</div>
@@ -129,10 +123,10 @@
 
 	<div class="friends-auth-overlay" id="friends-auth-modal" hidden>
 		<section class="friends-auth-dialog" role="dialog" aria-modal="true" aria-labelledby="friends-auth-title" aria-describedby="friends-auth-message">
-			<button class="friends-auth-close" id="friends-auth-close" type="button" aria-label="Đóng thông báo">×</button>
-			<p class="friends-eyebrow">KẾT NỐI DIEUER</p>
+			<button class="friends-auth-close" id="friends-auth-close" type="button" aria-label="Đóng thông báo">&times;</button>
+			<p class="friends-eyebrow">KẾT NỐI CỘNG ĐỒNG NQD</p>
 			<h2 id="friends-auth-title">Đăng nhập để tiếp tục</h2>
-			<p class="friends-auth-message" id="friends-auth-message">Đăng nhập hoặc đăng ký để kết nối với các DIEUER.</p>
+			<p class="friends-auth-message" id="friends-auth-message">Đăng nhập hoặc đăng ký để kết nối với bạn học.</p>
 			<div class="friends-auth-actions">
 				<a class="friends-primary-button" href="./profile.html">Đăng nhập</a>
 				<a class="friends-secondary-button" href="./profile.html#register">Đăng ký</a>
