@@ -703,6 +703,19 @@ function initializeDatabase(dbPath) {
 	const msgCols = db.prepare("PRAGMA table_info(messages)").all().map(c => c.name);
 	if (!msgCols.includes("sticker_url")) db.exec("ALTER TABLE messages ADD COLUMN sticker_url TEXT NOT NULL DEFAULT ''");
 
+	const reportCols = db.prepare("PRAGMA table_info(reports)").all().map(c => c.name);
+	if (!reportCols.includes("status")) db.exec("ALTER TABLE reports ADD COLUMN status TEXT NOT NULL DEFAULT 'open'");
+	if (!reportCols.includes("reason")) db.exec("ALTER TABLE reports ADD COLUMN reason TEXT NOT NULL DEFAULT ''");
+
+	const studySetCols = db.prepare("PRAGMA table_info(study_sets)").all().map(c => c.name);
+	if (!studySetCols.includes("forked_from_id")) db.exec("ALTER TABLE study_sets ADD COLUMN forked_from_id TEXT REFERENCES study_sets(id) ON DELETE SET NULL");
+	if (!studySetCols.includes("subject")) db.exec("ALTER TABLE study_sets ADD COLUMN subject TEXT NOT NULL DEFAULT 'Chung'");
+	if (!studySetCols.includes("description")) db.exec("ALTER TABLE study_sets ADD COLUMN description TEXT NOT NULL DEFAULT ''");
+	if (!studySetCols.includes("cards_json")) db.exec("ALTER TABLE study_sets ADD COLUMN cards_json TEXT NOT NULL DEFAULT '[]'");
+	if (!studySetCols.includes("pinned")) db.exec("ALTER TABLE study_sets ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0");
+	if (!studySetCols.includes("study_count")) db.exec("ALTER TABLE study_sets ADD COLUMN study_count INTEGER NOT NULL DEFAULT 0");
+	if (!studySetCols.includes("updated_at")) db.exec("ALTER TABLE study_sets ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''");
+
 	if (process.env.TURSO_DATABASE_URL) syncDb(db);
 	const now = new Date().toISOString();
 	db.prepare("INSERT OR IGNORE INTO admin_emails(email, created_at) VALUES (?, ?)").run("k18th.hao2802@nqd.edu.vn", now);
