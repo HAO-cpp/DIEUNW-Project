@@ -1,6 +1,6 @@
 (() => {
     const API_BASE = "https://dieunw.onrender.com";
-    const FALLBACK_AVATAR = "./DIEU.png";
+    const FALLBACK_AVATAR = "./DIEU.avif";
 
     // Tự động gắn Authorization Bearer token cho các request tới backend
     const originalFetch = window.fetch.bind(window);
@@ -881,7 +881,7 @@
                 <picture>
                     <source srcset="./DIEU.avif" type="image/avif">
                     <source srcset="./DIEU.webp" type="image/webp">
-                    <img src="./DIEU.png" alt="DIEUNW" class="nav-brand-icon">
+                    <img src="./DIEU.avif" alt="DIEUNW" class="nav-brand-icon">
                 </picture>
                 <span class="nav-brand-caret">▾</span>
             `;
@@ -893,7 +893,7 @@
             avatarLink.title = "Trang cá nhân";
             if (isProfilePage) avatarLink.setAttribute("aria-current", "page");
             avatarLink.innerHTML = `
-                <img class="nav-user-avatar" src="./DIEU.png" alt="Trang cá nhân">
+                <img class="nav-user-avatar" src="./DIEU.avif" alt="Trang cá nhân">
                 <span class="nav-status-dot" data-status="offline" aria-hidden="true"></span>
             `;
 

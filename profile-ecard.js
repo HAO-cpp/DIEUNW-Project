@@ -306,7 +306,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 
 		const avatarImg = document.getElementById("ecard-avatar-img");
-		if (avatarImg) avatarImg.src = resolveMedia(user.avatar) || "./DIEU.png";
+		if (avatarImg) avatarImg.src = resolveMedia(user.avatar) || "./DIEU.avif";
 		const nameEl = document.getElementById("ecard-name-label");
 		if (nameEl) nameEl.textContent = user.name || "Học sinh NQD";
 		const classEl = document.getElementById("ecard-class-label");
@@ -479,7 +479,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		const avX = RIGHT_X + 160;
 		const avY = 190;
 		const avR = 96;
-		const avatarImg = await loadImageElement(resolveMedia(user.avatar) || "./DIEU.png");
+		const avatarImg = await loadImageElement(resolveMedia(user.avatar) || "./DIEU.avif");
 		ctx.save();
 		ctx.beginPath();
 		ctx.arc(avX, avY, avR + 8, 0, Math.PI * 2);
