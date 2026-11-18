@@ -1,6 +1,6 @@
 (() => {
 	const API_BASE = "https://dieunw.onrender.com";
-	const fallbackAvatar = "./DIEU.png";
+	const fallbackAvatar = "./DIEU.avif";
 	const AUDIO_STATE_KEY = "dieunw_global_audio_state_v1";
 
 	function getToken() {

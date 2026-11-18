@@ -414,7 +414,7 @@
 		ctx.textAlign = "left";
 
 		// Avatar tròn siêu nét
-		const avatarImg = await loadCorsImage(resolveMedia(user.avatar) || "./DIEU.png");
+		const avatarImg = await loadCorsImage(resolveMedia(user.avatar) || "./DIEU.avif");
 		const avX = 120;
 		const avY = 330;
 		const avR = 135;
@@ -681,7 +681,7 @@
 		highlights.forEach(hl => {
 			const btn = makeEl("button", "highlight-bubble");
 			btn.type = "button";
-			const firstImg = resolveMedia(hl.coverImage || hl.items?.[0]?.mediaUrl || "./DIEU.png");
+			const firstImg = resolveMedia(hl.coverImage || hl.items?.[0]?.mediaUrl || "./DIEU.avif");
 			btn.innerHTML = `
 				<span class="highlight-ring"><img src="${escapeHtml(firstImg)}" alt=""></span>
 				<span class="highlight-title"></span>
@@ -705,7 +705,7 @@
 			id: highlight.id,
 			userId: highlight.userId,
 			userName: ownerUser?.name || "Học sinh NQD",
-			userAvatar: ownerUser?.avatar || "./DIEU.png",
+			userAvatar: ownerUser?.avatar || "./DIEU.avif",
 			mediaUrl: it.mediaUrl,
 			mediaType: it.mediaType || "image",
 			caption: it.caption || highlight.title,
@@ -814,7 +814,7 @@
 			return seg;
 		}));
 
-		document.getElementById("story-viewer-avatar").src = resolveMedia(story.userAvatar) || "./DIEU.png";
+		document.getElementById("story-viewer-avatar").src = resolveMedia(story.userAvatar) || "./DIEU.avif";
 		document.getElementById("story-viewer-name").textContent = story.userName || "Học sinh NQD";
 		document.getElementById("story-viewer-time").textContent = story.createdAt ? new Date(story.createdAt).toLocaleString("vi-VN") : "";
 		document.getElementById("story-viewer-caption").textContent = story.caption || "";
@@ -1625,7 +1625,7 @@
 	document.getElementById("btn-ecard-open")?.addEventListener("click", () => {
 		const user = state.profileData?.user || state.viewerUser;
 		if (!user) return;
-		document.getElementById("ecard-avatar-img").src = resolveMedia(user.avatar) || "./DIEU.png";
+		document.getElementById("ecard-avatar-img").src = resolveMedia(user.avatar) || "./DIEU.avif";
 		document.getElementById("ecard-name-label").textContent = user.name || "Học sinh NQD";
 		document.getElementById("ecard-class-label").textContent = user.studentClass ? `Lớp ${user.studentClass}` : "Học sinh trường NQD";
 		document.getElementById("ecard-cohort-label").textContent = user.cohort || "NQD";

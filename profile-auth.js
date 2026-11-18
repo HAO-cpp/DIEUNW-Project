@@ -536,7 +536,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		renderProfileRoles(user);
 
 		const avatarEl = document.getElementById("user-display-avatar");
-		if (avatarEl) avatarEl.src = resolveMedia(user.avatar) || "./DIEU.png";
+		if (avatarEl) avatarEl.src = resolveMedia(user.avatar) || "./DIEU.avif";
 
 		const coverEl = document.getElementById("profile-cover-image");
 		if (coverEl) {
@@ -606,7 +606,7 @@ document.addEventListener("DOMContentLoaded", () => {
 				postEl.className = "post-card";
 				const imgUrl = resolveMedia(post.image || "");
 				const imgHtml = imgUrl ? `<img src="${escapeHtml(imgUrl)}" class="post-card-image" loading="lazy">` : "";
-				const avatar = escapeHtml(resolveMedia(post.avatar || userAvatar) || "./DIEU.png");
+				const avatar = escapeHtml(resolveMedia(post.avatar || userAvatar) || "./DIEU.avif");
 				const musicHtml = post.musicUrl ? `
 					<div class="dieunw-inline-audio-box">
 						<span class="dieunw-inline-audio-title">🎵 ${escapeHtml(post.musicTitle || "Nhạc đính kèm")}</span>
@@ -629,11 +629,11 @@ document.addEventListener("DOMContentLoaded", () => {
 					</div>
 					<div class="post-status-info">
 						<span class="like-count-text">
-							<img src="./icon-like.png" class="status-like-icon" alt="Like">
+							<img src="./icon-like.avif" class="status-like-icon" alt="Like">
 							<span class="count">${post.likes || 0}</span> lượt thích
 						</span>
 						<span class="comment-count-text">
-							<img src="./icon-comment.png" class="status-comment-icon" alt="Comment">
+							<img src="./icon-comment.avif" class="status-comment-icon" alt="Comment">
 							<span class="comment-count">${Array.isArray(post.comments) ? post.comments.length : 0}</span> bình luận
 						</span>
 					</div>
@@ -700,7 +700,7 @@ document.addEventListener("DOMContentLoaded", () => {
 			document.getElementById("user-display-bio").innerText = club.bio || `Fanpage chính thức của ${club.name}`;
 
 			const avatarEl = document.getElementById("user-display-avatar");
-			if (avatarEl) avatarEl.src = resolveMedia(club.logo) || "./DIEU.png";
+			if (avatarEl) avatarEl.src = resolveMedia(club.logo) || "./DIEU.avif";
 
 			const coverEl = document.getElementById("profile-cover-image");
 			if (coverEl) {
@@ -758,7 +758,7 @@ document.addEventListener("DOMContentLoaded", () => {
 						` : "";
 						postEl.innerHTML = `
 							<div class="post-card-header">
-								<img src="${escapeHtml(resolveMedia(club.logo) || "./DIEU.png")}" class="post-card-avatar" style="object-fit:cover;">
+								<img src="${escapeHtml(resolveMedia(club.logo) || "./DIEU.avif")}" class="post-card-avatar" style="object-fit:cover;">
 								<div>
 									<h4 class="post-card-author">${escapeHtml(club.name)}</h4>
 									<span class="post-card-time">${new Date(post.createdAt).toLocaleString("vi-VN")}</span>

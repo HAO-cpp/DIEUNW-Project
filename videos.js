@@ -525,7 +525,7 @@ document.addEventListener("DOMContentLoaded", () => {
 						title: mTitle,
 						artist: mArtist || video.authorName || "",
 						audioUrl: musicUrl,
-						coverUrl: resolveMedia(video.coverUrl || video.cover_url) || "./DIEU.png"
+						coverUrl: resolveMedia(video.coverUrl || video.cover_url) || "./DIEU.avif"
 					});
 					notify(`Đang phát "${mTitle}" ở đĩa nhạc góc trên!`, "success");
 				}
@@ -538,7 +538,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 		const avatarImg = document.createElement("img");
 		avatarImg.className = "video-rail-avatar";
-		avatarImg.src = resolveMedia(video.authorAvatar || video.avatar) || "./DIEU.png";
+		avatarImg.src = resolveMedia(video.authorAvatar || video.avatar) || "./DIEU.avif";
 		avatarImg.alt = "";
 
 		const likeBtn = document.createElement("button");
@@ -681,7 +681,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		const row = document.createElement("div");
 		row.className = "video-comment-row";
 		const img = document.createElement("img");
-		img.src = resolveMedia(cmt.avatar || cmt.authorAvatar) || "./DIEU.png";
+		img.src = resolveMedia(cmt.avatar || cmt.authorAvatar) || "./DIEU.avif";
 		img.alt = "";
 		const bubble = document.createElement("div");
 		bubble.className = "video-comment-bubble";
@@ -754,7 +754,7 @@ document.addEventListener("DOMContentLoaded", () => {
 			commentsListEl.querySelector(".empty-cmt-note")?.remove();
 			appendCommentRow(data.comment || {
 				name: currentUser.name || currentUser.email,
-				avatar: currentUser.avatar || "./DIEU.png",
+				avatar: currentUser.avatar || "./DIEU.avif",
 				content
 			});
 			currentCommentsVideo.commentsCount = Number(currentCommentsVideo.commentsCount || 0) + 1;

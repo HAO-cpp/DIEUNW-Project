@@ -354,7 +354,7 @@
         }
 
         const name = user.name || user.email;
-        const avatar = resolveMedia(user.avatar) || "./DIEU.png";
+        const avatar = resolveMedia(user.avatar) || "./DIEU.avif";
         const authorName = document.getElementById("post-author-name");
         const authorAvatar = document.getElementById("post-author-avatar");
         if (authorName) authorName.textContent = name;
@@ -509,7 +509,7 @@
             item.type = "button";
             item.className = "mention-item";
             item.innerHTML = `
-                <img src="${escapeHtml(resolveMedia(u.avatar) || "./DIEU.png")}" alt="">
+                <img src="${escapeHtml(resolveMedia(u.avatar) || "./DIEU.avif")}" alt="">
                 <span><strong>${escapeHtml(u.name || "Thành viên")}</strong> <small>${escapeHtml(u.email || "")}</small></span>
             `;
             item.addEventListener("mousedown", (e) => {
@@ -615,7 +615,7 @@
 
         const countLikes = Number(post.likes || 0);
         const authorName = escapeHtml(post.name || viewer?.name || viewer?.email || "Thành viên DIEUNW");
-        const authorAvatar = escapeHtml(resolveMedia(post.avatar) || "./DIEU.png");
+        const authorAvatar = escapeHtml(resolveMedia(post.avatar) || "./DIEU.avif");
         const visibilityLabel = post.visibility === "private" ? "Riêng tư" : "Công khai";
 
         let savedComments = [];
@@ -670,25 +670,25 @@
             </div>
             <div class="post-status-info">
                 <span class="like-count-text">
-                    <img src="./icon-like.png" class="status-like-icon" alt="Like">
+                    <img src="./icon-like.avif" class="status-like-icon" alt="Like">
                     <span class="count">${countLikes}</span> lượt thích
                 </span>
                 <span class="comment-count-text">
-                    <img src="./icon-comment.png" class="status-comment-icon" alt="Comment">
+                    <img src="./icon-comment.avif" class="status-comment-icon" alt="Comment">
                     <span class="comment-count">${savedComments.length}</span> bình luận
                 </span>
             </div>
             <div class="post-interact-bar">
                 <button type="button" class="btn-interact btn-like ${isLiked ? "liked" : ""}" ${isLiked ? 'style="color:#0078ff;font-weight:bold;"' : ""}>
-                    <img src="./icon-like.png" class="custom-interact-icon" alt="Like"> Thích
+                    <img src="./icon-like.avif" class="custom-interact-icon" alt="Like"> Thích
                 </button>
                 <button type="button" class="btn-interact btn-comment">
-                    <img src="./icon-comment.png" class="custom-interact-icon" alt="Comment"> Bình luận
+                    <img src="./icon-comment.avif" class="custom-interact-icon" alt="Comment"> Bình luận
                 </button>
             </div>
             <div class="comment-section" style="display: none;">
                 <div class="comment-input-group">
-                    <img src="${escapeHtml(resolveMedia(viewer?.avatar) || "./DIEU.png")}" class="user-avatar-mini" style="width:32px; height:32px;" alt="">
+                    <img src="${escapeHtml(resolveMedia(viewer?.avatar) || "./DIEU.avif")}" class="user-avatar-mini" style="width:32px; height:32px;" alt="">
                     <input type="text" class="comment-field" placeholder="Viết bình luận công khai...">
                 </div>
                 <div class="comments-list"></div>
@@ -772,7 +772,7 @@
                 commentField.value = "";
                 const createdCmt = data.comment || {
                     name: viewer?.name || viewer?.email || "Bạn",
-                    avatar: viewer?.avatar || "./DIEU.png",
+                    avatar: viewer?.avatar || "./DIEU.avif",
                     text: content
                 };
                 appendCommentDom(commentsListEl, createdCmt, viewer?.name);
@@ -832,7 +832,7 @@
         if (!container) return;
         const item = document.createElement("div");
         item.className = "comment-item";
-        const avatarSrc = escapeHtml(resolveMedia(cmt.avatar) || "./DIEU.png");
+        const avatarSrc = escapeHtml(resolveMedia(cmt.avatar) || "./DIEU.avif");
         const stickerHtml = cmt.stickerUrl
             ? `<img src="${escapeHtml(resolveMedia(cmt.stickerUrl))}" alt="Sticker" style="max-width:110px; border-radius:8px; margin-top:4px;">`
             : "";

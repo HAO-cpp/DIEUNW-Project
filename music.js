@@ -293,7 +293,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		hubAudio.play().catch(() => {});
 
 		if (deckBar) deckBar.hidden = false;
-		if (deckCover) deckCover.src = resolveMedia(track.coverUrl || track.cover_url) || "./DIEU.png";
+		if (deckCover) deckCover.src = resolveMedia(track.coverUrl || track.cover_url) || "./DIEU.avif";
 		if (deckTitle) deckTitle.textContent = track.title || "Không rõ tiêu đề";
 		if (deckArtist) deckArtist.textContent = track.artist || track.authorName || "Thành viên DIEUNW";
 
@@ -409,7 +409,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		coverBtn.className = "music-cover-btn";
 		coverBtn.title = "Phát / Tạm dừng";
 		const img = document.createElement("img");
-		img.src = resolveMedia(track.coverUrl || track.cover_url) || "./DIEU.png";
+		img.src = resolveMedia(track.coverUrl || track.cover_url) || "./DIEU.avif";
 		img.alt = "";
 		img.loading = "lazy";
 		const overlay = document.createElement("span");
