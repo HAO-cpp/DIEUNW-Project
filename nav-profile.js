@@ -914,3 +914,99 @@
 		if (event.key === "dieuNwUser") updateNavAvatar();
 	});
 })();
+/* ===== TỰ ĐỘNG CĂN VỊ TRÍ KHUNG NHẠC TRÊN MỌI MÀN HÌNH ===== */
+(() => {
+    function setupPopoverSafePositioning() {
+        const btn = document.getElementById("nav-music-btn");
+        const popover = document.getElementById("nav-music-popover");
+        if (!btn || !popover || popover.dataset.posPatched === "1") return;
+        popover.dataset.posPatched = "1";
+
+        // Đưa popover ra ngoài thanh navbar để không bị overflow/backdrop-filter cắt mất góc
+        if (popover.parentElement !== document.body) {
+            document.body.appendChild(popover);
+        }
+
+        // Ngăn sự kiện click bên trong popover làm kích hoạt listener đóng-khi-bấm-ra-ngoài trên wrap cũ
+        popover.addEventListener("click", (e) => {
+            e.stopPropagation();
+        });
+
+        function positionPopover() {
+            const isHidden = popover.hidden || getComputedStyle(popover).display === "none";
+            if (isHidden) return;
+
+            const margin = 12;
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const popW = Math.min(350, vw - margin * 2);
+            const rect = btn.getBoundingClientRect();
+
+            let top = Math.round(rect.bottom + 10);
+            if (top < margin || top > vh - 160) {
+                top = 72;
+            }
+
+            let left;
+            if (vw <= 600) {
+                // Trên điện thoại / màn hình hẹp: căn giữa màn hình để thao tác thoải mái nhất
+                left = Math.round((vw - popW) / 2);
+            } else {
+                // Trên máy tính: neo gần nút đĩa nhạc nhưng luôn ép nằm gọn trong màn hình
+                left = Math.round(rect.right - popW);
+                if (left < margin) left = Math.round(rect.left);
+                if (left + popW > vw - margin) left = vw - popW - margin;
+                if (left < margin) left = margin;
+            }
+
+            popover.style.setProperty("position", "fixed", "important");
+            popover.style.setProperty("top", `${top}px`, "important");
+            popover.style.setProperty("left", `${left}px`, "important");
+            popover.style.setProperty("right", "auto", "important");
+            popover.style.setProperty("bottom", "auto", "important");
+            popover.style.setProperty("width", `${popW}px`, "important");
+            popover.style.setProperty("max-height", `${Math.max(220, vh - top - margin)}px`, "important");
+            popover.style.setProperty("z-index", "9999", "important");
+        }
+
+        // Theo dõi mỗi lần mở/đóng popover
+        const attrObserver = new MutationObserver(() => {
+            requestAnimationFrame(positionPopover);
+        });
+        attrObserver.observe(popover, { attributes: true, attributeFilter: ["hidden", "class", "style"] });
+
+        btn.addEventListener("click", () => {
+            requestAnimationFrame(positionPopover);
+        });
+
+        document.addEventListener("click", (e) => {
+            if (!popover.hidden && !popover.contains(e.target) && !btn.contains(e.target)) {
+                popover.hidden = true;
+                popover.classList.remove("open");
+            }
+        });
+
+        window.addEventListener("resize", positionPopover);
+        window.addEventListener("scroll", positionPopover, { passive: true });
+        positionPopover();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", setupPopoverSafePositioning);
+    } else {
+        setupPopoverSafePositioning();
+    }
+
+    const domWatcher = new MutationObserver(() => {
+        if (document.getElementById("nav-music-popover")) {
+            setupPopoverSafePositioning();
+        }
+    });
+    if (document.body) {
+        domWatcher.observe(document.body, { childList: true, subtree: true });
+    } else {
+        document.addEventListener("DOMContentLoaded", () => {
+            domWatcher.observe(document.body, { childList: true, subtree: true });
+        });
+    }
+})();

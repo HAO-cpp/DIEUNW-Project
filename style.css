@@ -5663,3 +5663,25 @@ body.theme-dark .audio-player-panel {
     border: 1px solid #d5e2ee;
     margin-bottom: 12px;
 }
+
+/* ===== SỬA VỊ TRÍ KHUNG BẬT NHẠC TRÊN NAVBAR KHÔNG BỊ LỆCH MÉP ===== */
+.nav-music-popover {
+    position: fixed !important;
+    width: min(350px, calc(100vw - 24px)) !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100vh - 92px) !important;
+    overflow-y: auto !important;
+    background: rgba(255, 255, 255, 0.97) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid #cbd9e6 !important;
+    box-shadow: 0 18px 46px rgba(10, 30, 52, 0.28) !important;
+    z-index: 9999 !important;
+    box-sizing: border-box !important;
+}
+body.dark-mode .nav-music-popover,
+body.theme-dark .nav-music-popover {
+    background: rgba(24, 30, 40, 0.97) !important;
+    color: #f1f5f9 !important;
+    border-color: rgba(255, 255, 255, 0.16) !important;
+}
