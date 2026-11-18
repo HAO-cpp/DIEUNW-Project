@@ -3,19 +3,30 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<link rel="stylesheet" href="./style.css?v=9">
+	<link rel="stylesheet" href="./style.css?v=12">
 	<link rel="prefetch" href="./profile.html">
-	<link rel="icon" type="image/png" href="./DIEU.avif?v=9">
+	<link rel="icon" type="image/avif" href="./DIEU.avif?v=6">
+	<link rel="alternate icon" type="image/png" href="./DIEU.png?v=6">
 	<title>DIEUNW - Trang Chủ</title>
 </head>
 <body>
 	<header class="navbar nav-scroll">
-		<div class="nav-left">
-			<a href="./index.html" class="brand-logo-link">
-				<img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo">
+		<div class="nav-corner-dock">
+			<button type="button" class="nav-brand-toggle" aria-expanded="false" aria-controls="main-nav-menu" aria-label="Mở menu điều hướng DIEUNW">
+				<picture>
+					<source srcset="./DIEU.avif" type="image/avif">
+					<source srcset="./DIEU.webp" type="image/webp">
+					<img src="./DIEU.png" alt="DIEUNW" class="nav-brand-icon">
+				</picture>
+				<span class="nav-brand-caret">▾</span>
+			</button>
+			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
+				<img class="nav-user-avatar" src="./DIEU.avif" alt="Trang cá nhân">
+				<span class="nav-status-dot" data-status="offline" aria-hidden="true"></span>
 			</a>
+			<button type="button" class="nav-theme-toggle" id="nav-theme-toggle" aria-label="Bật/tắt chế độ tối" title="Chế độ Sáng / Tối">🌙</button>
 		</div>
-		<nav class="nav-menu" aria-label="Điều hướng chính">
+		<nav id="main-nav-menu" class="nav-menu nav-dropdown-panel" aria-label="Điều hướng chính" hidden>
 			<a href="./index.html" class="nav-item active" aria-current="page">Trang chủ</a>
 			<a href="./videos.html" class="nav-item">Video</a>
 			<a href="./music.html" class="nav-item">Kho nhạc</a>
@@ -27,15 +38,14 @@
 			<a href="./clubs.html" class="nav-item">CLB</a>
 			<a href="./announcements.html" class="nav-item">Thông báo</a>
 		</nav>
-		<div class="nav-right">
-			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
-				<img class="nav-user-avatar" src="./DIEU.avif" alt="">
-			</a>
-		</div>
 	</header>
 
 	<div id="hero-banner">
-		<img src="./DIEUNW.png" alt="DIEUNW Banner">
+		<picture>
+			<source srcset="./DIEUNW.avif" type="image/avif">
+			<source srcset="./DIEUNW.webp" type="image/webp">
+			<img src="./DIEUNW.png" alt="DIEUNW Banner">
+		</picture>
 	</div>
 
 	<main class="main-content page-enter">
@@ -50,8 +60,8 @@
 		</section>
 
 		<div class="feed-trigger-box" id="feed-trigger-box" hidden>
-			<img id="trigger-user-avatar" src="./DIEU.avif" alt="Avatar" class="user-avatar-mini">
-			<div id="trigger-modal-input">Dieuer ơi, bạn đang nghĩ gì thế?</div>
+			<img id="feed-trigger-avatar" src="./DIEU.avif" alt="Avatar" class="user-avatar-mini">
+			<div id="trigger-modal-input" role="button" tabindex="0">Dieuer ơi, bạn đang nghĩ gì thế?</div>
 			<button id="btn-trigger-open" type="button">Đăng bài</button>
 		</div>
 
@@ -59,7 +69,7 @@
 			<p class="loading-text">Đang tải bài viết...</p>
 		</div>
 
-		<!-- Khung đăng nhập / đăng ký nhanh khi chưa đăng nhập -->
+		<!-- Khung đăng nhập / đăng ký nhanh ngay trên Trang chủ -->
 		<div id="auth-container" class="auth-box" style="display: none;">
 			<div id="login-view">
 				<h2>Chào mừng bạn đã trở lại DIEUNW</h2>
@@ -122,9 +132,21 @@
 				</p>
 			</div>
 		</div>
+
+		<!-- Stub ẩn giữ tương thích nếu profile-auth.js cập nhật phần tử hồ sơ -->
+		<div id="profile-container" style="display: none;" hidden aria-hidden="true">
+			<img id="user-display-avatar" src="./DIEU.avif" alt="">
+			<img id="profile-cover-image" alt="" hidden>
+			<span id="user-display-name"></span>
+			<span id="user-display-email"></span>
+			<span id="user-display-class"></span>
+			<span id="user-display-bio"></span>
+			<div id="profile-role-tags"></div>
+			<span class="verified-badge"></span>
+		</div>
 	</main>
 
-	<!-- Modal tạo bài viết (Rich Text + @tag email + Upload ảnh nén WebP + Nhạc nền + Thanh loading %) -->
+	<!-- Modal tạo bài viết -->
 	<div id="post-modal-overlay" class="modal-overlay" hidden>
 		<div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="post-modal-title">
 			<div class="modal-header">
@@ -163,7 +185,7 @@
 
 				<div class="image-upload-box">
 					<div class="image-upload-row">
-						<label class="image-upload-label dieunw-file-btn" for="post-image-file">Chọn ảnh từ máy</label>
+						<label class="image-upload-label" for="post-image-file">Chọn ảnh từ máy</label>
 						<input id="post-image-file" type="file" accept="image/*" hidden>
 						<span id="post-image-filename" class="image-upload-filename">Chưa chọn ảnh</span>
 						<button type="button" id="post-image-clear" class="btn-clear-upload" hidden>Xóa ảnh</button>
@@ -173,7 +195,7 @@
 					</div>
 				</div>
 
-				<!-- Gắn nhạc từ Kho nhạc online hoặc tệp từ máy -->
+				<!-- Widget đính kèm nhạc nền từ Kho nhạc hoặc file MP3 -->
 				<div id="post-music-picker"></div>
 
 				<fieldset class="post-visibility-fieldset">
@@ -182,11 +204,10 @@
 					<label><input type="radio" name="post-visibility" value="private"> Riêng tư</label>
 				</fieldset>
 
-				<!-- Thanh loading % khi đăng bài -->
-				<div id="post-upload-progress"></div>
+				<div id="post-upload-progress" style="margin-top:10px;"></div>
 			</div>
 			<div class="modal-footer">
-				<button id="btn-submit-post" type="button">Đăng</button>
+				<button id="btn-submit-post" type="button">Đăng bài</button>
 			</div>
 		</div>
 	</div>
@@ -220,8 +241,8 @@
 			emailjs.init({ publicKey: "dViu70h7kpGKrNHN0" });
 		}
 	</script>
-	<script src="./nav-profile.js?v=9" defer></script>
-	<script src="./profile-auth.js?v=9" defer></script>
-	<script src="./script.js?v=9" defer></script>
+	<script src="./nav-profile.js?v=6" defer></script>
+	<script src="./profile-auth.js?v=6" defer></script>
+	<script src="./script.js?v=6" defer></script>
 </body>
 </html>
