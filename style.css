@@ -5655,3 +5655,11 @@ body.theme-dark .audio-player-panel {
         justify-content: center;
     }
 }
+
+.dieunw-file-btn{
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: #f4f8fc;
+    border: 1px solid #d5e2ee;
+    margin-bottom: 12px;
+}
