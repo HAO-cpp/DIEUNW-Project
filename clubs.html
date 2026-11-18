@@ -4,27 +4,14 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta name="theme-color" content="#1769aa">
-	<link rel="stylesheet" href="./style.css?v=11">
+	<link rel="stylesheet" href="./style.css?v=12">
 	<link rel="icon" type="image/png" href="./DIEU.png?v=1">
 	<title>CLB - DIEUNW</title>
 </head>
 <body class="clubs-page">
 	<header class="navbar nav-scroll">
-		<div class="nav-corner-dock">
-			<button class="nav-brand-toggle" type="button" aria-expanded="false" aria-controls="main-nav-menu" aria-label="Mở menu điều hướng">
-				<picture>
-					<source srcset="./DIEU.avif" type="image/avif">
-					<source srcset="./DIEU.webp" type="image/webp">
-					<img src="./DIEU.png" alt="DIEUNW" class="nav-brand-badge">
-				</picture>
-			</button>
-			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
-				<img class="nav-user-avatar" src="./DIEU.png" alt="">
-				<span class="nav-status-dot" aria-hidden="true"></span>
-			</a>
-			<button id="nav-theme-toggle" class="nav-theme-toggle" type="button" aria-label="Chuyển chế độ sáng tối" title="Chuyển chế độ sáng / tối">🌙</button>
-		</div>
-		<nav id="main-nav-menu" class="nav-menu nav-dropdown-panel" aria-label="Điều hướng chính" hidden>
+		<div class="nav-left"><a href="./index.html" class="brand-logo-link"><img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo"></a></div>
+		<nav class="nav-menu" aria-label="Điều hướng chính">
 			<a href="./index.html" class="nav-item">Trang chủ</a>
 			<a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
 			<a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
@@ -34,23 +21,15 @@
 			<a href="./clubs.html" class="nav-item active" aria-current="page">CLB</a>
 			<a href="./announcements.html" class="nav-item">Thông báo</a>
 		</nav>
+		<div class="nav-right"><a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân"><img class="nav-user-avatar" src="./DIEU.png" alt=""></a></div>
 	</header>
-
-	<section id="hero-banner" class="hero-banner" aria-label="DIEUNW Banner">
-		<picture>
-			<source srcset="./DIEUNW.avif" type="image/avif">
-			<source srcset="./DIEUNW.webp" type="image/webp">
-			<img src="./DIEUNW.png" alt="DIEUNW" class="hero-banner-img" loading="eager">
-		</picture>
-		<div class="hero-banner-fade" aria-hidden="true"></div>
-	</section>
 
 	<main class="clubs-main page-enter">
 		<header class="clubs-heading">
 			<div>
-				<p class="clubs-eyebrow">DIEUNW</p>
+				<p class="clubs-eyebrow">CỘNG ĐỒNG NQD</p>
 				<h1>Câu lạc bộ</h1>
-				<p>Khám phá và tham gia những câu lạc bộ đang hoạt động trong trường.</p>
+				<p>Khám phá, tham gia và đồng hành cùng các câu lạc bộ đang hoạt động trong trường.</p>
 			</div>
 			<a class="clubs-heading-link" href="./announcements.html">Đọc bảng tin <span aria-hidden="true">↗</span></a>
 		</header>
@@ -66,7 +45,7 @@
 			<aside class="clubs-sidebar">
 				<section id="clubs-auth-gate" class="clubs-panel" hidden>
 					<p class="clubs-eyebrow">THAM GIA CÂU LẠC BỘ</p>
-					<h2>Đăng nhập để đăng ký hoặc tham gia CLB</h2>
+					<h2>Đăng nhập để đăng ký &amp; tham gia CLB</h2>
 					<a class="clubs-button" href="./profile.html">Đăng nhập</a>
 				</section>
 				<form id="club-request-form" class="clubs-panel club-request-form" hidden>
@@ -82,8 +61,8 @@
 					<p class="clubs-field-hint">Email cần thuộc tài khoản DIEUNW đã đăng ký. Có thể thêm nhiều quản lý.</p>
 					<ul id="club-managers-list" class="admin-list" style="margin-top: 4px; margin-bottom: 8px;"></ul>
 					<label for="club-logo">Logo CLB</label>
-					<input id="club-logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif">
-					<p class="clubs-field-hint">PNG, JPG, WEBP, AVIF hoặc GIF, tối đa 500 KB.</p>
+					<input id="club-logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+					<p class="clubs-field-hint">PNG, JPG, WEBP hoặc GIF, tối đa 500 KB.</p>
 					<img id="club-logo-preview" class="club-logo-preview" alt="Xem trước logo CLB" hidden>
 					<label for="club-tag-color">Màu tag quản lý</label>
 					<div class="club-color-row"><input id="club-tag-color" name="tagColor" type="color" value="#1769aa"><span id="club-color-value">#1769AA</span></div>

@@ -165,12 +165,12 @@ document.addEventListener("DOMContentLoaded", () => {
 				document.documentElement.classList.add("dark-mode");
 				document.body.classList.add("dark-mode");
 				localStorage.setItem("dieunw_dark_mode", "1");
-				if (navThemeToggle) navThemeToggle.textContent = "☀️";
+				if (navThemeToggle) navThemeToggle.textContent = "☀";
 			} else if (themeName === "default") {
 				document.documentElement.classList.remove("dark-mode");
 				document.body.classList.remove("dark-mode");
 				localStorage.setItem("dieunw_dark_mode", "0");
-				if (navThemeToggle) navThemeToggle.textContent = "🌙";
+				if (navThemeToggle) navThemeToggle.textContent = "⏾";
 			}
 		}
 	}

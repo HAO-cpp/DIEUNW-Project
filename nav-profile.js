@@ -59,7 +59,7 @@
 		document.querySelectorAll(".nav-theme-toggle").forEach(btn => {
 			btn.setAttribute("aria-pressed", String(isDark));
 			btn.title = isDark ? "Chuyển sang Chế độ Sáng" : "Chuyển sang Chế độ Tối (Dark Mode)";
-			btn.textContent = isDark ? "☀️" : "🌙";
+			btn.textContent = isDark ? "☀" : "⏾";
 		});
 	}
 

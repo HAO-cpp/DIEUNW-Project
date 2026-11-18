@@ -19,6 +19,7 @@ const STATIC_EXTENSIONS = new Set([
 const MIME_TYPES = {
 	".avif": "image/avif",
 	".css": "text/css; charset=utf-8",
+	".csv": "text/csv; charset=utf-8",
 	".doc": "application/msword",
 	".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 	".gif": "image/gif",
@@ -27,13 +28,20 @@ const MIME_TYPES = {
 	".jpeg": "image/jpeg",
 	".jpg": "image/jpeg",
 	".js": "text/javascript; charset=utf-8",
+	".md": "text/markdown; charset=utf-8",
 	".mp4": "video/mp4",
 	".pdf": "application/pdf",
 	".png": "image/png",
+	".ppt": "application/vnd.ms-powerpoint",
+	".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+	".rar": "application/vnd.rar",
 	".svg": "image/svg+xml",
 	".txt": "text/plain; charset=utf-8",
 	".webm": "video/webm",
-	".webp": "image/webp"
+	".webp": "image/webp",
+	".xls": "application/vnd.ms-excel",
+	".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+	".zip": "application/zip"
 };
 
 const AVATAR_FRAME_COSTS = {
@@ -131,7 +139,7 @@ function saveUploadedFile(filePart, allowedType = "any") {
 	const ext = path.extname(filePart.fileName).toLowerCase();
 	const imageExts = new Set([".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif"]);
 	const videoExts = new Set([".mp4", ".webm"]);
-	const docExts = new Set([".pdf", ".doc", ".docx", ".txt", ".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".rar"]);
+	const docExts = new Set([".pdf", ".doc", ".docx", ".txt", ".md", ".csv", ".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".rar"]);
 	let valid = false;
 	if (allowedType === "image") valid = imageExts.has(ext);
 	else if (allowedType === "story") valid = imageExts.has(ext) || videoExts.has(ext);
@@ -205,6 +213,16 @@ function parseUnlockedFrames(raw) {
 	}
 }
 
+function parseEcardConfig(raw) {
+	if (!raw) return null;
+	try {
+		const parsed = JSON.parse(raw);
+		return parsed && typeof parsed === "object" ? parsed : null;
+	} catch {
+		return null;
+	}
+}
+
 function cleanUser(db, row, viewerId = "") {
 	if (!row) return null;
 	const relation = viewerId ? relationship(db, viewerId, row.id) : "none";
@@ -242,6 +260,7 @@ function cleanUser(db, row, viewerId = "") {
 		themeSecondary: row.theme_secondary || "",
 		activeAvatarFrame: row.active_avatar_frame || "none",
 		unlockedFrames: isSelf ? parseUnlockedFrames(row.unlocked_frames) : undefined,
+		ecardConfig: parseEcardConfig(row.ecard_config),
 		studyPoints: Number(row.study_points || 0),
 		studyStreakDays: Number(row.study_streak_days || 0),
 		weeklyStudyHours: Number((weeklyMinutes / 60).toFixed(1)),
@@ -628,6 +647,7 @@ function initializeDatabase(dbPath) {
 		["theme_secondary", "TEXT NOT NULL DEFAULT ''"],
 		["active_avatar_frame", "TEXT NOT NULL DEFAULT 'none'"],
 		["unlocked_frames", "TEXT NOT NULL DEFAULT '[\"none\"]'"],
+		["ecard_config", "TEXT NOT NULL DEFAULT ''"],
 		["study_points", "INTEGER NOT NULL DEFAULT 0"],
 		["study_streak_days", "INTEGER NOT NULL DEFAULT 0"],
 		["last_study_date", "TEXT NOT NULL DEFAULT ''"],
@@ -691,7 +711,6 @@ function initializeDatabase(dbPath) {
 	syncDb(db);
 	return db;
 }
-
 async function readJson(request) {
 	const chunks = [];
 	let size = 0;
@@ -711,6 +730,15 @@ async function readJson(request) {
 function sendJson(response, statusCode, payload, headers = {}) {
 	response.writeHead(statusCode, { "Cache-Control": "no-store", "Content-Type": "application/json; charset=utf-8", ...headers });
 	response.end(JSON.stringify(payload));
+}
+
+function isAllowedCorsOrigin(origin) {
+	if (!origin) return false;
+	return origin === "https://hao-cpp.github.io"
+		|| origin === "http://localhost:4173"
+		|| origin === "http://127.0.0.1:4173"
+		|| origin.startsWith("http://localhost:")
+		|| origin.startsWith("http://127.0.0.1:");
 }
 
 function parseCookies(request) {
@@ -835,7 +863,7 @@ function serializeStudySet(db, row) {
 		cards = JSON.parse(row.cards_json || "[]");
 	} catch {}
 	const author = db.prepare("SELECT id, name, email, avatar FROM users WHERE id = ?").get(row.user_id);
-	const rawLeaderboard = row.kind === "quiz"
+	const leaderboard = row.kind === "quiz"
 		? db.prepare(`
 			SELECT quiz_attempts.score, quiz_attempts.total, quiz_attempts.duration_ms AS durationMs,
 				quiz_attempts.created_at AS createdAt, users.id AS userId, users.name, users.avatar
@@ -845,10 +873,6 @@ function serializeStudySet(db, row) {
 			LIMIT 3
 		`).all(row.id)
 		: [];
-	const leaderboard = rawLeaderboard.map(entry => ({
-		...entry,
-		userName: entry.name
-	}));
 	return {
 		id: row.id,
 		userId: row.user_id,
@@ -856,16 +880,12 @@ function serializeStudySet(db, row) {
 		authorAvatar: author?.avatar || "./DIEU.png",
 		forkedFromId: row.forked_from_id || null,
 		kind: row.kind,
-		setType: row.kind,
 		title: row.title,
 		subject: row.subject || "Chung",
 		description: row.description || "",
 		cards,
-		items: cards,
 		pinned: Boolean(row.pinned),
-		isPinned: Boolean(row.pinned),
 		studyCount: Number(row.study_count || 0),
-		playCount: Number(row.study_count || 0),
 		leaderboard,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at
@@ -1043,43 +1063,30 @@ function getFullUserProfilePayload(db, targetRow, viewerId) {
 
 	const rawTags = db.prepare("SELECT id, subject, kind, created_at AS createdAt FROM study_tags WHERE user_id = ? ORDER BY created_at DESC").all(targetRow.id);
 	const studyTags = rawTags.map(tag => {
-		const rawEndorsements = db.prepare(`
+		const endorsements = db.prepare(`
 			SELECT e.id, e.comment, e.created_at AS createdAt, e.endorser_id AS endorserId, u.name AS endorserName, u.avatar AS endorserAvatar
 			FROM study_tag_endorsements e JOIN users u ON u.id = e.endorser_id
 			WHERE e.tag_id = ? ORDER BY e.created_at DESC LIMIT 20
 		`).all(tag.id);
-		const endorsements = rawEndorsements.map(e => ({
-			...e,
-			fromUserId: e.endorserId,
-			fromUserName: e.endorserName
-		}));
 		return {
 			...tag,
-			subjectTag: tag.subject,
-			tagType: tag.kind,
 			endorsementCount: endorsements.length,
 			endorsedByMe: Boolean(viewerId && endorsements.some(e => e.endorserId === viewerId)),
 			endorsements
 		};
 	});
 
-	const showcase = db.prepare("SELECT id, title, description, link, image, kind, created_at AS createdAt FROM profile_showcase WHERE user_id = ? ORDER BY created_at DESC")
-		.all(targetRow.id)
-		.map(item => ({ ...item, url: item.link }));
+	const showcase = db.prepare("SELECT id, title, description, link, image, kind, created_at AS createdAt FROM profile_showcase WHERE user_id = ? ORDER BY created_at DESC").all(targetRow.id);
 
 	const nowMs = Date.now();
 	const momentRow = db.prepare("SELECT * FROM user_moments WHERE user_id = ? AND expires_at > ? ORDER BY created_at DESC LIMIT 1").get(targetRow.id, nowMs);
 	let activeMoment = null;
 	if (momentRow) {
-		const rawReactions = db.prepare(`
+		const reactions = db.prepare(`
 			SELECT mr.emoji, mr.created_at AS createdAt, u.id AS userId, u.name, u.avatar
 			FROM moment_reactions mr JOIN users u ON u.id = mr.user_id
 			WHERE mr.moment_id = ? ORDER BY mr.created_at DESC
-		`).all(momentRow.id).map(r => ({
-			...r,
-			userName: r.name
-		}));
-		const visibleReactors = viewerId === targetRow.id ? rawReactions : rawReactions.slice(0, 3);
+		`).all(momentRow.id);
 		activeMoment = {
 			id: momentRow.id,
 			image: momentRow.image,
@@ -1088,24 +1095,13 @@ function getFullUserProfilePayload(db, targetRow, viewerId) {
 			gradTo: momentRow.grad_to,
 			expiresAt: Number(momentRow.expires_at),
 			createdAt: momentRow.created_at,
-			reactionCount: rawReactions.length,
-			myReaction: viewerId ? (rawReactions.find(r => r.userId === viewerId)?.emoji || "") : "",
-			reactors: visibleReactors,
-			reactions: visibleReactors
+			reactionCount: reactions.length,
+			myReaction: viewerId ? (reactions.find(r => r.userId === viewerId)?.emoji || "") : "",
+			reactors: viewerId === targetRow.id ? reactions : reactions.slice(0, 3)
 		};
 	}
 
-	const rawStories = db.prepare("SELECT id, media_url AS mediaUrl, media_type AS mediaType, caption, duration_hours AS durationHours, expires_at AS expiresAt, created_at AS createdAt FROM user_stories WHERE user_id = ? AND expires_at > ? ORDER BY created_at ASC").all(targetRow.id, nowMs);
-	const stories = rawStories.map(s => {
-		const viewCount = db.prepare("SELECT COUNT(*) AS count FROM story_views WHERE story_id = ?").get(s.id)?.count || 0;
-		return {
-			...s,
-			userId: targetRow.id,
-			userName: targetRow.name,
-			userAvatar: targetRow.avatar || "./DIEU.png",
-			viewCount
-		};
-	});
+	const stories = db.prepare("SELECT id, media_url AS mediaUrl, media_type AS mediaType, caption, duration_hours AS durationHours, expires_at AS expiresAt, created_at AS createdAt FROM user_stories WHERE user_id = ? AND expires_at > ? ORDER BY created_at ASC").all(targetRow.id, nowMs);
 	const studySets = db.prepare("SELECT * FROM study_sets WHERE user_id = ? ORDER BY pinned DESC, updated_at DESC").all(targetRow.id).map(s => serializeStudySet(db, s));
 
 	const postRows = db.prepare(`
@@ -1131,6 +1127,7 @@ function getFullUserProfilePayload(db, targetRow, viewerId) {
 		posts: postRows.map(p => postForViewer(db, p, viewerId || ""))
 	};
 }
+
 function createServer(options = {}) {
 	const env = options.env || process.env;
 	const dbPath = options.dbPath || env.DATABASE_PATH || path.join(ROOT, "data", "dieunw-turso.sqlite");
@@ -1138,17 +1135,44 @@ function createServer(options = {}) {
 	const server = createHttpServer(async (request, response) => {
 		const host = request.headers.host || "localhost";
 		const url = new URL(request.url || "/", `http://${host}`);
-		const secure = Boolean(request.socket.encrypted || env.COOKIE_SECURE === "1");
+		const secure = Boolean(request.socket.encrypted || env.COOKIE_SECURE === "1" || request.headers["x-forwarded-proto"] === "https");
+		const origin = request.headers.origin;
 		try {
 			if (url.pathname.startsWith("/api/")) {
 				await handleApi({ request, response, url, db, env, secure });
 				return;
 			}
-			if (request.method === "GET" && url.pathname.startsWith("/uploads/")) {
+			if (["GET", "HEAD", "OPTIONS"].includes(request.method || "GET") && url.pathname.startsWith("/uploads/")) {
+				const uploadHeaders = { "Vary": "Origin" };
+				if (isAllowedCorsOrigin(origin)) {
+					uploadHeaders["Access-Control-Allow-Origin"] = origin;
+					uploadHeaders["Access-Control-Allow-Credentials"] = "true";
+					uploadHeaders["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS";
+					uploadHeaders["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
+				}
+				if (request.method === "OPTIONS") {
+					response.writeHead(204, uploadHeaders);
+					response.end();
+					return;
+				}
 				const fileName = path.basename(decodeURIComponent(url.pathname.slice("/uploads/".length)));
 				const filePath = path.join(UPLOAD_DIR, fileName);
 				if (!existsSync(filePath) || !statSync(filePath).isFile()) throw makeError(404, "Không tìm thấy tệp.");
-				response.writeHead(200, { "Content-Type": MIME_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream" });
+				const forceDownload = url.searchParams.get("download") === "1";
+				const requestedName = String(url.searchParams.get("name") || fileName).replace(/["\r\n\\/]+/g, "_").trim() || fileName;
+				const headers = {
+					...uploadHeaders,
+					"Content-Type": MIME_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream",
+					"Cache-Control": "public, max-age=86400"
+				};
+				if (forceDownload) {
+					headers["Content-Disposition"] = `attachment; filename*=UTF-8''${encodeURIComponent(requestedName)}`;
+				}
+				response.writeHead(200, headers);
+				if (request.method === "HEAD") {
+					response.end();
+					return;
+				}
 				createReadStream(filePath).pipe(response);
 				return;
 			}
@@ -1156,7 +1180,13 @@ function createServer(options = {}) {
 		} catch (error) {
 			if (!response.headersSent) {
 				console.error("Chi tiết lỗi máy chủ:", error);
-				sendJson(response, error.statusCode || 500, { error: error.statusCode ? error.message : "Lỗi máy chủ." });
+				const errHeaders = {};
+				if (isAllowedCorsOrigin(origin)) {
+					errHeaders["Access-Control-Allow-Origin"] = origin;
+					errHeaders["Access-Control-Allow-Credentials"] = "true";
+					errHeaders["Vary"] = "Origin";
+				}
+				sendJson(response, error.statusCode || 500, { error: error.statusCode ? error.message : "Lỗi máy chủ." }, errHeaders);
 			} else {
 				response.destroy();
 			}
@@ -1170,9 +1200,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	const { pathname } = url;
 	const method = request.method || "GET";
 
-	const allowedOrigins = new Set(["https://hao-cpp.github.io", "http://localhost:4173", "http://127.0.0.1:4173"]);
 	const origin = request.headers.origin;
-	if (origin && !allowedOrigins.has(origin) && !origin.startsWith("http://localhost:") && !origin.startsWith("http://127.0.0.1:")) {
+	if (origin && !isAllowedCorsOrigin(origin)) {
 		throw makeError(403, "Nguồn yêu cầu không được phép.");
 	}
 	if (origin) {
@@ -1464,18 +1493,39 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			if (unlocked.includes(body.activeAvatarFrame)) activeFrame = body.activeAvatarFrame;
 		}
 
+		let ecardConfigRaw = currentRow.ecard_config || "";
+		if (body.ecardConfig !== undefined) {
+			if (body.ecardConfig === null) {
+				ecardConfigRaw = "";
+			} else if (typeof body.ecardConfig === "object") {
+				const cfg = body.ecardConfig;
+				const validPos = new Set(["center center", "left center", "right center", "center top", "center bottom"]);
+				const bgImage = cfg.bgImage ? validateProfileImage(cfg.bgImage, false, 950000) : "";
+				const cleanCfg = {
+					bgImage,
+					bgPos: validPos.has(cfg.bgPos) ? cfg.bgPos : "center center",
+					color1: hexRegex.test(cfg.color1 || "") ? cfg.color1 : "#1769aa",
+					color2: hexRegex.test(cfg.color2 || "") ? cfg.color2 : "#2298f8",
+					overlayOpacity: Math.max(0, Math.min(80, Math.round(Number(cfg.overlayOpacity ?? 25)))),
+					textTone: cfg.textTone === "dark" ? "dark" : "light",
+					tagline: String(cfg.tagline || "").trim().slice(0, 60)
+				};
+				ecardConfigRaw = JSON.stringify(cleanCfg);
+			}
+		}
+
 		try {
 			db.prepare(`
 				UPDATE users SET name = ?, email = ?, student_class = ?, cohort = ?, avatar = ?, cover = ?, bio = ?,
 					social_facebook = ?, social_instagram = ?, social_github = ?, study_schedule = ?,
 					privacy_album = ?, privacy_achievements = ?, privacy_activity = ?, ghost_mode = ?,
-					theme_primary = ?, theme_secondary = ?, active_avatar_frame = ?
+					theme_primary = ?, theme_secondary = ?, active_avatar_frame = ?, ecard_config = ?
 				WHERE id = ?
 			`).run(
 				name, email, studentClass, cohort, avatar, cover, bio,
 				socialFb, socialIg, socialGh, studySchedule,
 				pAlbum, pAch, pAct, ghost,
-				tPrim, tSec, activeFrame, user.id
+				tPrim, tSec, activeFrame, ecardConfigRaw, user.id
 			);
 			syncDb(db);
 		} catch {
@@ -1611,9 +1661,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	// STUDY TAGS & ENDORSEMENTS (+1 XÁC NHẬN & NHẬN XÉT)
 	if (method === "POST" && pathname === "/api/profile/study-tags") {
 		const body = await readJson(request);
-		const subject = String(body.subject || body.subjectTag || "").trim().replace(/^#/, "").slice(0, 40);
-		const rawKind = body.kind || body.tagType;
-		const kind = rawKind === "need_help" ? "need_help" : "strength";
+		const subject = String(body.subject || "").trim().replace(/^#/, "").slice(0, 40);
+		const kind = body.kind === "need_help" ? "need_help" : "strength";
 		if (!subject) throw makeError(400, "Nhập tên môn học / kỹ năng.");
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
@@ -1623,18 +1672,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		} catch {
 			throw makeError(409, "Thẻ môn học này đã tồn tại.");
 		}
-		sendJson(response, 201, {
-			tag: {
-				id,
-				subject,
-				subjectTag: subject,
-				kind,
-				tagType: kind,
-				endorsementCount: 0,
-				endorsements: [],
-				createdAt
-			}
-		});
+		sendJson(response, 201, { tag: { id, subject, kind, endorsementCount: 0, endorsements: [], createdAt } });
 		return;
 	}
 	const delStudyTag = pathname.match(/^\/api\/profile\/study-tags\/([^/]+)$/);
@@ -1678,11 +1716,10 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
 		const image = validateProfileImage(body.image, false);
-		const linkValue = String(body.link || body.url || "").trim().slice(0, 500);
 		db.prepare("INSERT INTO profile_showcase(id, user_id, title, description, link, image, kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-			.run(id, user.id, title, String(body.description || "").trim().slice(0, 240), linkValue, image, String(body.kind || "product").slice(0, 30), createdAt);
+			.run(id, user.id, title, String(body.description || "").trim().slice(0, 240), String(body.link || "").trim().slice(0, 500), image, String(body.kind || "product").slice(0, 30), createdAt);
 		syncDb(db);
-		sendJson(response, 201, { ok: true, id, item: { id, title, link: linkValue, url: linkValue, image, createdAt } });
+		sendJson(response, 201, { ok: true, id });
 		return;
 	}
 	const delShowcase = pathname.match(/^\/api\/profile\/showcase\/([^/]+)$/);
@@ -1782,7 +1819,6 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		sendJson(response, 200, { ok: true });
 		return;
 	}
-
 	// STUDY SETS (FLASHCARD + QUIZ + FORK + CHALLENGE LEADERBOARD)
 	if (method === "GET" && pathname === "/api/study-sets") {
 		const targetUserId = url.searchParams.get("userId");
@@ -1794,8 +1830,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 	if (method === "POST" && pathname === "/api/study-sets") {
 		const body = await readJson(request);
-		const rawKind = body.kind || body.setType;
-		const kind = rawKind === "quiz" ? "quiz" : "flashcard";
+		const kind = body.kind === "quiz" || body.setType === "quiz" ? "quiz" : "flashcard";
 		const title = String(body.title || "").trim().slice(0, 120);
 		if (!title) throw makeError(400, "Nhập tiêu đề bộ thẻ / đề ôn tập.");
 		const subject = String(body.subject || "Chung").trim().slice(0, 60);
@@ -1824,17 +1859,15 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const row = db.prepare("SELECT * FROM study_sets WHERE id = ? AND user_id = ?").get(setId, user.id);
 		if (!row) throw makeError(404, "Không tìm thấy bộ đề hoặc bạn không phải tác giả.");
 		const body = await readJson(request);
-		const rawKind = body.kind || body.setType;
-		const kind = rawKind ? (rawKind === "quiz" ? "quiz" : "flashcard") : row.kind;
 		const title = body.title !== undefined ? String(body.title).trim().slice(0, 120) : row.title;
 		const subject = body.subject !== undefined ? String(body.subject).trim().slice(0, 60) : row.subject;
 		const description = body.description !== undefined ? String(body.description).trim().slice(0, 400) : row.description;
 		const incomingCards = Array.isArray(body.cards) ? body.cards : (Array.isArray(body.items) ? body.items : null);
 		const cardsJson = incomingCards ? JSON.stringify(incomingCards.slice(0, 80)) : row.cards_json;
-		const rawPinned = body.pinned !== undefined ? body.pinned : body.isPinned;
-		const pinned = rawPinned !== undefined ? (rawPinned ? 1 : 0) : row.pinned;
-		db.prepare("UPDATE study_sets SET kind = ?, title = ?, subject = ?, description = ?, cards_json = ?, pinned = ?, updated_at = ? WHERE id = ?")
-			.run(kind, title || row.title, subject, description, cardsJson, pinned, new Date().toISOString(), setId);
+		const incomingPinned = body.pinned !== undefined ? body.pinned : body.isPinned;
+		const pinned = incomingPinned !== undefined ? (incomingPinned ? 1 : 0) : row.pinned;
+		db.prepare("UPDATE study_sets SET title = ?, subject = ?, description = ?, cards_json = ?, pinned = ?, updated_at = ? WHERE id = ?")
+			.run(title || row.title, subject, description, cardsJson, pinned, new Date().toISOString(), setId);
 		syncDb(db);
 		sendJson(response, 200, { studySet: serializeStudySet(db, db.prepare("SELECT * FROM study_sets WHERE id = ?").get(setId)) });
 		return;
@@ -1870,8 +1903,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 				.run(randomBytes(16).toString("hex"), setId, user.id, Math.max(0, Math.round(body.score)), Math.max(1, Math.round(body.total)), Math.max(100, Math.round(Number(body.durationMs || 1000))), new Date().toISOString());
 		}
 		syncDb(db);
-		const studySet = serializeStudySet(db, db.prepare("SELECT * FROM study_sets WHERE id = ?").get(setId));
-		sendJson(response, 200, { studySet, leaderboard: studySet?.leaderboard || [] });
+		sendJson(response, 200, { studySet: serializeStudySet(db, db.prepare("SELECT * FROM study_sets WHERE id = ?").get(setId)) });
 		return;
 	}
 
@@ -1914,20 +1946,12 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const clubStickers = clubIds.length
 			? db.prepare(`SELECT * FROM user_stickers WHERE owner_type = 'club' AND owner_id IN (${clubIds.map(() => "?").join(",")}) ORDER BY created_at DESC`).all(...clubIds)
 			: [];
-		const mapped = [...userStickers, ...clubStickers].map(s => ({
-			...s,
-			imageUrl: s.image,
-			ownerUserId: s.owner_id,
-			ownerType: s.owner_type,
-			ownerId: s.owner_id,
-			createdAt: s.created_at
-		}));
-		sendJson(response, 200, { stickers: mapped });
+		sendJson(response, 200, { stickers: [...userStickers, ...clubStickers] });
 		return;
 	}
 	if (method === "POST" && pathname === "/api/stickers") {
 		const body = await readJson(request);
-		const image = validateProfileImage(body.image || body.imageUrl, true);
+		const image = validateProfileImage(body.image, true);
 		const name = String(body.name || "Sticker").trim().slice(0, 40);
 		let ownerType = "user";
 		let ownerId = user.id;
@@ -1947,21 +1971,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const createdAt = new Date().toISOString();
 		db.prepare("INSERT INTO user_stickers(id, owner_type, owner_id, name, image, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(id, ownerType, ownerId, name, image, createdAt);
 		syncDb(db);
-		sendJson(response, 201, {
-			sticker: {
-				id,
-				owner_type: ownerType,
-				owner_id: ownerId,
-				ownerType,
-				ownerId,
-				ownerUserId: ownerId,
-				name,
-				image,
-				imageUrl: image,
-				created_at: createdAt,
-				createdAt
-			}
-		});
+		sendJson(response, 201, { sticker: { id, owner_type: ownerType, owner_id: ownerId, name, image, created_at: createdAt } });
 		return;
 	}
 	const delSticker = pathname.match(/^\/api\/stickers\/([^/]+)$/);
@@ -2116,15 +2126,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			const postRow = db.prepare("SELECT * FROM posts WHERE id = ?").get(g.target_id);
 			if (!postRow) return null;
 			const reasons = db.prepare("SELECT r.reason, r.created_at AS createdAt, u.name AS reporterName FROM reports r JOIN users u ON u.id = r.reporter_id WHERE r.target_type = 'post' AND r.target_id = ? AND r.status = 'open' ORDER BY r.created_at DESC").all(g.target_id);
-			const postObj = postForViewer(db, postRow, user.id);
-			return {
-				targetId: g.target_id,
-				reportCount: g.report_count,
-				targetTitle: `${postObj.name} (${postObj.authorEmail || "Thành viên"})`,
-				targetPreview: String(postRow.content || "").replace(/<[^>]+>/g, " ").trim().slice(0, 140),
-				post: postObj,
-				reasons
-			};
+			return { targetId: g.target_id, reportCount: g.report_count, post: postForViewer(db, postRow, user.id), reasons };
 		}).filter(Boolean);
 
 		const userReportGroups = db.prepare(`
@@ -2136,30 +2138,10 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			const uRow = db.prepare("SELECT * FROM users WHERE id = ?").get(g.target_id);
 			if (!uRow) return null;
 			const reasons = db.prepare("SELECT r.reason, r.created_at AS createdAt, u.name AS reporterName FROM reports r JOIN users u ON u.id = r.reporter_id WHERE r.target_type = 'user' AND r.target_id = ? AND r.status = 'open' ORDER BY r.created_at DESC").all(g.target_id);
-			const accObj = cleanUser(db, uRow, user.id);
-			return {
-				targetId: g.target_id,
-				reportCount: g.report_count,
-				targetTitle: `${accObj.name} (${accObj.email})`,
-				targetPreview: accObj.studentClass || "Tài khoản DIEUNW",
-				account: accObj,
-				reasons
-			};
+			return { targetId: g.target_id, reportCount: g.report_count, account: cleanUser(db, uRow, user.id), reasons };
 		}).filter(Boolean);
 
-		const rawLogs = db.prepare("SELECT * FROM moderation_audit_logs ORDER BY created_at DESC LIMIT 60").all();
-		const auditLogs = rawLogs.map(log => ({
-			...log,
-			actorId: log.actor_id,
-			actorName: log.actor_name,
-			actorEmail: log.actor_email,
-			actionLabel: log.action,
-			targetType: log.target_type,
-			targetId: log.target_id,
-			targetLabel: log.target_label,
-			detail: log.details || log.target_label || "",
-			createdAt: log.created_at
-		}));
+		const auditLogs = db.prepare("SELECT * FROM moderation_audit_logs ORDER BY created_at DESC LIMIT 60").all();
 		sendJson(response, 200, {
 			isAdmin: user.isAdmin,
 			isModerator: user.isModerator,

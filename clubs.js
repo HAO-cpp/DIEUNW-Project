@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
 	const API_BASE = "https://dieunw.onrender.com";
 	const clubsList = document.getElementById("clubs-list");
+	const clubsStatus = document.getElementById("clubs-status");
 	const requestForm = document.getElementById("club-request-form");
 	const requestStatus = document.getElementById("club-request-status");
 	const adminReviewPanel = document.getElementById("admin-review-panel");
@@ -12,20 +13,8 @@ document.addEventListener("DOMContentLoaded", () => {
 	const managersListEl = document.getElementById("club-managers-list");
 	const btnAddManager = document.getElementById("btn-add-manager");
 
-	function buildSkeletonMarkup(count = 3) {
-		if (window.DIEUNW && typeof window.DIEUNW.createSkeletonCardsHtml === "function") {
-			return window.DIEUNW.createSkeletonCardsHtml(count);
-		}
-		return Array.from({ length: count }, () => `
-			<div class="skeleton-card" aria-hidden="true">
-				<div class="skeleton-line short"></div>
-				<div class="skeleton-line"></div>
-			</div>
-		`).join("");
-	}
-
 	async function api(url, options = {}) {
-		const token = localStorage.getItem("session_token") || localStorage.getItem("dieuNwToken") || "";
+		const token = localStorage.getItem("session_token");
 		const headers = {
 			...(token ? { Authorization: `Bearer ${token}` } : {}),
 			...(options.headers || {})
@@ -94,30 +83,49 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 	});
 
-	async function toggleJoinClub(club, button) {
-		if (!currentUser) {
-			window.location.href = "./profile.html";
-			return;
+	function createJoinButtonIcon(isJoined) {
+		const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		svg.setAttribute("width", "14");
+		svg.setAttribute("height", "14");
+		svg.setAttribute("viewBox", "0 0 24 24");
+		svg.setAttribute("fill", "none");
+		svg.setAttribute("stroke", "currentColor");
+		svg.setAttribute("stroke-width", "2.4");
+		svg.setAttribute("stroke-linecap", "round");
+		svg.setAttribute("stroke-linejoin", "round");
+		svg.setAttribute("aria-hidden", "true");
+		if (isJoined) {
+			const poly = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+			poly.setAttribute("points", "20 6 9 17 4 12");
+			svg.appendChild(poly);
+		} else {
+			const p1 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+			p1.setAttribute("x1", "12"); p1.setAttribute("y1", "5"); p1.setAttribute("x2", "12"); p1.setAttribute("y2", "19");
+			const p2 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+			p2.setAttribute("x1", "5"); p2.setAttribute("y1", "12"); p2.setAttribute("x2", "19"); p2.setAttribute("y2", "12");
+			svg.appendChild(p1);
+			svg.appendChild(p2);
 		}
-		const isMember = Boolean(club.isMember);
-		button.disabled = true;
-		try {
-			await api(`/api/clubs/${encodeURIComponent(club.id)}/join`, {
-				method: isMember ? "DELETE" : "POST",
-				headers: { "Content-Type": "application/json" },
-				body: isMember ? undefined : "{}"
-			});
-			await loadClubs();
-		} catch (error) {
-			document.getElementById("clubs-status").textContent = error.message;
-			button.disabled = false;
+		return svg;
+	}
+
+	function updateJoinButtonState(btn, memberPill, club) {
+		btn.classList.toggle("is-joined", Boolean(club.isMember));
+		btn.setAttribute("aria-pressed", String(Boolean(club.isMember)));
+		btn.title = club.isMember ? "Nhấn để rời CLB" : "Tham gia CLB này";
+		btn.replaceChildren(
+			createJoinButtonIcon(club.isMember),
+			element("span", "btn-club-join-label", club.isMember ? "Đã tham gia" : "Tham gia CLB")
+		);
+		if (memberPill) {
+			memberPill.textContent = `${Number(club.memberCount || 0)} thành viên`;
 		}
 	}
 
 	function renderClub(club) {
 		const card = element("article", "club-card");
-		card.style.cursor = "pointer";
-		card.addEventListener("click", () => {
+		card.addEventListener("click", ev => {
+			if (ev.target.closest("button, a")) return;
 			window.location.href = `./profile.html?clubId=${encodeURIComponent(club.id)}`;
 		});
 
@@ -126,42 +134,67 @@ document.addEventListener("DOMContentLoaded", () => {
 			const logo = element("img", "club-card-logo");
 			logo.src = club.logo;
 			logo.alt = `Logo ${club.name}`;
-			logo.loading = "lazy";
 			brand.append(logo);
 		} else {
 			brand.append(element("span", "club-card-monogram", club.name.slice(0, 1).toUpperCase()));
 		}
 
-		const managersText = Array.isArray(club.managerEmails) && club.managerEmails.length
+		const managersText = Array.isArray(club.managerEmails)
 			? club.managerEmails.join(", ")
-			: (club.manager?.name || club.managerEmail || "Ban chủ nhiệm");
+			: (club.manager?.name || club.managerEmail);
 
 		const identity = element("div", "club-card-identity");
 		identity.append(element("h3", "", club.name), element("p", "", managersText));
 		brand.append(identity);
 		card.append(brand);
 
-		const footer = element("div", "club-card-footer");
-		footer.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px;";
-
 		const managerTag = element("span", "club-manager-tag", `Quản lý · ${managersText}`);
-		managerTag.style.marginTop = "0";
 		managerTag.style.setProperty("--club-color", club.tagColor || "#1769aa");
+		card.append(managerTag);
 
-		const joinBtn = element(
-			"button",
-			club.isMember ? "club-join-btn joined" : "club-join-btn",
-			club.isMember
-				? `✓ Đã tham gia${club.membersCount ? ` (${club.membersCount})` : ""}`
-				: `+ Tham gia CLB${club.membersCount ? ` (${club.membersCount})` : ""}`
-		);
+		// Footer: Member count + Fanpage link + Redesigned DIEUNW Theme Join button
+		const footer = element("div", "club-card-footer");
+		const memberPill = element("span", "club-member-pill", `${Number(club.memberCount || 0)} thành viên`);
+
+		const actions = element("div", "club-card-actions");
+		const fanpageLink = element("a", "club-fanpage-link", "Fanpage ↗");
+		fanpageLink.href = `./profile.html?clubId=${encodeURIComponent(club.id)}`;
+		fanpageLink.addEventListener("click", ev => ev.stopPropagation());
+
+		const joinBtn = element("button", "btn-club-join");
 		joinBtn.type = "button";
-		joinBtn.addEventListener("click", event => {
-			event.stopPropagation();
-			toggleJoinClub(club, joinBtn);
+		updateJoinButtonState(joinBtn, memberPill, club);
+
+		joinBtn.addEventListener("click", async ev => {
+			ev.preventDefault();
+			ev.stopPropagation();
+			if (!currentUser) {
+				if (clubsStatus) clubsStatus.textContent = "Vui lòng đăng nhập ở Trang cá nhân trước khi tham gia CLB.";
+				return;
+			}
+			const nextJoined = !club.isMember;
+			joinBtn.disabled = true;
+			try {
+				await api(`/api/clubs/${encodeURIComponent(club.id)}/join`, {
+					method: nextJoined ? "POST" : "DELETE"
+				});
+				club.isMember = nextJoined;
+				club.memberCount = Math.max(0, Number(club.memberCount || 0) + (nextJoined ? 1 : -1));
+				updateJoinButtonState(joinBtn, memberPill, club);
+				if (clubsStatus) {
+					clubsStatus.textContent = nextJoined
+						? `Bạn đã tham gia ${club.name}!`
+						: `Bạn đã rời khỏi ${club.name}.`;
+				}
+			} catch (error) {
+				if (clubsStatus) clubsStatus.textContent = error.message;
+			} finally {
+				joinBtn.disabled = false;
+			}
 		});
 
-		footer.append(managerTag, joinBtn);
+		actions.append(fanpageLink, joinBtn);
+		footer.append(memberPill, actions);
 		card.append(footer);
 		return card;
 	}
@@ -169,9 +202,9 @@ document.addEventListener("DOMContentLoaded", () => {
 	function renderReview(club) {
 		const item = element("article", "club-review-item");
 		const details = element("div", "club-review-details");
-		const managersText = Array.isArray(club.managerEmails) && club.managerEmails.length
+		const managersText = Array.isArray(club.managerEmails)
 			? club.managerEmails.join(", ")
-			: (club.manager?.name || club.managerEmail || "");
+			: (club.manager?.name || club.managerEmail);
 
 		details.append(element("h3", "", club.name), element("p", "", `Quản lý: ${managersText}`));
 		if (club.logo) {
@@ -195,7 +228,7 @@ document.addEventListener("DOMContentLoaded", () => {
 					});
 					await loadClubs();
 				} catch (error) {
-					document.getElementById("clubs-status").textContent = error.message;
+					if (clubsStatus) clubsStatus.textContent = error.message;
 					button.disabled = false;
 				}
 			});
@@ -219,8 +252,8 @@ document.addEventListener("DOMContentLoaded", () => {
 			if (!pending.length) reviewList.append(element("p", "clubs-empty", "Không có yêu cầu đang chờ."));
 		}
 		const ownRequest = clubs.find(club => club.requestedById === currentUser?.id && club.status !== "approved");
-		if (ownRequest) {
-			document.getElementById("clubs-status").textContent = ownRequest.status === "pending"
+		if (ownRequest && clubsStatus) {
+			clubsStatus.textContent = ownRequest.status === "pending"
 				? `Yêu cầu “${ownRequest.name}” đang chờ admin xác nhận.`
 				: `Yêu cầu “${ownRequest.name}” chưa được duyệt.`;
 		}
@@ -228,7 +261,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 	const logoInput = document.getElementById("club-logo");
 	const logoPreview = document.getElementById("club-logo-preview");
-	logoInput.addEventListener("change", () => {
+	logoInput?.addEventListener("change", () => {
 		const file = logoInput.files?.[0];
 		if (logoPreview.dataset.objectUrl) {
 			URL.revokeObjectURL(logoPreview.dataset.objectUrl);
@@ -252,11 +285,11 @@ document.addEventListener("DOMContentLoaded", () => {
 	});
 
 	const colorInput = document.getElementById("club-tag-color");
-	colorInput.addEventListener("input", () => {
+	colorInput?.addEventListener("input", () => {
 		document.getElementById("club-color-value").textContent = colorInput.value.toUpperCase();
 	});
 
-	requestForm.addEventListener("submit", async event => {
+	requestForm?.addEventListener("submit", async event => {
 		event.preventDefault();
 		if (!managerEmails.length) {
 			requestStatus.textContent = "Vui lòng thêm ít nhất 1 email quản lý.";
@@ -268,14 +301,12 @@ document.addEventListener("DOMContentLoaded", () => {
 		try {
 			let logo = "";
 			const file = logoInput.files?.[0];
-			if (file) {
-				logo = await new Promise((resolve, reject) => {
-					const reader = new FileReader();
-					reader.onload = () => resolve(reader.result);
-					reader.onerror = () => reject(new Error("Không đọc được ảnh logo."));
-					reader.readAsDataURL(file);
-				});
-			}
+			if (file) logo = await new Promise((resolve, reject) => {
+				const reader = new FileReader();
+				reader.onload = () => resolve(reader.result);
+				reader.onerror = () => reject(new Error("Không đọc được ảnh logo."));
+				reader.readAsDataURL(file);
+			});
 			const data = await api("/api/clubs", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -301,10 +332,9 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 	});
 
-	clubsList.innerHTML = buildSkeletonMarkup(3);
-	Promise.all([api("/api/auth/me").catch(() => ({ user: null })), api("/api/clubs")])
+	Promise.all([api("/api/auth/me"), api("/api/clubs")])
 		.then(([auth]) => {
-			currentUser = auth?.user || null;
+			currentUser = auth.user;
 			if (currentUser) {
 				requestForm.hidden = false;
 				if (!managerEmails.includes(currentUser.email)) {
@@ -317,7 +347,6 @@ document.addEventListener("DOMContentLoaded", () => {
 			return loadClubs();
 		})
 		.catch(error => {
-			clubsList.replaceChildren();
-			document.getElementById("clubs-status").textContent = error.message;
+			if (clubsStatus) clubsStatus.textContent = error.message;
 		});
 });

@@ -1,27 +1,22 @@
 document.addEventListener("DOMContentLoaded", () => {
 	const API_BASE = "https://dieunw.onrender.com";
 	const POSTS_API = `${API_BASE}/api/posts`;
-	const BOOKMARKS_API = `${API_BASE}/api/bookmarks`;
-
-	function getToken() {
-		const userObj = (() => {
-			try {
-				return JSON.parse(localStorage.getItem("dieuNwUser") || "{}");
-			} catch {
-				return {};
-			}
-		})();
-		return (
-			localStorage.getItem("session_token") ||
-			localStorage.getItem("dieuNwToken") ||
-			userObj.token ||
-			""
-		);
-	}
 
 	function getAuthHeaders(extra = {}) {
-		const token = getToken();
-		return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra };
+		let storedUser = {};
+		try {
+			storedUser = JSON.parse(localStorage.getItem("dieuNwUser") || "{}");
+		} catch {
+			storedUser = {};
+		}
+		const token = localStorage.getItem("session_token")
+			|| localStorage.getItem("dieuNwToken")
+			|| storedUser.token
+			|| "";
+		return {
+			...(token ? { Authorization: `Bearer ${token}` } : {}),
+			...extra
+		};
 	}
 
 	function getCurrentUser() {
@@ -37,18 +32,18 @@ document.addEventListener("DOMContentLoaded", () => {
 		"Thường": ["Toán", "Văn", "Anh", "Tin", "Hóa", "Lý", "Sinh", "Địa", "Công nghệ", "Kinh tế và pháp luật", "Quốc phòng", "Thể chất"]
 	};
 
-	const subjectImageBases = {
-		"Toán": "./Math",
-		"Văn": "./Literature",
-		"Anh": "./English",
-		"Tin": "./Informatics",
-		"Hóa": "./Chemistry",
-		"Lý": "./Physics",
-		"Sinh": "./Biology",
-		"Địa": "./Geography",
-		"Sử": "./History",
-		"Công nghệ": "./Technology",
-		"Kinh tế và pháp luật": "./Economics and law"
+	const subjectImages = {
+		"Toán": "./Math.png",
+		"Văn": "./Literature.png",
+		"Anh": "./English.png",
+		"Tin": "./Informatics.png",
+		"Hóa": "./Chemistry.png",
+		"Lý": "./Physics.png",
+		"Sinh": "./Biology.png",
+		"Địa": "./Geography.png",
+		"Sử": "./History.png",
+		"Công nghệ": "./Technology.png",
+		"Kinh tế và pháp luật": "./Economics and law.png"
 	};
 
 	const selection = { grade: "", track: "Chuyên", subject: "" };
@@ -68,34 +63,43 @@ document.addEventListener("DOMContentLoaded", () => {
 	const previousSubjectPage = document.getElementById("subject-page-previous");
 	const nextSubjectPage = document.getElementById("subject-page-next");
 	const resourceList = document.getElementById("resource-list");
+	const filterTrack = document.getElementById("filter-track");
+	const filterSubject = document.getElementById("filter-subject");
+	const filterGrade = document.getElementById("filter-grade");
 	const resourceForm = document.getElementById("resource-form");
 	const resourceMessage = document.getElementById("resource-message");
 	const resourceSubmit = document.getElementById("resource-submit");
 	const coverColorInput = document.getElementById("resource-cover-color");
 	const coverColorLabel = document.querySelector(".color-picker-label");
 
-	// Book Reader Elements
+	const fileBox = document.getElementById("resource-file-box");
+	const fileInput = document.getElementById("resource-file");
+	const fileNameLabel = document.getElementById("resource-file-name");
+	const fileClearBtn = document.getElementById("resource-file-clear");
+
+	// Book Reader Modal elements
 	const readerOverlay = document.getElementById("book-reader-overlay");
+	const readerModal = document.getElementById("book-reader-modal");
+	const readerEyebrow = document.getElementById("reader-meta-eyebrow");
+	const readerTitle = document.getElementById("reader-book-title");
+	const readerSpread = document.getElementById("book-spread");
+	const pageLeftEl = document.getElementById("book-page-left");
+	const pageRightEl = document.getElementById("book-page-right");
+	const flipPrevBtn = document.getElementById("book-flip-prev");
+	const flipNextBtn = document.getElementById("book-flip-next");
+	const pageIndicator = document.getElementById("book-page-indicator");
+	const bookmarkBtn = document.getElementById("book-bookmark-btn");
+	const downloadBtn = document.getElementById("book-download-btn");
+	const openLinkBtn = document.getElementById("book-open-link-btn");
+	const deleteBtn = document.getElementById("book-delete-btn");
 	const readerCloseBtn = document.getElementById("book-reader-close");
-	const readerMetaEyebrow = document.getElementById("reader-meta-eyebrow");
-	const readerBookTitle = document.getElementById("reader-book-title");
-	const bookSpread = document.getElementById("book-spread");
-	const bookPageLeft = document.getElementById("book-page-left");
-	const bookPageRight = document.getElementById("book-page-right");
-	const bookFlipPrev = document.getElementById("book-flip-prev");
-	const bookFlipNext = document.getElementById("book-flip-next");
-	const bookPageIndicator = document.getElementById("book-page-indicator");
-	const bookBookmarkBtn = document.getElementById("book-bookmark-btn");
-	const bookDownloadBtn = document.getElementById("book-download-btn");
-	const bookOpenLinkBtn = document.getElementById("book-open-link-btn");
-	const bookDeleteBtn = document.getElementById("book-delete-btn");
 
 	let resources = [];
-	let bookmarkedIds = new Set();
-	let activeReaderBook = null;
-	let readerSpreads = [];
-	let currentSpreadIndex = 0;
+	let activeBook = null;
+	let readerPages = [];
+	let readerSpreadIndex = 0;
 
+	// Tabs
 	groupTabs.forEach(tab => {
 		tab.addEventListener("click", () => {
 			const targetId = tab.dataset.panel;
@@ -117,6 +121,71 @@ document.addEventListener("DOMContentLoaded", () => {
 		});
 	}
 
+	// File Upload Picker (click anywhere in box or on label, drag & drop, clear)
+	function formatFileSize(bytes) {
+		const size = Number(bytes || 0);
+		if (!size) return "";
+		if (size < 1024) return `${size} B`;
+		if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+		return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+	}
+
+	function syncSelectedFileUi() {
+		if (!fileInput || !fileNameLabel || !fileClearBtn) return;
+		const file = fileInput.files?.[0];
+		if (file) {
+			const sizeStr = formatFileSize(file.size);
+			fileNameLabel.textContent = sizeStr ? `${file.name} (${sizeStr})` : file.name;
+			fileNameLabel.title = file.name;
+			fileClearBtn.hidden = false;
+		} else {
+			fileNameLabel.textContent = "Chưa chọn tệp nào";
+			fileNameLabel.title = "";
+			fileClearBtn.hidden = true;
+		}
+	}
+
+	if (fileInput) {
+		fileInput.addEventListener("change", syncSelectedFileUi);
+	}
+
+	if (fileClearBtn && fileInput) {
+		fileClearBtn.addEventListener("click", ev => {
+			ev.preventDefault();
+			ev.stopPropagation();
+			fileInput.value = "";
+			syncSelectedFileUi();
+		});
+	}
+
+	if (fileBox && fileInput) {
+		fileBox.addEventListener("click", ev => {
+			if (ev.target.closest("#resource-file-clear") || ev.target.closest("label")) return;
+			fileInput.click();
+		});
+		fileBox.addEventListener("dragover", ev => {
+			ev.preventDefault();
+			fileBox.classList.add("is-dragover");
+		});
+		fileBox.addEventListener("dragleave", () => {
+			fileBox.classList.remove("is-dragover");
+		});
+		fileBox.addEventListener("drop", ev => {
+			ev.preventDefault();
+			fileBox.classList.remove("is-dragover");
+			const dropped = ev.dataTransfer?.files?.[0];
+			if (!dropped) return;
+			try {
+				const dt = new DataTransfer();
+				dt.items.add(dropped);
+				fileInput.files = dt.files;
+				syncSelectedFileUi();
+			} catch {
+				// Fallback if DataTransfer constructor blocked
+			}
+		});
+	}
+
 	function escapeHtml(value) {
 		return String(value ?? "").replace(/[&<>"']/g, ch => ({
 			"&": "&amp;",
@@ -135,36 +204,41 @@ document.addEventListener("DOMContentLoaded", () => {
 		return "";
 	}
 
-	function buildSkeletonMarkup(count = 3) {
-		if (window.DIEUNW && typeof window.DIEUNW.createSkeletonCardsHtml === "function") {
-			return window.DIEUNW.createSkeletonCardsHtml(count);
-		}
-		return Array.from({ length: count }, () => `
-			<div class="skeleton-card" aria-hidden="true">
-				<div class="skeleton-line short"></div>
-				<div class="skeleton-line"></div>
-				<div class="skeleton-line medium"></div>
-			</div>
-		`).join("");
+	function buildDownloadUrl(fileUrl, fileName) {
+		const safe = safeResourceUrl(fileUrl);
+		if (!safe) return "";
+		try {
+			const parsed = new URL(safe);
+			if (parsed.origin === API_BASE) {
+				parsed.searchParams.set("download", "1");
+				if (fileName) parsed.searchParams.set("name", fileName);
+				return parsed.toString();
+			}
+		} catch {}
+		return safe;
 	}
 
-	function createSubjectPicture(basePath) {
-		const picture = document.createElement("picture");
-		const srcAvif = document.createElement("source");
-		srcAvif.srcset = `${basePath}.avif`;
-		srcAvif.type = "image/avif";
-
-		const srcWebp = document.createElement("source");
-		srcWebp.srcset = `${basePath}.webp`;
-		srcWebp.type = "image/webp";
-
-		const img = document.createElement("img");
-		img.src = `${basePath}.png`;
-		img.alt = "";
-		img.loading = "lazy";
-
-		picture.append(srcAvif, srcWebp, img);
-		return picture;
+	async function triggerResourceDownload(fileUrl, fileName) {
+		const dlUrl = buildDownloadUrl(fileUrl, fileName);
+		if (!dlUrl) return;
+		try {
+			const res = await fetch(dlUrl, { credentials: "include" });
+			if (!res.ok) {
+				const errJson = await res.json().catch(() => ({}));
+				throw new Error(errJson.error || "Không tìm thấy tệp trên máy chủ.");
+			}
+			const blob = await res.blob();
+			const blobUrl = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = blobUrl;
+			a.download = fileName || "tai-lieu-dieunw";
+			document.body.appendChild(a);
+			a.click();
+			a.remove();
+			setTimeout(() => URL.revokeObjectURL(blobUrl), 15000);
+		} catch (err) {
+			alert(err.message || "Không thể tải tệp tài liệu này. Có thể tệp đã bị xóa khỏi bộ nhớ tạm máy chủ.");
+		}
 	}
 
 	function updateSelectionSummary() {
@@ -195,8 +269,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 	function renderSubjectOptions() {
 		subjectOptions.replaceChildren();
-		const subjects = tracks[pendingTrack] || [];
-		const pageCount = Math.max(1, Math.ceil(subjects.length / 6));
+		const subjects = tracks[pendingTrack];
+		const pageCount = Math.ceil(subjects.length / 6);
 		const pageSubjects = subjects.slice(subjectPage * 6, subjectPage * 6 + 6);
 		Array.from({ length: 6 }, (_, index) => pageSubjects[index]).forEach(subject => {
 			const button = document.createElement("button");
@@ -205,8 +279,11 @@ document.addEventListener("DOMContentLoaded", () => {
 			const imageSlot = document.createElement("span");
 			imageSlot.className = "subject-tile-image";
 			imageSlot.setAttribute("aria-hidden", "true");
-			if (subject && subjectImageBases[subject]) {
-				imageSlot.appendChild(createSubjectPicture(subjectImageBases[subject]));
+			if (subjectImages[subject]) {
+				const image = document.createElement("img");
+				image.src = subjectImages[subject];
+				image.alt = "";
+				imageSlot.appendChild(image);
 			}
 			button.appendChild(imageSlot);
 			if (subject) {
@@ -241,7 +318,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	subjectPickerButton.addEventListener("click", () => {
 		pendingTrack = selection.track;
 		pendingSubject = selection.subject;
-		const selectedIndex = (tracks[pendingTrack] || []).indexOf(pendingSubject);
+		const selectedIndex = tracks[pendingTrack].indexOf(pendingSubject);
 		subjectPage = selectedIndex < 0 ? 0 : Math.floor(selectedIndex / 6);
 		document.querySelectorAll(".subject-track-button").forEach(button => {
 			const active = button.dataset.track === pendingTrack;
@@ -254,11 +331,18 @@ document.addEventListener("DOMContentLoaded", () => {
 		(subjectOptions.querySelector('[aria-pressed="true"]') || subjectOptions.querySelector(".subject-option"))?.focus();
 	});
 
-	document.getElementById("subject-modal-close").addEventListener("click", closeSubjectPicker);
-	document.getElementById("subject-modal-cancel").addEventListener("click", closeSubjectPicker);
-	subjectModal.addEventListener("click", event => {
+	document.getElementById("subject-modal-close")?.addEventListener("click", closeSubjectPicker);
+	document.getElementById("subject-modal-cancel")?.addEventListener("click", closeSubjectPicker);
+	subjectModal?.addEventListener("click", event => {
 		if (event.target === subjectModal) closeSubjectPicker();
 	});
+	document.addEventListener("keydown", event => {
+		if (event.key === "Escape") {
+			if (!subjectModal.hidden) closeSubjectPicker();
+			else if (readerOverlay && !readerOverlay.hidden) closeBookReader();
+		}
+	});
+
 	subjectModalConfirm.addEventListener("click", () => {
 		if (!pendingSubject) return;
 		selection.track = pendingTrack;
@@ -270,7 +354,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	document.querySelectorAll(".subject-track-button").forEach(button => {
 		button.addEventListener("click", () => {
 			pendingTrack = button.dataset.track;
-			if (!(tracks[pendingTrack] || []).includes(pendingSubject)) pendingSubject = "";
+			if (!tracks[pendingTrack].includes(pendingSubject)) pendingSubject = "";
 			subjectPage = 0;
 			document.querySelectorAll(".subject-track-button").forEach(item => {
 				const active = item === button;
@@ -281,14 +365,14 @@ document.addEventListener("DOMContentLoaded", () => {
 		});
 	});
 
-	previousSubjectPage.addEventListener("click", () => {
+	previousSubjectPage?.addEventListener("click", () => {
 		if (subjectPage > 0) {
 			subjectPage--;
 			renderSubjectOptions();
 		}
 	});
-	nextSubjectPage.addEventListener("click", () => {
-		if ((subjectPage + 1) * 6 < (tracks[pendingTrack] || []).length) {
+	nextSubjectPage?.addEventListener("click", () => {
+		if ((subjectPage + 1) * 6 < tracks[pendingTrack].length) {
 			subjectPage++;
 			renderSubjectOptions();
 		}
@@ -306,261 +390,225 @@ document.addEventListener("DOMContentLoaded", () => {
 		return trackOrder * 100 + (subIndex >= 0 ? subIndex : 99);
 	}
 
-	function splitTextToChunks(text, maxChars = 540) {
-		const clean = String(text || "").trim();
-		if (!clean) return [];
-		const paragraphs = clean.split(/\n+/).map(p => p.trim()).filter(Boolean);
+	// =========================================================
+	// BOOK READER MODAL (3D SHELF + PAGE FLIP + DOWNLOAD + BOOKMARK)
+	// =========================================================
+	function buildBookPages(post) {
+		const desc = String(post.resource_description || post.description || "").trim() || "Tài liệu do bạn học chia sẻ trên thư viện DIEUNW.";
+		const chunkSize = 420;
 		const chunks = [];
-		let buffer = "";
-		for (const para of paragraphs) {
-			if (para.length > maxChars) {
-				if (buffer) {
-					chunks.push(buffer);
-					buffer = "";
-				}
-				for (let i = 0; i < para.length; i += maxChars) {
-					chunks.push(para.slice(i, i + maxChars));
-				}
-				continue;
-			}
-			if (!buffer) {
-				buffer = para;
-			} else if (buffer.length + 1 + para.length <= maxChars) {
-				buffer += "\n\n" + para;
-			} else {
-				chunks.push(buffer);
-				buffer = para;
-			}
+		for (let i = 0; i < desc.length; i += chunkSize) {
+			chunks.push(desc.slice(i, i + chunkSize));
 		}
-		if (buffer) chunks.push(buffer);
-		return chunks;
-	}
+		if (!chunks.length) chunks.push("");
 
-	function buildReaderSpreads(post) {
-		const title = post.resource_title || "Tài liệu học tập";
-		const desc = post.resource_description || post.description || "";
-		const grade = post.resource_grade ? `Khối ${post.resource_grade}` : "Tất cả khối";
-		const track = post.resource_track || "Chung";
-		const subject = post.resource_subject || "Tổng hợp";
-		const safeFileUrl = safeResourceUrl(post.resource_file_url);
-		const safeLink = safeResourceUrl(post.resource_link);
-		const fileName = post.resource_file_name || "";
-		const fileType = post.resource_file_type || "";
-		const authorName = post.name || post.authorName || "Dieuer Ẩn Danh";
-		const createdText = displayDate(post.createdAt);
-
-		const descChunks = splitTextToChunks(desc, 480);
-		const firstChunk = descChunks.shift() || "Người chia sẻ chưa viết mô tả chi tiết cho tài liệu này.";
-
-		const coverLeftHtml = `
-			<div class="page-content">
-				<span class="book-page-tag">${escapeHtml(grade)} · ${escapeHtml(track)} · ${escapeHtml(subject)}</span>
-				<h2>${escapeHtml(title)}</h2>
-				<p class="page-info">Đăng bởi: <strong>${escapeHtml(authorName)}</strong> · ${escapeHtml(createdText)}</p>
-				<div class="page-desc">${escapeHtml(firstChunk).replace(/\n/g, "<br>")}</div>
-			</div>
-		`;
-
-		const attachmentRightHtml = `
-			<div class="page-content">
-				<h2>Tệp &amp; Liên kết</h2>
-				${fileName && safeFileUrl
-					? `<p><strong>Tệp đính kèm:</strong> ${escapeHtml(fileName)}${fileType ? ` (${escapeHtml(fileType)})` : ""}</p>
-					   <p><a href="${escapeHtml(safeFileUrl)}" class="page-link" download="${escapeHtml(fileName)}" target="_blank" rel="noopener noreferrer">⬇ Tải tệp tài liệu</a></p>`
-					: `<p class="text-muted">Không có tệp tải lên trực tiếp.</p>`}
-				${safeLink
-					? `<p><strong>Liên kết ngoài:</strong></p>
-					   <p><a href="${escapeHtml(safeLink)}" class="page-link" target="_blank" rel="noopener noreferrer">↗ Mở liên kết tài liệu</a></p>`
-					: `<p class="text-muted">Không có liên kết ngoài đính kèm.</p>`}
-				<hr style="border:none;border-top:1px dashed rgba(23,56,83,0.16);margin:14px 0;">
-				<p class="text-muted">Mẹo: Bấm nút <strong>☆ Lưu tài liệu</strong> bên dưới để lưu về mục Tài liệu đã lưu trong trang cá nhân của bạn.</p>
-			</div>
-		`;
-
-		const spreads = [{ left: coverLeftHtml, right: attachmentRightHtml }];
-
-		while (descChunks.length > 0) {
-			const leftChunk = descChunks.shift();
-			const rightChunk = descChunks.shift() || "";
-			spreads.push({
-				left: `
-					<div class="page-content">
-						<h3>Nội dung chi tiết (tiếp)</h3>
-						<div class="page-desc">${escapeHtml(leftChunk).replace(/\n/g, "<br>")}</div>
-					</div>
-				`,
-				right: rightChunk
-					? `
-						<div class="page-content">
-							<h3>Nội dung chi tiết (tiếp)</h3>
-							<div class="page-desc">${escapeHtml(rightChunk).replace(/\n/g, "<br>")}</div>
-						</div>
-					`
-					: `
-						<div class="page-content">
-							<h3>Hết phần mô tả</h3>
-							<p class="text-muted">Bạn có thể dùng nút tải tệp hoặc mở liên kết ở thanh công cụ bên dưới để xem toàn bộ tài liệu gốc.</p>
-						</div>
-					`
+		const pages = [];
+		// Page 1: Cover / Overview & first text chunk
+		pages.push({
+			type: "overview",
+			text: chunks[0]
+		});
+		// Middle text pages (if long description)
+		for (let i = 1; i < chunks.length; i++) {
+			pages.push({
+				type: "text",
+				text: chunks[i]
 			});
 		}
-
-		return spreads;
-	}
-
-	function updateReaderBookmarkUI() {
-		if (!activeReaderBook || !bookBookmarkBtn) return;
-		const saved = bookmarkedIds.has(String(activeReaderBook.id));
-		bookBookmarkBtn.textContent = saved ? "★ Đã lưu tài liệu" : "☆ Lưu tài liệu";
-		bookBookmarkBtn.classList.toggle("saved", saved);
-		bookBookmarkBtn.setAttribute("aria-pressed", String(saved));
-	}
-
-	function renderCurrentSpread(direction = "") {
-		if (!readerSpreads.length) return;
-		const spread = readerSpreads[currentSpreadIndex];
-		if (direction && bookSpread) {
-			bookSpread.classList.remove("flip-next", "flip-prev");
-			void bookSpread.offsetWidth;
-			bookSpread.classList.add(direction === "next" ? "flip-next" : "flip-prev");
-			setTimeout(() => bookSpread.classList.remove("flip-next", "flip-prev"), 280);
+		// Final attachments & author info page
+		pages.push({
+			type: "attachments"
+		});
+		if (pages.length % 2 !== 0) {
+			// Ensure even spreads when needed
+			pages.splice(pages.length - 1, 0, {
+				type: "note",
+				text: "Chúc bạn ôn tập hiệu quả cùng cộng đồng học tập DIEUNW NQD!"
+			});
 		}
-		bookPageLeft.innerHTML = spread.left;
-		bookPageRight.innerHTML = spread.right;
+		return pages;
+	}
 
-		const totalPages = readerSpreads.length * 2;
-		const leftNum = currentSpreadIndex * 2 + 1;
-		const rightNum = leftNum + 1;
-		bookPageIndicator.textContent = `Trang ${leftNum}-${rightNum} / ${totalPages}`;
-		bookFlipPrev.disabled = currentSpreadIndex <= 0;
-		bookFlipNext.disabled = currentSpreadIndex >= readerSpreads.length - 1;
+	function renderReaderPageHtml(pageObj, pageNumber, post) {
+		if (!pageObj) {
+			return `<div class="book-page-num">Trang ${pageNumber}</div>`;
+		}
+		const safeFileUrl = safeResourceUrl(post.resource_file_url);
+		const safeLink = safeResourceUrl(post.resource_link);
+		const fileName = post.resource_file_name || "tai-lieu-dinh-kem";
+		const fileType = post.resource_file_type || "";
+
+		if (pageObj.type === "overview") {
+			return `
+				<div class="book-meta-badges">
+					<span class="book-meta-badge">Khối ${escapeHtml(post.resource_grade || "?")}</span>
+					<span class="book-meta-badge">${escapeHtml(post.resource_track || "Chung")}</span>
+					<span class="book-meta-badge">${escapeHtml(post.resource_subject || "Tổng hợp")}</span>
+				</div>
+				<h3 style="font-size:18px; color:#173853;">${escapeHtml(post.resource_title || "Tài liệu học tập")}</h3>
+				<p class="book-page-text">${escapeHtml(pageObj.text)}</p>
+				<div class="book-page-num">Trang ${pageNumber}</div>
+			`;
+		}
+
+		if (pageObj.type === "attachments") {
+			return `
+				<h3 style="font-size:17px; color:#173853;">Tệp &amp; Liên kết đính kèm</h3>
+				<div class="book-resource-box">
+					${safeFileUrl ? `
+						<div>
+							<p style="font-size:13px; font-weight:700; color:#173853;">📄 ${escapeHtml(fileName)}${fileType ? ` (${escapeHtml(fileType)})` : ""}</p>
+							<button type="button" class="book-action-link js-reader-inline-download" style="margin-top:8px;">⬇ Tải tệp tài liệu</button>
+						</div>
+					` : `<p style="font-size:13px; color:#6b8195;">Không có tệp tải lên trực tiếp.</p>`}
+					${safeLink ? `
+						<div style="padding-top:6px; border-top:1px dashed #e0e8f0;">
+							<p style="font-size:12.5px; color:#526b80; margin-bottom:6px; word-break:break-all;">🔗 ${escapeHtml(safeLink)}</p>
+							<a href="${escapeHtml(safeLink)}" class="book-action-link secondary" target="_blank" rel="noopener noreferrer">↗ Mở liên kết tài liệu</a>
+						</div>
+					` : ""}
+				</div>
+				<p style="font-size:12.5px; color:#5c6f82; margin-top:6px;">
+					<strong>Người chia sẻ:</strong> ${escapeHtml(post.name || "Thành viên NQD")}<br>
+					<strong>Thời gian:</strong> ${escapeHtml(displayDate(post.createdAt))}
+				</p>
+				<div class="book-page-num">Trang ${pageNumber}</div>
+			`;
+		}
+
+		return `
+			<p class="book-page-text">${escapeHtml(pageObj.text)}</p>
+			<div class="book-page-num">Trang ${pageNumber}</div>
+		`;
+	}
+
+	function renderReaderSpread(direction = "") {
+		if (!activeBook) return;
+		const totalSpreads = Math.max(1, Math.ceil(readerPages.length / 2));
+		readerSpreadIndex = Math.max(0, Math.min(readerSpreadIndex, totalSpreads - 1));
+		const leftIdx = readerSpreadIndex * 2;
+		const rightIdx = leftIdx + 1;
+
+		pageLeftEl.innerHTML = renderReaderPageHtml(readerPages[leftIdx], leftIdx + 1, activeBook);
+		pageRightEl.innerHTML = renderReaderPageHtml(readerPages[rightIdx], rightIdx + 1, activeBook);
+
+		pageRightEl.querySelectorAll(".js-reader-inline-download").forEach(btn => {
+			btn.addEventListener("click", () => {
+				triggerResourceDownload(activeBook.resource_file_url, activeBook.resource_file_name);
+			});
+		});
+		pageLeftEl.querySelectorAll(".js-reader-inline-download").forEach(btn => {
+			btn.addEventListener("click", () => {
+				triggerResourceDownload(activeBook.resource_file_url, activeBook.resource_file_name);
+			});
+		});
+
+		const leftNum = leftIdx + 1;
+		const rightNum = Math.min(readerPages.length, rightIdx + 1);
+		pageIndicator.textContent = `Trang ${leftNum}-${rightNum} / ${readerPages.length}`;
+		flipPrevBtn.disabled = readerSpreadIndex === 0;
+		flipNextBtn.disabled = readerSpreadIndex >= totalSpreads - 1;
+
+		if (direction && readerSpread) {
+			readerSpread.classList.remove("flip-next", "flip-prev");
+			void readerSpread.offsetWidth;
+			readerSpread.classList.add(direction === "next" ? "flip-next" : "flip-prev");
+		}
 	}
 
 	function openBookReader(post) {
-		activeReaderBook = post;
-		readerSpreads = buildReaderSpreads(post);
-		currentSpreadIndex = 0;
+		activeBook = post;
+		readerPages = buildBookPages(post);
+		readerSpreadIndex = 0;
 
-		const grade = post.resource_grade ? `Khối ${post.resource_grade}` : "Tất cả khối";
-		const track = post.resource_track || "Chung";
-		const subject = post.resource_subject || "Tài liệu";
-		readerMetaEyebrow.textContent = `${grade} · ${track} · ${subject}`.toUpperCase();
-		readerBookTitle.textContent = post.resource_title || "Tài liệu học tập";
+		const coverColor = post.resource_cover_color || "#1769aa";
+		if (readerModal) readerModal.style.setProperty("--book-color", coverColor);
+		if (readerEyebrow) {
+			readerEyebrow.textContent = `KHỐI ${post.resource_grade || "?"} · ${post.resource_track || ""} · ${post.resource_subject || "TÀI LIỆU"}`;
+		}
+		if (readerTitle) readerTitle.textContent = post.resource_title || "Tài liệu học tập";
 
 		const safeFileUrl = safeResourceUrl(post.resource_file_url);
 		const safeLink = safeResourceUrl(post.resource_link);
-
-		if (safeFileUrl) {
-			bookDownloadBtn.href = safeFileUrl;
-			if (post.resource_file_name) bookDownloadBtn.setAttribute("download", post.resource_file_name);
-			bookDownloadBtn.hidden = false;
-		} else {
-			bookDownloadBtn.hidden = true;
-			bookDownloadBtn.removeAttribute("href");
+		if (downloadBtn) {
+			downloadBtn.hidden = !safeFileUrl;
+			downloadBtn.href = buildDownloadUrl(post.resource_file_url, post.resource_file_name) || "#";
 		}
-
-		if (safeLink) {
-			bookOpenLinkBtn.href = safeLink;
-			bookOpenLinkBtn.hidden = false;
-		} else {
-			bookOpenLinkBtn.hidden = true;
-			bookOpenLinkBtn.removeAttribute("href");
+		if (openLinkBtn) {
+			openLinkBtn.hidden = !safeLink;
+			openLinkBtn.href = safeLink || "#";
+		}
+		if (bookmarkBtn) {
+			bookmarkBtn.textContent = post.bookmarkedByMe ? "★ Đã lưu tài liệu" : "☆ Lưu tài liệu";
 		}
 
 		const me = getCurrentUser();
-		const isOwner = me && String(me.id) === String(post.user_id || post.userId || "");
-		const isMod = me && ["admin", "super_admin", "moderator"].includes(String(me.role || "").toLowerCase());
-		bookDeleteBtn.hidden = !(isOwner || isMod);
+		const canDelete = Boolean(me && (String(me.id) === String(post.userId) || me.isAdmin || me.isModerator));
+		if (deleteBtn) deleteBtn.hidden = !canDelete;
 
-		updateReaderBookmarkUI();
-		renderCurrentSpread("");
-		readerOverlay.hidden = false;
-		document.body.classList.add("subject-modal-open");
-		readerCloseBtn.focus();
+		renderReaderSpread();
+		if (readerOverlay) readerOverlay.hidden = false;
 	}
 
 	function closeBookReader() {
-		readerOverlay.hidden = true;
-		document.body.classList.remove("subject-modal-open");
-		activeReaderBook = null;
+		if (readerOverlay) readerOverlay.hidden = true;
+		activeBook = null;
 	}
 
-	bookFlipPrev?.addEventListener("click", () => {
-		if (currentSpreadIndex > 0) {
-			currentSpreadIndex--;
-			renderCurrentSpread("prev");
-		}
-	});
-
-	bookFlipNext?.addEventListener("click", () => {
-		if (currentSpreadIndex < readerSpreads.length - 1) {
-			currentSpreadIndex++;
-			renderCurrentSpread("next");
-		}
-	});
-
 	readerCloseBtn?.addEventListener("click", closeBookReader);
-	readerOverlay?.addEventListener("click", event => {
-		if (event.target === readerOverlay) closeBookReader();
+	readerOverlay?.addEventListener("click", ev => {
+		if (ev.target === readerOverlay) closeBookReader();
 	});
 
-	document.addEventListener("keydown", event => {
-		if (event.key === "Escape") {
-			if (readerOverlay && !readerOverlay.hidden) closeBookReader();
-			else if (subjectModal && !subjectModal.hidden) closeSubjectPicker();
-		} else if (readerOverlay && !readerOverlay.hidden) {
-			if (event.key === "ArrowLeft" && currentSpreadIndex > 0) {
-				currentSpreadIndex--;
-				renderCurrentSpread("prev");
-			} else if (event.key === "ArrowRight" && currentSpreadIndex < readerSpreads.length - 1) {
-				currentSpreadIndex++;
-				renderCurrentSpread("next");
-			}
+	flipPrevBtn?.addEventListener("click", () => {
+		if (readerSpreadIndex > 0) {
+			readerSpreadIndex--;
+			renderReaderSpread("prev");
 		}
 	});
 
-	bookBookmarkBtn?.addEventListener("click", async () => {
-		if (!activeReaderBook) return;
-		if (!getToken() && !getCurrentUser()) {
-			resourceMessage.textContent = "Hãy đăng nhập để lưu tài liệu vào trang cá nhân.";
-			resourceMessage.classList.add("error");
-			return;
+	flipNextBtn?.addEventListener("click", () => {
+		const totalSpreads = Math.max(1, Math.ceil(readerPages.length / 2));
+		if (readerSpreadIndex < totalSpreads - 1) {
+			readerSpreadIndex++;
+			renderReaderSpread("next");
 		}
-		const bookId = String(activeReaderBook.id);
-		bookBookmarkBtn.disabled = true;
+	});
+
+	downloadBtn?.addEventListener("click", ev => {
+		if (!activeBook?.resource_file_url) return;
+		ev.preventDefault();
+		triggerResourceDownload(activeBook.resource_file_url, activeBook.resource_file_name);
+	});
+
+	bookmarkBtn?.addEventListener("click", async () => {
+		if (!activeBook) return;
+		bookmarkBtn.disabled = true;
 		try {
-			const res = await fetch(`${BOOKMARKS_API}/toggle`, {
+			const res = await fetch(`${API_BASE}/api/bookmarks/toggle`, {
 				method: "POST",
 				credentials: "include",
 				headers: getAuthHeaders({ "Content-Type": "application/json" }),
-				body: JSON.stringify({ itemType: "resource", itemId: bookId })
+				body: JSON.stringify({ itemType: "resource", itemId: activeBook.id })
 			});
 			const data = await res.json().catch(() => ({}));
-			if (!res.ok) throw new Error(data.error || "Không thể cập nhật lưu tài liệu.");
-			const isSavedNow = typeof data.bookmarked === "boolean" ? data.bookmarked : !bookmarkedIds.has(bookId);
-			if (isSavedNow) bookmarkedIds.add(bookId);
-			else bookmarkedIds.delete(bookId);
-			updateReaderBookmarkUI();
+			if (!res.ok) throw new Error(data.error || "Hãy đăng nhập để lưu tài liệu.");
+			activeBook.bookmarkedByMe = Boolean(data.bookmarked);
+			bookmarkBtn.textContent = activeBook.bookmarkedByMe ? "★ Đã lưu tài liệu" : "☆ Lưu tài liệu";
 			renderResources();
-		} catch (error) {
-			alertFallbackMessage(error.message || "Không thể lưu tài liệu lúc này.");
+		} catch (err) {
+			alert(err.message || "Không thể lưu tài liệu.");
 		} finally {
-			bookBookmarkBtn.disabled = false;
+			bookmarkBtn.disabled = false;
 		}
 	});
 
-	function alertFallbackMessage(msg) {
-		resourceMessage.textContent = msg;
-		resourceMessage.classList.add("error");
-	}
-
-	bookDeleteBtn?.addEventListener("click", async () => {
-		if (!activeReaderBook) return;
-		const bookTitle = activeReaderBook.resource_title || "tài liệu này";
-		if (!window.confirm(`Bạn có chắc muốn xóa "${bookTitle}" khỏi kệ sách?`)) return;
-		bookDeleteBtn.disabled = true;
+	deleteBtn?.addEventListener("click", async () => {
+		if (!activeBook) return;
+		if (!window.confirm(`Bạn có chắc muốn xóa tài liệu "${activeBook.resource_title || "này"}"?`)) return;
+		deleteBtn.disabled = true;
 		try {
-			const res = await fetch(`${POSTS_API}/${encodeURIComponent(activeReaderBook.id)}`, {
+			const res = await fetch(`${POSTS_API}/${encodeURIComponent(activeBook.id)}`, {
 				method: "DELETE",
 				credentials: "include",
 				headers: getAuthHeaders()
@@ -569,72 +617,85 @@ document.addEventListener("DOMContentLoaded", () => {
 			if (!res.ok) throw new Error(data.error || "Không thể xóa tài liệu.");
 			closeBookReader();
 			await loadResources();
-		} catch (error) {
-			alertFallbackMessage(error.message || "Xóa tài liệu thất bại.");
+		} catch (err) {
+			alert(err.message || "Không thể xóa tài liệu.");
 		} finally {
-			bookDeleteBtn.disabled = false;
+			deleteBtn.disabled = false;
 		}
 	});
 
-	function makeBookOnShelf(post) {
-		const book = document.createElement("button");
-		book.type = "button";
-		book.className = "book-on-shelf";
-		book.dataset.subject = post.resource_subject || "";
-		book.dataset.track = post.resource_track || "";
-		const title = post.resource_title || "Tài liệu";
-		const coverColor = post.resource_cover_color || "#6aa68d";
-		book.setAttribute("aria-label", `Mở sách ${title}`);
-		book.title = `${title} (${post.name || "Thành viên DIEUNW"})`;
-		book.style.setProperty("--book-color", coverColor);
+	function makeBook(post) {
+		const button = document.createElement("button");
+		button.type = "button";
+		button.className = "book-on-shelf";
+		button.dataset.subject = post.resource_subject || "";
+		button.dataset.track = post.resource_track || "";
+		button.setAttribute("aria-label", `Mở tài liệu ${post.resource_title || "Tài liệu"}`);
+		button.title = `${post.resource_title || "Tài liệu"} (${post.resource_subject || ""})`;
 
+		const coverColor = post.resource_cover_color || "#6aa68d";
 		const spine = document.createElement("div");
 		spine.className = "book-3d-spine";
-		spine.style.background = `linear-gradient(155deg, ${coverColor}, #173853 185%)`;
+		spine.style.setProperty("--book-color", coverColor);
+		spine.style.background = coverColor;
 
-		const gradePip = document.createElement("span");
-		gradePip.className = "book-grade-pip";
-		gradePip.textContent = post.resource_grade ? `K${post.resource_grade}` : "TL";
+		if (post.resource_grade) {
+			const pip = document.createElement("span");
+			pip.className = "book-grade-pip";
+			pip.textContent = `K${post.resource_grade}`;
+			spine.appendChild(pip);
+		}
 
 		const titleSpan = document.createElement("span");
 		titleSpan.className = "book-3d-title";
-		titleSpan.textContent = title;
+		titleSpan.textContent = post.resource_title || "Tài liệu";
+		spine.appendChild(titleSpan);
 
-		spine.append(gradePip, titleSpan);
-
-		if (bookmarkedIds.has(String(post.id))) {
+		if (post.bookmarkedByMe) {
 			const star = document.createElement("span");
 			star.className = "book-saved-star";
-			star.textContent = "★";
+			star.textContent = "⭐";
 			star.title = "Đã lưu";
 			spine.appendChild(star);
 		}
 
-		book.appendChild(spine);
-		book.addEventListener("click", () => openBookReader(post));
-		return book;
+		button.appendChild(spine);
+		button.addEventListener("click", () => openBookReader(post));
+		return button;
+	}
+
+	function updateSubjectFilter() {
+		if (!filterSubject || !filterTrack) return;
+		const selectedSubject = filterSubject.value;
+		const availableSubjects = filterTrack.value
+			? tracks[filterTrack.value]
+			: [...new Set(Object.values(tracks).flat())];
+		filterSubject.replaceChildren(new Option("Tất cả môn", ""));
+		availableSubjects.forEach(subject => filterSubject.add(new Option(subject, subject)));
+		filterSubject.value = availableSubjects.includes(selectedSubject) ? selectedSubject : "";
 	}
 
 	function renderResources() {
 		resourceList.replaceChildren();
-		if (!resources.length) {
-			resourceList.innerHTML = `
-				<div class="empty-state-box">
-					<span class="empty-illustration" aria-hidden="true">📚</span>
-					<h3>Kệ sách đang trống</h3>
-					<p>Chưa có tài liệu nào được chia sẻ. Hãy là người đầu tiên đặt cuốn sách lên kệ!</p>
-				</div>
-			`;
+		const trackVal = filterTrack?.value || "";
+		const subVal = filterSubject?.value || "";
+		const gradeVal = filterGrade?.value || "";
+
+		const filtered = resources.filter(post => {
+			return (!trackVal || post.resource_track === trackVal)
+				&& (!subVal || post.resource_subject === subVal)
+				&& (!gradeVal || String(post.resource_grade) === gradeVal);
+		});
+		if (!filtered.length) {
+			resourceList.innerHTML = `<p class="feed-state">${resources.length ? "Không tìm thấy tài liệu phù hợp với bộ lọc." : "Chưa có tài liệu nào. Bạn có thể chia sẻ đầu tiên."}</p>`;
 			return;
 		}
-
 		const grouped = {};
-		resources.forEach(post => {
+		filtered.forEach(post => {
 			const key = post.resource_subject || "Khác";
 			if (!grouped[key]) grouped[key] = [];
 			grouped[key].push(post);
 		});
-
 		const subjectOrder = Object.keys(grouped).sort((a, b) => {
 			const ta = tracks.Chuyên.includes(a) ? "Chuyên" : (tracks.Thường.includes(a) ? "Thường" : "");
 			const tb = tracks.Chuyên.includes(b) ? "Chuyên" : (tracks.Thường.includes(b) ? "Thường" : "");
@@ -657,59 +718,37 @@ document.addEventListener("DOMContentLoaded", () => {
 					<span class="shelf-track">${escapeHtml(trackLabel)}</span>
 					<span class="shelf-subject">${escapeHtml(subject)}</span>
 				</div>
-				<span class="shelf-count">${posts.length} cuốn</span>
+				<span class="shelf-count">${posts.length} tài liệu</span>
 			`;
 
-			const booksTrack = document.createElement("div");
-			booksTrack.className = "shelf-books";
-			posts.forEach(post => booksTrack.appendChild(makeBookOnShelf(post)));
+			const shelf = document.createElement("div");
+			shelf.className = "shelf-books";
+			posts.forEach(post => shelf.appendChild(makeBook(post)));
 
 			const plank = document.createElement("div");
 			plank.className = "shelf-plank";
 			plank.setAttribute("aria-hidden", "true");
 
-			row.append(header, booksTrack, plank);
+			row.appendChild(header);
+			row.appendChild(shelf);
+			row.appendChild(plank);
 			resourceList.appendChild(row);
 		}
 	}
 
-	async function loadBookmarks() {
-		if (!getToken() && !getCurrentUser()) return;
+	async function loadResources() {
+		resourceList.innerHTML = "<p class=\"feed-state\">Đang tải kệ sách...</p>";
 		try {
-			const res = await fetch(BOOKMARKS_API, {
+			const response = await fetch(POSTS_API, {
 				credentials: "include",
 				headers: getAuthHeaders()
 			});
-			if (!res.ok) return;
-			const data = await res.json().catch(() => ({}));
-			const items = Array.isArray(data) ? data : (data.bookmarks || data.items || []);
-			bookmarkedIds = new Set(
-				items
-					.filter(item => !item.item_type || item.item_type === "resource" || item.itemType === "resource")
-					.map(item => String(item.item_id ?? item.itemId ?? item.post_id ?? item.id ?? ""))
-					.filter(Boolean)
-			);
-		} catch {
-			// Bỏ qua nếu chưa đăng nhập hoặc API bookmarks tạm thời chưa phản hồi
-		}
-	}
-
-	async function loadResources() {
-		resourceList.innerHTML = buildSkeletonMarkup(3);
-		try {
-			const [postsRes] = await Promise.all([
-				fetch(POSTS_API, {
-					credentials: "include",
-					headers: getAuthHeaders()
-				}),
-				loadBookmarks()
-			]);
-			const data = await postsRes.json().catch(() => ({}));
-			if (postsRes.status === 401) {
+			const data = await response.json().catch(() => ({}));
+			if (response.status === 401) {
 				resourceList.innerHTML = "<p class=\"feed-state\">Hãy <a href=\"./profile.html\">đăng nhập</a> để xem và chia sẻ tài liệu.</p>";
 				return;
 			}
-			if (!postsRes.ok) throw new Error(data.error || "Không tải được kệ sách.");
+			if (!response.ok) throw new Error(data.error || "Không tải được kệ sách.");
 			const posts = data.posts || data || [];
 			resources = posts
 				.filter(post => post.type === "study-resource")
@@ -721,31 +760,23 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 	}
 
-	resourceForm.addEventListener("submit", async event => {
+	resourceForm?.addEventListener("submit", async event => {
 		event.preventDefault();
-		resourceMessage.textContent = "";
-		resourceMessage.classList.remove("error");
-
 		if (!selection.grade || !selection.subject) {
 			resourceMessage.textContent = "Hãy chọn khối và môn học trước khi đăng.";
 			resourceMessage.classList.add("error");
 			return;
 		}
-
 		const titleVal = document.getElementById("resource-title").value.trim();
-		const descVal = document.getElementById("resource-description").value.trim();
 		const linkVal = document.getElementById("resource-link").value.trim();
-		const fileInput = document.getElementById("resource-file");
-		const hasFile = fileInput.files && fileInput.files.length > 0;
-
-		if (!linkVal && !hasFile) {
-			resourceMessage.textContent = "Vui lòng nhập Liên kết tài liệu hoặc chọn Tệp đính kèm (cần ít nhất 1 trong 2).";
+		const hasFile = Boolean(fileInput?.files?.length);
+		if (!titleVal) {
+			resourceMessage.textContent = "Hãy nhập tên tài liệu.";
 			resourceMessage.classList.add("error");
 			return;
 		}
-
-		if (linkVal && !/^https?:\/\//i.test(linkVal)) {
-			resourceMessage.textContent = "Liên kết tài liệu cần bắt đầu bằng http:// hoặc https://";
+		if (!linkVal && !hasFile) {
+			resourceMessage.textContent = "Hãy nhập Liên kết tài liệu hoặc Chọn tệp từ máy.";
 			resourceMessage.classList.add("error");
 			return;
 		}
@@ -753,7 +784,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		const formData = new FormData();
 		formData.append("type", "study-resource");
 		formData.append("resource_title", titleVal);
-		formData.append("resource_description", descVal);
+		formData.append("resource_description", document.getElementById("resource-description").value.trim());
 		formData.append("resource_link", linkVal);
 		formData.append("resource_grade", selection.grade);
 		formData.append("resource_track", selection.track);
@@ -767,6 +798,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 		resourceSubmit.disabled = true;
 		resourceSubmit.textContent = "Đang đăng...";
+		resourceMessage.textContent = "";
+		resourceMessage.classList.remove("error");
 
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), 45000);
@@ -788,11 +821,16 @@ document.addEventListener("DOMContentLoaded", () => {
 			if (!response.ok) throw new Error(data.error || "Không thể đăng tài liệu.");
 
 			resourceForm.reset();
+			syncSelectedFileUi();
 			selection.grade = "";
 			selection.subject = "";
 			renderChoices();
-			if (coverColorLabel) coverColorLabel.textContent = "#6aa68d";
-			resourceMessage.textContent = "Đã đặt cuốn sách lên kệ thành công!";
+			if (coverColorLabel) coverColorLabel.textContent = "#6AA68D";
+			if (filterTrack) filterTrack.value = "";
+			if (filterSubject) filterSubject.value = "";
+			if (filterGrade) filterGrade.value = "";
+			updateSubjectFilter();
+			resourceMessage.textContent = "Đã đăng tài liệu thành công.";
 			await loadResources();
 		} catch (error) {
 			clearTimeout(timeoutId);
@@ -809,9 +847,19 @@ document.addEventListener("DOMContentLoaded", () => {
 	});
 
 	document.getElementById("resource-refresh")?.addEventListener("click", loadResources);
+	filterTrack?.addEventListener("change", () => {
+		updateSubjectFilter();
+		renderResources();
+	});
+	filterSubject?.addEventListener("change", renderResources);
+	filterGrade?.addEventListener("change", renderResources);
+	updateSubjectFilter();
 	renderChoices();
 	loadResources();
 
+	// =========================================================
+	// ONLINE STUDY ROOMS (JITSI MEET)
+	// =========================================================
 	const roomForm = document.getElementById("room-form");
 	const roomInput = document.getElementById("room-name");
 	const roomMessage = document.getElementById("room-message");

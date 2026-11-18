@@ -9,6 +9,16 @@
         { id: "nqd-anniversary", name: "Kỷ niệm NQD", cost: 150 }
     ];
 
+    const DEFAULT_ECARD_CONFIG = {
+        bgImage: "",
+        bgPos: "center center",
+        color1: "#1769aa",
+        color2: "#2298f8",
+        overlayOpacity: 25,
+        textTone: "light",
+        tagline: ""
+    };
+
     const state = {
         targetUserId: null,
         viewerUser: null,
@@ -19,15 +29,24 @@
         activeEndorseTag: null,
         editingStudySetId: null,
         modTab: "posts",
-        modWorkspaceData: null
+        modWorkspaceData: null,
+        activePostFilter: "mine",
+        ecardDraft: { ...DEFAULT_ECARD_CONFIG }
     };
 
     function getAuthHeaders(extra = {}) {
-        const token = localStorage.getItem("session_token");
+        const token = localStorage.getItem("session_token") || localStorage.getItem("dieuNwToken");
         return {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
             ...extra
         };
+    }
+
+    function resolveMediaUrl(url) {
+        const raw = String(url || "").trim();
+        if (!raw) return "";
+        if (raw.startsWith("/uploads/")) return `${API_BASE}${raw}`;
+        return raw;
     }
 
     async function api(path, options = {}) {
@@ -54,14 +73,6 @@
             '"': "&quot;",
             "'": "&#39;"
         })[ch]);
-    }
-
-    function safeUploadUrl(rawUrl) {
-        const url = String(rawUrl || "").trim();
-        if (!url) return "";
-        if (url.startsWith("/uploads/")) return `${API_BASE}${url}`;
-        if (/^https?:\/\//i.test(url)) return url;
-        return "";
     }
 
     function makeEl(tag, className, text) {
@@ -385,7 +396,7 @@
                     link.href = `./profile.html?clubId=${encodeURIComponent(c.id)}`;
                     if (c.logo) {
                         const img = makeEl("img");
-                        img.src = c.logo;
+                        img.src = resolveMediaUrl(c.logo);
                         img.alt = c.name;
                         link.append(img);
                     } else {
@@ -444,7 +455,7 @@
 
         const media = makeEl("div", "moment-media");
         const img = makeEl("img");
-        img.src = moment.image;
+        img.src = resolveMediaUrl(moment.image);
         img.alt = moment.caption || "Khoảnh khắc 24h";
         media.append(img);
         if (moment.caption) {
@@ -454,12 +465,13 @@
         const footer = makeEl("div", "moment-footer");
         const reactBar = makeEl("div", "moment-reactions-bar");
         const emojis = ["❤️", "🔥", "👏", "😂", "🎯"];
-        const reactions = moment.reactions || moment.reactors || [];
+        const reactions = moment.reactors || moment.reactions || [];
         const myId = state.viewerUser?.id;
 
         emojis.forEach(emoji => {
             const matching = reactions.filter(r => r.emoji === emoji);
-            const active = (myId && matching.some(r => String(r.userId) === String(myId))) || moment.myReaction === emoji;
+            const active = (moment.myReaction && moment.myReaction === emoji)
+                || (myId && matching.some(r => String(r.userId) === String(myId)));
             const btn = makeEl("button", `moment-react-btn${active ? " active" : ""}`, `${emoji} ${matching.length || ""}`.trim());
             btn.type = "button";
             btn.addEventListener("click", async () => {
@@ -478,12 +490,15 @@
 
         footer.append(reactBar);
 
+        const totalReacts = Number(moment.reactionCount || reactions.length || 0);
         const reactorsSummary = reactions.length
-            ? reactions.slice(0, 6).map(r => `${r.userName || r.name || "Bạn"} ${r.emoji}`).join(", ") + (reactions.length > 6 ? ` +${reactions.length - 6}` : "")
-            : (moment.reactionCount ? `${moment.reactionCount} tương tác` : "Chưa có tương tác");
+            ? reactions.slice(0, 6).map(r => `${r.name || r.userName || "Bạn học"} ${r.emoji}`).join(", ")
+                + (totalReacts > 6 ? ` +${totalReacts - 6}` : "")
+            : "Chưa có tương tác";
         const rightMeta = makeEl("div", "", "");
         rightMeta.style.cssText = "display:flex; align-items:center; gap:8px; flex-wrap:wrap;";
-        rightMeta.append(makeEl("span", "profile-extra-hint", reactorsSummary));
+        const reactorSpan = makeEl("span", "profile-extra-hint", reactorsSummary);
+        rightMeta.append(reactorSpan);
 
         if (isOwner) {
             const delBtn = makeEl("button", "profile-extra-delete", "Xóa Moment");
@@ -501,8 +516,15 @@
 
     function openStoryViewer(stories, startIdx = 0) {
         if (!stories || !stories.length) return;
-        state.storiesList = stories;
-        state.storyIndex = Math.max(0, Math.min(startIdx, stories.length - 1));
+        const ownerUser = state.profileData?.user;
+        state.storiesList = stories.map(s => ({
+            ...s,
+            userId: s.userId || ownerUser?.id || "",
+            userName: s.userName || ownerUser?.name || "Học sinh NQD",
+            userAvatar: resolveMediaUrl(s.userAvatar || ownerUser?.avatar || "./DIEU.png"),
+            mediaUrl: resolveMediaUrl(s.mediaUrl)
+        }));
+        state.storyIndex = Math.max(0, Math.min(startIdx, state.storiesList.length - 1));
         renderCurrentStory();
         openModal("story-viewer-overlay");
     }
@@ -521,17 +543,15 @@
             return seg;
         }));
 
-        const profileOwner = state.profileData?.user;
-        document.getElementById("story-viewer-avatar").src = story.userAvatar || profileOwner?.avatar || "./DIEU.png";
-        document.getElementById("story-viewer-name").textContent = story.userName || profileOwner?.name || "Học sinh NQD";
+        document.getElementById("story-viewer-avatar").src = story.userAvatar || "./DIEU.png";
+        document.getElementById("story-viewer-name").textContent = story.userName || "Học sinh NQD";
         document.getElementById("story-viewer-time").textContent = new Date(story.createdAt).toLocaleString("vi-VN");
         document.getElementById("story-viewer-caption").textContent = story.caption || "";
         document.getElementById("story-viewer-views").textContent = `${story.viewCount || 0} lượt xem`;
         document.getElementById("story-viewer-expiry").textContent = `Hết hạn: ${new Date(story.expiresAt).toLocaleString("vi-VN")}`;
 
-        const storyOwnerId = story.userId || profileOwner?.id;
         const delBtn = document.getElementById("story-viewer-delete");
-        const isOwner = state.viewerUser && (String(state.viewerUser.id) === String(storyOwnerId) || state.viewerUser.isAdmin);
+        const isOwner = state.viewerUser && (String(state.viewerUser.id) === String(story.userId) || state.viewerUser.isAdmin);
         delBtn.hidden = !isOwner;
         delBtn.onclick = async () => {
             if (!confirm("Xóa Story này?")) return;
@@ -545,10 +565,9 @@
         const nextBtn = document.getElementById("story-next-btn");
         stage.querySelectorAll("img, video").forEach(n => n.remove());
 
-        const resolvedUrl = safeUploadUrl(story.mediaUrl) || story.mediaUrl;
-        const isVideo = story.mediaType === "video" || /\.(mp4|webm)(\?|$)/i.test(resolvedUrl || "");
+        const isVideo = story.mediaType === "video" || /\.(mp4|webm)(\?|$)/i.test(story.mediaUrl || "");
         const mediaEl = document.createElement(isVideo ? "video" : "img");
-        mediaEl.src = resolvedUrl;
+        mediaEl.src = story.mediaUrl;
         if (isVideo) {
             mediaEl.controls = true;
             mediaEl.autoplay = true;
@@ -593,11 +612,11 @@
         strWrap.replaceChildren();
         helpWrap.replaceChildren();
 
-        const getTagKind = t => t.kind || t.tagType || "strength";
-        const getTagLabel = t => t.subject || t.subjectTag || "";
+        const getKind = t => t.kind || t.tagType || "strength";
+        const getLabel = t => t.subject || t.subjectTag || "";
 
-        const strengthTags = tags.filter(t => getTagKind(t) !== "need_help");
-        const helpTags = tags.filter(t => getTagKind(t) === "need_help");
+        const strengthTags = tags.filter(t => getKind(t) !== "need_help");
+        const helpTags = tags.filter(t => getKind(t) === "need_help");
 
         const renderGroup = (list, container, emptyMsg) => {
             if (!list.length) {
@@ -605,15 +624,17 @@
                 return;
             }
             list.forEach(tag => {
-                const kind = getTagKind(tag);
+                const kind = getKind(tag);
+                const label = getLabel(tag);
                 const chip = makeEl("div", `study-tag-chip ${kind === "need_help" ? "is-need-help" : "is-strength"}`);
-                chip.append(makeEl("span", "", `#${getTagLabel(tag).replace(/^#/, "")}`));
+                chip.append(makeEl("span", "", label));
 
                 if (kind !== "need_help") {
-                    const count = tag.endorsements?.length ?? tag.endorsementCount ?? 0;
-                    const endorsed = Boolean(
-                        tag.endorsedByMe ||
-                        (state.viewerUser && (tag.endorsements || []).some(e => String(e.endorserId || e.fromUserId) === String(state.viewerUser.id)))
+                    const count = tag.endorsementCount ?? tag.endorsements?.length ?? 0;
+                    const endorsed = Boolean(tag.endorsedByMe) || Boolean(
+                        state.viewerUser && (tag.endorsements || []).some(
+                            e => String(e.endorserId || e.fromUserId) === String(state.viewerUser.id)
+                        )
                     );
                     const btn = makeEl("button", `btn-endorse-tag${endorsed ? " is-endorsed" : ""}`, `+1 (${count})`);
                     btn.type = "button";
@@ -642,7 +663,7 @@
 
     function openEndorseModal(tag) {
         state.activeEndorseTag = tag;
-        document.getElementById("endorse-tag-label").textContent = `Thẻ môn: #${(tag.subject || tag.subjectTag || "").replace(/^#/, "")}`;
+        document.getElementById("endorse-tag-label").textContent = `Thẻ môn: ${tag.subject || tag.subjectTag || ""}`;
         const listEl = document.getElementById("endorse-existing-comments");
         listEl.replaceChildren();
         const comments = (tag.endorsements || []).filter(e => e.comment);
@@ -650,7 +671,8 @@
             listEl.append(makeEl("p", "profile-extra-empty", "Chưa có nhận xét nào."));
         } else {
             comments.forEach(e => {
-                listEl.append(makeEl("div", "", `• ${e.endorserName || e.fromUserName || "Bạn học"}: "${e.comment}"`));
+                const authorName = e.endorserName || e.fromUserName || "Bạn học";
+                listEl.append(makeEl("div", "", `• ${authorName}: "${e.comment}"`));
             });
         }
         const canSubmit = state.viewerUser && !state.isSelf;
@@ -691,14 +713,14 @@
         sec.hidden = false;
         grid.replaceChildren();
         if (!items.length) {
-            grid.append(makeEl("p", "profile-extra-empty", "Ghim tối đa 3 sản phẩm CLB, poster hoặc liên kết nổi bật."));
+            grid.append(makeEl("p", "profile-extra-empty", "Ghim tối đa 6 sản phẩm CLB, poster hoặc liên kết nổi bật."));
             return;
         }
         items.forEach(item => {
             const card = makeEl("article", "showcase-item-card");
             if (item.image) {
                 const img = makeEl("img");
-                img.src = item.image;
+                img.src = resolveMediaUrl(item.image);
                 img.alt = item.title;
                 img.loading = "lazy";
                 card.append(img);
@@ -733,16 +755,16 @@
     }
 
     // =========================================================
-    // STUDY SETS: BUILDER, 3D FLASHCARD + SPACED REPETITION, QUIZ CHALLENGE + TOP 3
+    // STUDY SETS: BUILDER (FIXED API FIELDS), 3D FLASHCARD, QUIZ CHALLENGE + TOP 3
     // =========================================================
     function addBuilderItemRow(data = {}) {
         const container = document.getElementById("studyset-items-builder");
-        const setType = document.getElementById("studyset-type-select").value;
+        const kind = document.getElementById("studyset-type-select").value === "quiz" ? "quiz" : "flashcard";
         const row = makeEl("div", "study-builder-item");
 
         const top = makeEl("div", "", "");
         top.style.cssText = "display:flex; justify-content:space-between; align-items:center;";
-        top.append(makeEl("strong", "", setType === "quiz" ? "Câu hỏi Trắc nghiệm" : "Thẻ Flashcard"));
+        top.append(makeEl("strong", "", kind === "quiz" ? "Câu hỏi Trắc nghiệm" : "Thẻ Flashcard"));
         const rem = makeEl("button", "admin-remove-btn", "×");
         rem.type = "button";
         rem.onclick = () => row.remove();
@@ -750,7 +772,7 @@
 
         const front = makeEl("input", "sb-front");
         front.type = "text";
-        front.placeholder = setType === "quiz" ? "Nội dung câu hỏi..." : "Mặt trước (Thuật ngữ / Câu hỏi)...";
+        front.placeholder = kind === "quiz" ? "Nội dung câu hỏi..." : "Mặt trước (Thuật ngữ / Câu hỏi)...";
         front.value = data.front || "";
 
         const colorWrap = makeEl("label", "", "");
@@ -769,11 +791,10 @@
 
         row.append(top, front, colorWrap, imgInput);
 
-        if (setType === "quiz") {
+        if (kind === "quiz") {
             const optsGrid = makeEl("div", "", "");
             optsGrid.style.cssText = "display:grid; grid-template-columns:1fr 1fr; gap:6px;";
-            const existingOpts = Array.isArray(data.options) ? data.options : [];
-            const opts = [0, 1, 2, 3].map(i => existingOpts[i] || "");
+            const opts = Array.isArray(data.options) && data.options.length === 4 ? data.options : ["", "", "", ""];
             ["A", "B", "C", "D"].forEach((lbl, idx) => {
                 const oi = makeEl("input", `sb-opt-${idx}`);
                 oi.type = "text";
@@ -803,28 +824,6 @@
         container.append(row);
     }
 
-    function openStudySetBuilderForEdit(studySet) {
-        const kind = studySet.kind || studySet.setType || "flashcard";
-        state.editingStudySetId = studySet.id;
-        document.getElementById("studyset-builder-title").textContent = "Chỉnh sửa Bộ thẻ / Đề ôn tập";
-        document.getElementById("studyset-builder-form").reset();
-        document.getElementById("studyset-builder-status").textContent = "";
-        document.getElementById("studyset-title-input").value = studySet.title || "";
-        document.getElementById("studyset-subject-input").value = studySet.subject || "";
-        document.getElementById("studyset-type-select").value = kind;
-        document.getElementById("studyset-pin-checkbox").checked = Boolean(studySet.pinned ?? studySet.isPinned);
-
-        const builder = document.getElementById("studyset-items-builder");
-        builder.replaceChildren();
-        const cards = Array.isArray(studySet.cards) ? studySet.cards : (Array.isArray(studySet.items) ? studySet.items : []);
-        if (cards.length) {
-            cards.forEach(c => addBuilderItemRow(c));
-        } else {
-            addBuilderItemRow();
-        }
-        openModal("studyset-builder-overlay");
-    }
-
     document.getElementById("btn-open-studyset-builder")?.addEventListener("click", () => {
         state.editingStudySetId = null;
         document.getElementById("studyset-builder-title").textContent = "Tạo Bộ thẻ / Đề ôn tập";
@@ -840,15 +839,12 @@
         document.getElementById("studyset-builder-status").textContent = "";
         document.getElementById("studyset-items-builder").replaceChildren();
         addBuilderItemRow();
-        addBuilderItemRow();
     });
 
     document.getElementById("btn-add-studyset-item")?.addEventListener("click", () => addBuilderItemRow());
 
     document.getElementById("studyset-builder-form")?.addEventListener("submit", async event => {
         event.preventDefault();
-        const form = event.currentTarget;
-        const submitBtn = form.querySelector("button[type='submit']");
         const status = document.getElementById("studyset-builder-status");
         const title = document.getElementById("studyset-title-input").value.trim();
         const subject = document.getElementById("studyset-subject-input").value.trim() || "Chung";
@@ -856,68 +852,67 @@
         const pinned = document.getElementById("studyset-pin-checkbox").checked;
 
         if (!title) {
-            status.textContent = "Vui lòng nhập tên bộ thẻ / đề ôn tập.";
+            status.textContent = "Vui lòng nhập Tên bộ thẻ / đề ôn tập.";
             return;
         }
 
-        if (submitBtn) submitBtn.disabled = true;
-        status.textContent = "Đang kiểm tra & lưu bộ ôn tập...";
+        status.textContent = "Đang kiểm tra & lưu...";
         try {
             const rows = Array.from(document.querySelectorAll("#studyset-items-builder .study-builder-item"));
             const cards = [];
-            for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
-                const row = rows[rowIdx];
+
+            for (let idx = 0; idx < rows.length; idx++) {
+                const row = rows[idx];
+                const cardNo = idx + 1;
                 const front = row.querySelector(".sb-front")?.value.trim() || "";
                 const back = row.querySelector(".sb-back")?.value.trim() || "";
                 const textColor = row.querySelector(".sb-color")?.value || "#173853";
                 const fileInput = row.querySelector(".sb-image-file");
+                const hasNewImg = Boolean(fileInput?.files?.[0]);
+                const options = kind === "quiz"
+                    ? [0, 1, 2, 3].map(i => row.querySelector(`.sb-opt-${i}`)?.value.trim() || "")
+                    : [];
+                const hasAnySecondaryInput = Boolean(back || hasNewImg || options.some(Boolean));
+
+                // Bỏ qua dòng hoàn toàn trống nếu đã có hoặc sẽ có thẻ khác
+                if (!front && !hasAnySecondaryInput) continue;
+
+                // Nếu đã gõ nội dung phụ nhưng quên nhập câu hỏi / mặt trước thì báo rõ vị trí
+                if (!front && hasAnySecondaryInput) {
+                    throw new Error(`Thẻ/Câu #${cardNo} đang thiếu nội dung ${kind === "quiz" ? "câu hỏi" : "mặt trước"}.`);
+                }
+
                 let image = fileInput?.dataset.existingImage || "";
-                if (fileInput?.files?.[0]) image = await toOptimizedImage(fileInput.files[0], 720);
+                if (hasNewImg) image = await toOptimizedImage(fileInput.files[0], 720);
 
                 if (kind === "quiz") {
-                    const rawOpts = [0, 1, 2, 3].map(i => row.querySelector(`.sb-opt-${i}`)?.value.trim() || "");
-                    const hasAnyInput = Boolean(front || back || image || rawOpts.some(Boolean));
-                    if (!hasAnyInput) continue;
-                    if (!front) throw new Error(`Câu hỏi số ${rowIdx + 1} chưa có nội dung câu hỏi.`);
-
-                    const rawCorrect = Number(row.querySelector(".sb-correct")?.value || 0);
-                    if (!rawOpts[rawCorrect]) {
-                        throw new Error(`Câu hỏi số ${rowIdx + 1}: Đáp án đúng (${["A", "B", "C", "D"][rawCorrect]}) đang để trống.`);
+                    const filledCount = options.filter(Boolean).length;
+                    if (filledCount < 2) {
+                        throw new Error(`Câu #${cardNo} cần nhập ít nhất 2 phương án trả lời (A, B...).`);
                     }
-                    const options = [];
-                    let correctIndex = 0;
-                    rawOpts.forEach((optText, i) => {
-                        if (!optText) return;
-                        if (i === rawCorrect) correctIndex = options.length;
-                        options.push(optText);
-                    });
-                    if (options.length < 2) {
-                        throw new Error(`Câu hỏi số ${rowIdx + 1} cần nhập ít nhất 2 đáp án.`);
-                    }
+                    const correctIndex = Number(row.querySelector(".sb-correct")?.value || 0);
                     cards.push({ front, options, correctIndex, explanation: back, textColor, image });
                 } else {
-                    const hasAnyInput = Boolean(front || back || image);
-                    if (!hasAnyInput) continue;
-                    if (!front) throw new Error(`Thẻ số ${rowIdx + 1} chưa nhập Mặt trước.`);
-                    if (!back && !image) throw new Error(`Thẻ số ${rowIdx + 1} chưa nhập Mặt sau.`);
+                    if (!back && !image) {
+                        throw new Error(`Thẻ #${cardNo} cần nhập Mặt sau (định nghĩa/đáp án) hoặc chọn ảnh minh họa.`);
+                    }
                     cards.push({ front, back, textColor, image });
                 }
             }
+
             if (!cards.length) {
                 throw new Error(kind === "quiz"
-                    ? "Hãy nhập đầy đủ ít nhất 1 câu hỏi trắc nghiệm."
-                    : "Hãy nhập đầy đủ ít nhất 1 thẻ Flashcard (cả Mặt trước và Mặt sau).");
+                    ? "Hãy nhập ít nhất 1 câu hỏi và tối thiểu 2 đáp án."
+                    : "Hãy nhập ít nhất 1 thẻ Flashcard (cả Mặt trước và Mặt sau).");
             }
 
             const payload = {
+                kind,
                 title,
                 subject,
-                kind,
-                setType: kind,
+                description: "",
                 cards,
-                items: cards,
-                pinned,
-                isPinned: pinned
+                pinned
             };
 
             if (state.editingStudySetId) {
@@ -936,8 +931,6 @@
             await loadFullProfile();
         } catch (err) {
             status.textContent = err.message || "Không thể lưu bộ ôn tập.";
-        } finally {
-            if (submitBtn) submitBtn.disabled = false;
         }
     });
 
@@ -947,21 +940,18 @@
         if (!titleEl || !bodyEl) return;
         titleEl.textContent = studySet.title;
 
-        const items = Array.isArray(studySet.cards)
-            ? studySet.cards
-            : (Array.isArray(studySet.items) ? studySet.items : []);
+        const cards = Array.isArray(studySet.cards) ? studySet.cards : (Array.isArray(studySet.items) ? studySet.items : []);
         const kind = studySet.kind || studySet.setType || "flashcard";
-
-        if (!items.length) {
+        if (!cards.length) {
             bodyEl.innerHTML = `<p class="profile-extra-empty">Bộ học liệu này chưa có thẻ nào.</p>`;
             openModal("studyset-player-overlay");
             return;
         }
 
         if (kind === "quiz") {
-            runQuizPlayer(studySet, items, bodyEl, startChallenge);
+            runQuizPlayer(studySet, cards, bodyEl, startChallenge);
         } else {
-            runFlashcardPlayer(studySet, items, bodyEl);
+            runFlashcardPlayer(studySet, cards, bodyEl);
         }
         openModal("studyset-player-overlay");
     }
@@ -1001,7 +991,7 @@
             front.append(fText);
             if (card.image) {
                 const im = makeEl("img");
-                im.src = card.image;
+                im.src = resolveMediaUrl(card.image);
                 im.alt = card.front;
                 front.append(im);
             }
@@ -1056,7 +1046,7 @@
                     method: "POST",
                     body: JSON.stringify({ score, total: items.length, durationMs })
                 }).then(res => {
-                    const top3 = res.leaderboard || res.studySet?.leaderboard || studySet.leaderboard || [];
+                    const top3 = res.studySet?.leaderboard || res.leaderboard || studySet.leaderboard || [];
                     if (top3.length) renderLeaderboard(top3, bodyEl);
                 }).catch(() => {});
                 return;
@@ -1083,7 +1073,7 @@
             bodyEl.append(qTitle);
             if (q.image) {
                 const im = makeEl("img");
-                im.src = q.image;
+                im.src = resolveMediaUrl(q.image);
                 im.style.cssText = "max-height:160px; border-radius:8px; object-fit:cover;";
                 bodyEl.append(im);
             }
@@ -1095,10 +1085,12 @@
             nextBtn.hidden = true;
             nextBtn.onclick = () => { idx++; renderQuestion(); };
 
-            const validOptions = (q.options || []).filter(Boolean);
-            validOptions.forEach((optText, oIdx) => {
-                const btn = makeEl("button", "quiz-option-btn", `${["A", "B", "C", "D"][oIdx] || oIdx + 1}. ${optText}`);
+            const renderedButtons = [];
+            (q.options || []).forEach((optText, oIdx) => {
+                if (!optText) return;
+                const btn = makeEl("button", "quiz-option-btn", `${["A", "B", "C", "D"][oIdx]}. ${optText}`);
                 btn.type = "button";
+                btn.dataset.optIndex = String(oIdx);
                 btn.onclick = () => {
                     optsList.querySelectorAll("button").forEach(b => { b.disabled = true; });
                     const correctIdx = Number(q.correctIndex || 0);
@@ -1107,11 +1099,13 @@
                         score++;
                     } else {
                         btn.classList.add("is-wrong");
-                        optsList.querySelectorAll("button")[correctIdx]?.classList.add("is-correct");
+                        const rightBtn = renderedButtons.find(b => Number(b.dataset.optIndex) === correctIdx);
+                        rightBtn?.classList.add("is-correct");
                     }
                     if (q.explanation) explBox.textContent = `Giải thích: ${q.explanation}`;
                     nextBtn.hidden = false;
                 };
+                renderedButtons.push(btn);
                 optsList.append(btn);
             });
 
@@ -1128,7 +1122,8 @@
         box.append(makeEl("strong", "", "BXH Top 3 Thách đấu"));
         top3.slice(0, 3).forEach((row, i) => {
             const r = makeEl("div", "leaderboard-row");
-            r.innerHTML = `<span>#${i + 1} ${escapeHtml(row.name || row.userName || "Bạn học")}</span><strong>${row.score}/${row.total} (${((row.durationMs || 0) / 1000).toFixed(1)}s)</strong>`;
+            const displayName = row.name || row.userName || "Bạn học";
+            r.innerHTML = `<span>#${i + 1} ${escapeHtml(displayName)}</span><strong>${row.score}/${row.total} (${((row.durationMs || 0) / 1000).toFixed(1)}s)</strong>`;
             box.append(r);
         });
         container.append(box);
@@ -1153,12 +1148,12 @@
             const kind = s.kind || s.setType || "flashcard";
             const cards = Array.isArray(s.cards) ? s.cards : (Array.isArray(s.items) ? s.items : []);
             const pinned = Boolean(s.pinned ?? s.isPinned);
-            const plays = Number(s.studyCount ?? s.playCount ?? 0);
+            const studyCount = Number(s.studyCount ?? s.playCount ?? 0);
 
             const card = makeEl("article", "study-set-card");
             const badge = makeEl("span", "study-set-badge", `${kind === "quiz" ? "Quiz" : "Flashcard"} · ${s.subject || "Tổng hợp"}`);
             const title = makeEl("strong", "", `${pinned ? "[Đã ghim] " : ""}${s.title}`);
-            const meta = makeEl("p", "profile-extra-hint", `${cards.length} thẻ/câu · ${plays} lượt học`);
+            const meta = makeEl("p", "profile-extra-hint", `${cards.length} thẻ/câu · ${studyCount} lượt học`);
 
             const actions = makeEl("div", "study-set-actions");
             const btnStudy = makeEl("button", "study-set-btn primary", kind === "quiz" ? "Làm bài" : "Học Flashcard");
@@ -1184,10 +1179,6 @@
             }
 
             if (isOwner) {
-                const btnEdit = makeEl("button", "study-set-btn", "Sửa");
-                btnEdit.type = "button";
-                btnEdit.onclick = () => openStudySetBuilderForEdit(s);
-
                 const btnPost = makeEl("button", "study-set-btn", "Đăng lên Feed");
                 btnPost.type = "button";
                 btnPost.onclick = async () => {
@@ -1208,14 +1199,13 @@
                     await api(`/api/study-sets/${encodeURIComponent(s.id)}`, { method: "DELETE" });
                     await loadFullProfile();
                 };
-                actions.append(btnEdit, btnPost, btnDel);
+                actions.append(btnPost, btnDel);
             }
             card.append(badge, title, meta, actions);
             list.append(card);
         });
     }
-
-    // =========================================================
+	// =========================================================
     // SAVED & SHARED MATERIALS TAB
     // =========================================================
     async function loadSavedMaterialsTab() {
@@ -1248,24 +1238,37 @@
                 return;
             }
             combined.forEach(res => {
-                const titleText = res.resource_title || res.title || "Tài liệu học tập";
-                const descText = res.resource_description || res.description || "";
-                const subjText = res.resource_subject || res.subject || "Tài liệu";
-                const linkHref = safeUploadUrl(res.resource_file_url || res.fileUrl) || safeUploadUrl(res.resource_link || res.resourceUrl);
+                const title = res.resource_title || res.title || "Tài liệu học tập";
+                const subject = res.resource_subject || res.subject || "Tài liệu";
+                const desc = res.resource_description || res.description || "";
+                const rawFileUrl = res.resource_file_url || res.fileUrl || "";
+                const fileUrl = resolveMediaUrl(rawFileUrl);
+                const extLink = res.resource_link || res.resourceUrl || "";
+                const fileName = res.resource_file_name || "tai-lieu";
 
                 const card = makeEl("article", "study-set-card");
-                card.append(makeEl("span", "study-set-badge", `${res._tag} · ${subjText}`));
-                card.append(makeEl("strong", "", titleText));
-                if (descText) card.append(makeEl("p", "profile-extra-hint", descText));
-                if (linkHref) {
-                    const link = makeEl("a", "study-set-btn primary", "Mở tài liệu");
-                    link.href = linkHref;
-                    link.target = "_blank";
-                    link.rel = "noopener noreferrer";
-                    link.style.width = "max-content";
-                    link.style.textDecoration = "none";
-                    card.append(link);
+                card.append(makeEl("span", "study-set-badge", `${res._tag} · ${subject}`));
+                card.append(makeEl("strong", "", title));
+                if (desc) card.append(makeEl("p", "profile-extra-hint", desc));
+
+                const actions = makeEl("div", "study-set-actions");
+                if (fileUrl) {
+                    const dl = makeEl("a", "study-set-btn primary", "Mở / Tải tệp");
+                    dl.href = `${fileUrl}${fileUrl.includes("?") ? "&" : "?"}download=1&name=${encodeURIComponent(fileName)}`;
+                    dl.target = "_blank";
+                    dl.rel = "noopener noreferrer";
+                    dl.style.textDecoration = "none";
+                    actions.append(dl);
                 }
+                if (extLink) {
+                    const a = makeEl("a", "study-set-btn", "Mở liên kết");
+                    a.href = extLink;
+                    a.target = "_blank";
+                    a.rel = "noopener noreferrer";
+                    a.style.textDecoration = "none";
+                    actions.append(a);
+                }
+                if (actions.children.length) card.append(actions);
                 container.append(card);
             });
         } catch (err) {
@@ -1274,7 +1277,7 @@
     }
 
     // =========================================================
-    // ACHIEVEMENTS, INTERESTS & ALBUM
+    // ACHIEVEMENTS, INTERESTS & ALBUM (WITH PRIVACY LOCK & COLLAPSED FORMS)
     // =========================================================
     function renderAchievements(list, locked, isOwner) {
         const container = document.getElementById("profile-achievements-list");
@@ -1292,12 +1295,13 @@
             const item = makeEl("article", "profile-achievement-item");
             item.append(makeEl("span", "profile-achievement-tag", a.title));
             if (a.certificateImage) {
+                const certUrl = resolveMediaUrl(a.certificateImage);
                 const link = makeEl("a", "profile-certificate-link");
-                link.href = a.certificateImage;
+                link.href = certUrl;
                 link.target = "_blank";
                 link.rel = "noopener noreferrer";
                 const img = makeEl("img", "profile-certificate-image");
-                img.src = a.certificateImage;
+                img.src = certUrl;
                 img.alt = a.title;
                 link.append(img, makeEl("span", "", "Xem chứng nhận"));
                 item.append(link);
@@ -1355,7 +1359,7 @@
         photos.forEach(photo => {
             const card = makeEl("article", "profile-album-item");
             const img = makeEl("img", "profile-album-image");
-            img.src = photo.image;
+            img.src = resolveMediaUrl(photo.image);
             img.alt = photo.caption || "Ảnh album";
             img.loading = "lazy";
             card.append(img);
@@ -1374,20 +1378,234 @@
     }
 
     // =========================================================
-    // E-STUDENT QR CARD & DIEUNW+ MODAL
+    // E-STUDENT QR CARD & LEFT-TO-CENTER BACKGROUND CUSTOMIZER
     // =========================================================
+    function getEcardLocalKey(userId) {
+        return `dieunw_ecard_config_${userId || "me"}`;
+    }
+
+    function loadUserEcardConfig(user) {
+        let saved = user?.ecardConfig || null;
+        if (!saved && user?.id) {
+            try {
+                const raw = localStorage.getItem(getEcardLocalKey(user.id));
+                if (raw) saved = JSON.parse(raw);
+            } catch {
+                saved = null;
+            }
+        }
+        return {
+            ...DEFAULT_ECARD_CONFIG,
+            color1: user?.themePrimary || DEFAULT_ECARD_CONFIG.color1,
+            color2: user?.themeSecondary || DEFAULT_ECARD_CONFIG.color2,
+            ...(saved && typeof saved === "object" ? saved : {})
+        };
+    }
+
+    function applyEcardPreviewConfig(cfg) {
+        const card = document.getElementById("ecard-preview-card");
+        const photoEl = document.getElementById("ecard-custom-bg-photo");
+        const taglineEl = document.getElementById("ecard-tagline-label");
+        if (!card) return;
+
+        const safe = { ...DEFAULT_ECARD_CONFIG, ...(cfg || {}) };
+        card.dataset.tone = safe.textTone === "dark" ? "dark" : "light";
+        card.style.setProperty("--ecard-c1", safe.color1 || "#1769aa");
+        card.style.setProperty("--ecard-c2", safe.color2 || "#2298f8");
+        card.style.setProperty("--ecard-bg-pos", safe.bgPos || "center center");
+        const opacity = Math.max(0, Math.min(80, Number(safe.overlayOpacity ?? 25))) / 100;
+        card.style.setProperty("--ecard-overlay", String(opacity));
+
+        if (photoEl) {
+            if (safe.bgImage) {
+                photoEl.style.backgroundImage = `url("${resolveMediaUrl(safe.bgImage)}")`;
+            } else {
+                photoEl.style.backgroundImage = "none";
+            }
+        }
+
+        if (taglineEl) {
+            const tag = String(safe.tagline || "").trim();
+            taglineEl.textContent = tag;
+            taglineEl.hidden = !tag;
+        }
+    }
+
+    function syncEcardCustomizerInputs(cfg) {
+        const posEl = document.getElementById("ecard-bg-pos");
+        const toneEl = document.getElementById("ecard-text-tone");
+        const c1El = document.getElementById("ecard-c1");
+        const c2El = document.getElementById("ecard-c2");
+        const rangeEl = document.getElementById("ecard-overlay-range");
+        const rangeLbl = document.getElementById("ecard-overlay-label");
+        const taglineInput = document.getElementById("ecard-tagline-input");
+        const clearBgBtn = document.getElementById("btn-clear-ecard-bg");
+        const fileEl = document.getElementById("ecard-bg-file");
+
+        if (posEl) posEl.value = cfg.bgPos || "center center";
+        if (toneEl) toneEl.value = cfg.textTone === "dark" ? "dark" : "light";
+        if (c1El) c1El.value = cfg.color1 || "#1769aa";
+        if (c2El) c2El.value = cfg.color2 || "#2298f8";
+        if (rangeEl) rangeEl.value = String(cfg.overlayOpacity ?? 25);
+        if (rangeLbl) rangeLbl.textContent = `${cfg.overlayOpacity ?? 25}%`;
+        if (taglineInput) taglineInput.value = cfg.tagline || "";
+        if (clearBgBtn) clearBgBtn.hidden = !cfg.bgImage;
+        if (fileEl) fileEl.value = "";
+    }
+
     document.getElementById("btn-ecard-open")?.addEventListener("click", () => {
         const user = state.profileData?.user || state.viewerUser;
         if (!user) return;
-        document.getElementById("ecard-avatar-img").src = user.avatar || "./DIEU.png";
+        document.getElementById("ecard-avatar-img").src = resolveMediaUrl(user.avatar || "./DIEU.png");
         document.getElementById("ecard-name-label").textContent = user.name || "Học sinh NQD";
         document.getElementById("ecard-class-label").textContent = user.studentClass ? `Lớp ${user.studentClass}` : "Học sinh trường NQD";
         document.getElementById("ecard-cohort-label").textContent = user.cohort || "NQD";
         document.getElementById("ecard-email-label").textContent = user.email || "";
 
+        state.ecardDraft = loadUserEcardConfig(user);
+        applyEcardPreviewConfig(state.ecardDraft);
+        syncEcardCustomizerInputs(state.ecardDraft);
+
+        const customSection = document.getElementById("ecard-custom-section");
+        const customAcc = document.getElementById("ecard-custom-accordion");
+        const toggleBtn = document.getElementById("btn-toggle-ecard-custom");
+        const statusEl = document.getElementById("ecard-custom-status");
+        if (customSection) customSection.hidden = !state.isSelf;
+        if (customAcc) customAcc.hidden = true;
+        if (toggleBtn) {
+            toggleBtn.setAttribute("aria-expanded", "false");
+            toggleBtn.textContent = "Tùy chỉnh nền & giao diện thẻ ▾";
+        }
+        if (statusEl) statusEl.textContent = "";
+
         const profileUrl = `${location.origin}${location.pathname}?userId=${encodeURIComponent(user.id)}`;
         drawQrToCanvas(document.getElementById("ecard-qr-canvas"), profileUrl);
         openModal("ecard-modal-overlay");
+    });
+
+    document.getElementById("btn-toggle-ecard-custom")?.addEventListener("click", () => {
+        const acc = document.getElementById("ecard-custom-accordion");
+        const btn = document.getElementById("btn-toggle-ecard-custom");
+        if (!acc || !btn) return;
+        acc.hidden = !acc.hidden;
+        const isOpen = !acc.hidden;
+        btn.setAttribute("aria-expanded", String(isOpen));
+        btn.textContent = isOpen ? "Thu gọn phần tùy chỉnh ▴" : "Tùy chỉnh nền & giao diện thẻ ▾";
+    });
+
+    document.getElementById("ecard-bg-file")?.addEventListener("change", async event => {
+        const file = event.target.files?.[0];
+        const statusEl = document.getElementById("ecard-custom-status");
+        if (!file) return;
+        try {
+            if (statusEl) statusEl.textContent = "Đang tối ưu ảnh nền...";
+            const compressed = await toOptimizedImage(file, 900);
+            state.ecardDraft.bgImage = compressed;
+            const clearBtn = document.getElementById("btn-clear-ecard-bg");
+            if (clearBtn) clearBtn.hidden = false;
+            applyEcardPreviewConfig(state.ecardDraft);
+            if (statusEl) statusEl.textContent = "Đã xem trước ảnh nền. Bấm \"Lưu mẫu thẻ\" để lưu lại.";
+        } catch (err) {
+            if (statusEl) statusEl.textContent = err.message;
+        }
+    });
+
+    document.getElementById("btn-clear-ecard-bg")?.addEventListener("click", () => {
+        state.ecardDraft.bgImage = "";
+        const fileEl = document.getElementById("ecard-bg-file");
+        const clearBtn = document.getElementById("btn-clear-ecard-bg");
+        if (fileEl) fileEl.value = "";
+        if (clearBtn) clearBtn.hidden = true;
+        applyEcardPreviewConfig(state.ecardDraft);
+    });
+
+    document.getElementById("ecard-bg-pos")?.addEventListener("change", e => {
+        state.ecardDraft.bgPos = e.target.value;
+        applyEcardPreviewConfig(state.ecardDraft);
+    });
+
+    document.getElementById("ecard-text-tone")?.addEventListener("change", e => {
+        state.ecardDraft.textTone = e.target.value === "dark" ? "dark" : "light";
+        applyEcardPreviewConfig(state.ecardDraft);
+    });
+
+    document.getElementById("ecard-c1")?.addEventListener("input", e => {
+        state.ecardDraft.color1 = e.target.value;
+        applyEcardPreviewConfig(state.ecardDraft);
+    });
+
+    document.getElementById("ecard-c2")?.addEventListener("input", e => {
+        state.ecardDraft.color2 = e.target.value;
+        applyEcardPreviewConfig(state.ecardDraft);
+    });
+
+    document.querySelectorAll(".ecard-swatch-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const c1 = btn.dataset.ec1 || "#1769aa";
+            const c2 = btn.dataset.ec2 || "#2298f8";
+            state.ecardDraft.color1 = c1;
+            state.ecardDraft.color2 = c2;
+            const c1El = document.getElementById("ecard-c1");
+            const c2El = document.getElementById("ecard-c2");
+            if (c1El) c1El.value = c1;
+            if (c2El) c2El.value = c2;
+            applyEcardPreviewConfig(state.ecardDraft);
+        });
+    });
+
+    document.getElementById("ecard-overlay-range")?.addEventListener("input", e => {
+        const val = Number(e.target.value || 0);
+        state.ecardDraft.overlayOpacity = val;
+        const lbl = document.getElementById("ecard-overlay-label");
+        if (lbl) lbl.textContent = `${val}%`;
+        applyEcardPreviewConfig(state.ecardDraft);
+    });
+
+    document.getElementById("ecard-tagline-input")?.addEventListener("input", e => {
+        state.ecardDraft.tagline = e.target.value.slice(0, 60);
+        applyEcardPreviewConfig(state.ecardDraft);
+    });
+
+    document.getElementById("btn-reset-ecard-custom")?.addEventListener("click", () => {
+        const user = state.profileData?.user || state.viewerUser;
+        state.ecardDraft = {
+            ...DEFAULT_ECARD_CONFIG,
+            color1: user?.themePrimary || DEFAULT_ECARD_CONFIG.color1,
+            color2: user?.themeSecondary || DEFAULT_ECARD_CONFIG.color2
+        };
+        syncEcardCustomizerInputs(state.ecardDraft);
+        applyEcardPreviewConfig(state.ecardDraft);
+        const statusEl = document.getElementById("ecard-custom-status");
+        if (statusEl) statusEl.textContent = "Đã khôi phục mặc định. Bấm \"Lưu mẫu thẻ\" nếu muốn ghi đè mẫu cũ.";
+    });
+
+    document.getElementById("btn-save-ecard-custom")?.addEventListener("click", async () => {
+        const user = state.profileData?.user || state.viewerUser;
+        const statusEl = document.getElementById("ecard-custom-status");
+        if (!user) return;
+        const payloadCfg = { ...state.ecardDraft };
+
+        try {
+            if (statusEl) statusEl.textContent = "Đang lưu mẫu thẻ...";
+            try {
+                localStorage.setItem(getEcardLocalKey(user.id), JSON.stringify(payloadCfg));
+            } catch {}
+
+            const res = await api("/api/users/me", {
+                method: "PATCH",
+                body: JSON.stringify({ ecardConfig: payloadCfg })
+            });
+            if (res.user) {
+                state.viewerUser = res.user;
+                if (state.profileData) state.profileData.user = res.user;
+                localStorage.setItem("dieuNwUser", JSON.stringify(res.user));
+            }
+            if (statusEl) statusEl.textContent = "Đã lưu tùy chỉnh Thẻ học sinh điện tử!";
+        } catch (err) {
+            if (statusEl) {
+                statusEl.textContent = `Đã lưu trên thiết bị này (đồng bộ server gặp lỗi: ${err.message}).`;
+            }
+        }
     });
 
     document.getElementById("btn-copy-profile-link")?.addEventListener("click", async () => {
@@ -1398,15 +1616,201 @@
         alert("Đã sao chép liên kết hồ sơ!");
     });
 
-    document.getElementById("btn-download-ecard")?.addEventListener("click", () => {
-        const canvas = document.getElementById("ecard-qr-canvas");
-        if (!canvas) return;
-        const link = document.createElement("a");
-        link.download = "dieunw-qr-card.png";
-        link.href = canvas.toDataURL("image/png");
-        link.click();
+    function loadCanvasImage(src) {
+        return new Promise((resolve, reject) => {
+            if (!src) return resolve(null);
+            const img = new Image();
+            if (!src.startsWith("data:") && !src.startsWith("blob:")) {
+                img.crossOrigin = "anonymous";
+            }
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error("Image load failed"));
+            img.src = src;
+        });
+    }
+
+    function drawRoundRectPath(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+    }
+
+    document.getElementById("btn-download-ecard")?.addEventListener("click", async () => {
+        const qrCanvas = document.getElementById("ecard-qr-canvas");
+        const user = state.profileData?.user || state.viewerUser;
+        if (!qrCanvas || !user) return;
+
+        const cfg = state.ecardDraft || loadUserEcardConfig(user);
+        const W = 760;
+        const H = 430;
+        const outCanvas = document.createElement("canvas");
+        outCanvas.width = W;
+        outCanvas.height = H;
+        const ctx = outCanvas.getContext("2d");
+
+        try {
+            // Card clip & right-half clean base
+            ctx.save();
+            drawRoundRectPath(ctx, 0, 0, W, H, 28);
+            ctx.clip();
+
+            const isDarkText = cfg.textTone === "dark";
+            const rightBaseGrad = ctx.createLinearGradient(0, 0, W, H);
+            if (isDarkText) {
+                rightBaseGrad.addColorStop(0, "#f8fafc");
+                rightBaseGrad.addColorStop(1, "#dbeafe");
+            } else {
+                rightBaseGrad.addColorStop(0, "#0b2236");
+                rightBaseGrad.addColorStop(1, "#133a5c");
+            }
+            ctx.fillStyle = rightBaseGrad;
+            ctx.fillRect(0, 0, W, H);
+
+            // Left-to-near-center custom background zone (68% width fading out toward QR zone)
+            const bgLayer = document.createElement("canvas");
+            bgLayer.width = W;
+            bgLayer.height = H;
+            const bctx = bgLayer.getContext("2d");
+
+            const zoneGrad = bctx.createLinearGradient(0, 0, W * 0.68, H);
+            zoneGrad.addColorStop(0, cfg.color1 || "#1769aa");
+            zoneGrad.addColorStop(1, cfg.color2 || "#2298f8");
+            bctx.fillStyle = zoneGrad;
+            bctx.fillRect(0, 0, W, H);
+
+            if (cfg.bgImage) {
+                const bgImg = await loadCanvasImage(resolveMediaUrl(cfg.bgImage)).catch(() => null);
+                if (bgImg) {
+                    const zoneW = W * 0.72;
+                    const scale = Math.max(zoneW / bgImg.width, H / bgImg.height);
+                    const dw = bgImg.width * scale;
+                    const dh = bgImg.height * scale;
+                    let dx = (zoneW - dw) / 2;
+                    let dy = (H - dh) / 2;
+                    if (cfg.bgPos === "left center") dx = 0;
+                    else if (cfg.bgPos === "right center") dx = zoneW - dw;
+                    else if (cfg.bgPos === "center top") dy = 0;
+                    else if (cfg.bgPos === "center bottom") dy = H - dh;
+                    bctx.drawImage(bgImg, dx, dy, dw, dh);
+                }
+            }
+
+            const overlayAlpha = Math.max(0, Math.min(80, Number(cfg.overlayOpacity ?? 25))) / 100;
+            if (overlayAlpha > 0) {
+                bctx.fillStyle = `rgba(7, 17, 29, ${overlayAlpha})`;
+                bctx.fillRect(0, 0, W, H);
+            }
+
+            // Smooth horizontal mask so left-to-center custom area blends seamlessly before QR zone
+            bctx.globalCompositeOperation = "destination-in";
+            const maskGrad = bctx.createLinearGradient(0, 0, W * 0.74, 0);
+            maskGrad.addColorStop(0, "rgba(0,0,0,1)");
+            maskGrad.addColorStop(0.68, "rgba(0,0,0,0.92)");
+            maskGrad.addColorStop(0.92, "rgba(0,0,0,0.22)");
+            maskGrad.addColorStop(1, "rgba(0,0,0,0)");
+            bctx.fillStyle = maskGrad;
+            bctx.fillRect(0, 0, W, H);
+
+            ctx.drawImage(bgLayer, 0, 0);
+
+            // Typography & header
+            const textColor = isDarkText ? "#0f172a" : "#ffffff";
+            const mutedColor = isDarkText ? "rgba(15,23,42,0.78)" : "rgba(255,255,255,0.88)";
+
+            ctx.fillStyle = isDarkText ? "rgba(15,23,42,0.72)" : "rgba(255,255,255,0.82)";
+            ctx.font = "700 16px system-ui, -apple-system, sans-serif";
+            ctx.fillText("DIEUNW · E-STUDENT CARD", 36, 48);
+
+            // Cohort pill on top-right
+            const cohortText = (user.cohort || "NQD").slice(0, 24);
+            ctx.font = "700 15px system-ui, -apple-system, sans-serif";
+            const pillW = Math.max(76, ctx.measureText(cohortText).width + 28);
+            drawRoundRectPath(ctx, W - 36 - pillW, 26, pillW, 32, 16);
+            ctx.fillStyle = isDarkText ? "rgba(15,23,42,0.10)" : "rgba(255,255,255,0.18)";
+            ctx.fill();
+            ctx.fillStyle = textColor;
+            ctx.textAlign = "center";
+            ctx.fillText(cohortText, W - 36 - pillW / 2, 47);
+            ctx.textAlign = "left";
+
+            // Avatar circle
+            const avImg = await loadCanvasImage(resolveMediaUrl(user.avatar || "./DIEU.png")).catch(() => null);
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(76, 134, 40, 0, Math.PI * 2);
+            ctx.closePath();
+            ctx.clip();
+            if (avImg) {
+                ctx.drawImage(avImg, 36, 94, 80, 80);
+            } else {
+                ctx.fillStyle = "#1769aa";
+                ctx.fillRect(36, 94, 80, 80);
+            }
+            ctx.restore();
+            ctx.strokeStyle = isDarkText ? "rgba(15,23,42,0.28)" : "#ffffff";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(76, 134, 40, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Student identity text on left zone
+            ctx.fillStyle = textColor;
+            ctx.font = "800 28px system-ui, -apple-system, sans-serif";
+            ctx.fillText((user.name || "Học sinh NQD").slice(0, 26), 36, 222);
+
+            ctx.fillStyle = mutedColor;
+            ctx.font = "600 19px system-ui, -apple-system, sans-serif";
+            ctx.fillText(user.studentClass ? `Lớp ${user.studentClass}` : "Học sinh trường NQD", 36, 258);
+
+            ctx.font = "500 16px system-ui, -apple-system, sans-serif";
+            ctx.fillText(user.email || "", 36, 290);
+
+            if (cfg.tagline) {
+                const tag = String(cfg.tagline).trim().slice(0, 48);
+                ctx.font = "700 15px system-ui, -apple-system, sans-serif";
+                const tagW = Math.min(410, ctx.measureText(tag).width + 24);
+                drawRoundRectPath(ctx, 36, 318, tagW, 34, 17);
+                ctx.fillStyle = isDarkText ? "rgba(15,23,42,0.12)" : "rgba(255,255,255,0.20)";
+                ctx.fill();
+                ctx.fillStyle = textColor;
+                ctx.fillText(tag, 48, 340, 386);
+            }
+
+            // Right QR Box
+            const qrBoxSize = 216;
+            const qrX = W - 36 - qrBoxSize;
+            const qrY = 114;
+            drawRoundRectPath(ctx, qrX, qrY, qrBoxSize, qrBoxSize, 20);
+            ctx.fillStyle = "#ffffff";
+            ctx.fill();
+            ctx.drawImage(qrCanvas, qrX + 14, qrY + 14, qrBoxSize - 28, qrBoxSize - 28);
+
+            ctx.fillStyle = isDarkText ? "rgba(15,23,42,0.70)" : "rgba(255,255,255,0.75)";
+            ctx.font = "600 13px system-ui, -apple-system, sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("Quét mã để mở hồ sơ", qrX + qrBoxSize / 2, qrY + qrBoxSize + 24);
+            ctx.textAlign = "left";
+            ctx.restore();
+
+            const link = document.createElement("a");
+            link.download = `the-hoc-sinh-${(user.name || "nqd").toLowerCase().replace(/\s+/g, "-")}.png`;
+            link.href = outCanvas.toDataURL("image/png");
+            link.click();
+        } catch {
+            const link = document.createElement("a");
+            link.download = "dieunw-qr-card.png";
+            link.href = qrCanvas.toDataURL("image/png");
+            link.click();
+        }
     });
 
+    // =========================================================
+    // DIEUNW+ MODAL
+    // =========================================================
     async function renderDieunwPlusModal() {
         const user = state.profileData?.user || state.viewerUser;
         if (!user) return;
@@ -1478,7 +1882,7 @@
                 const box = makeEl("div", "sticker-thumb-btn");
                 box.style.position = "relative";
                 const im = makeEl("img");
-                im.src = st.image || st.imageUrl;
+                im.src = resolveMediaUrl(st.image || st.imageUrl);
                 im.alt = st.name || "Sticker";
                 box.append(im);
                 const ownerId = st.owner_id || st.ownerUserId;
@@ -1525,7 +1929,7 @@
             const image = await toOptimizedImage(file, 256);
             await api("/api/stickers", {
                 method: "POST",
-                body: JSON.stringify({ name, image, imageUrl: image })
+                body: JSON.stringify({ name, image })
             });
             document.getElementById("plus-sticker-name").value = "";
             document.getElementById("plus-sticker-file").value = "";
@@ -1694,12 +2098,12 @@
             } else {
                 const list = makeEl("div", "audit-log-list");
                 logs.forEach(log => {
-                    const actor = log.actorName || log.actor_name || log.actorEmail || log.actor_email || "Kiểm duyệt viên";
-                    const act = log.actionLabel || log.action || "Xử lý";
-                    const det = log.detail || log.target_label || log.details || "";
-                    const created = log.createdAt || log.created_at;
+                    const actor = log.actor_name || log.actorName || log.actor_email || log.actorEmail || "Ban kiểm duyệt";
+                    const action = log.action || log.actionLabel || "";
+                    const detail = log.target_label || log.details || log.detail || "";
+                    const ts = log.created_at || log.createdAt;
                     const item = makeEl("div", "audit-log-item");
-                    item.innerHTML = `<strong>${escapeHtml(actor)} · ${escapeHtml(act)}</strong><span class="audit-log-meta">${escapeHtml(det)}${created ? ` • ${new Date(created).toLocaleString("vi-VN")}` : ""}</span>`;
+                    item.innerHTML = `<strong>${escapeHtml(actor)} · ${escapeHtml(action)}</strong><span class="audit-log-meta">${escapeHtml(detail)}${detail ? " • " : ""}${ts ? new Date(ts).toLocaleString("vi-VN") : ""}</span>`;
                     list.append(item);
                 });
                 content.append(list);
@@ -1715,13 +2119,11 @@
 
         queue.forEach(entry => {
             const titleText = entry.targetTitle
-                || entry.post?.name
-                || entry.account?.name
-                || entry.account?.email
+                || (entry.post ? `Bài viết của ${entry.post.name || "Thành viên"}` : null)
+                || (entry.account ? `${entry.account.name} (${entry.account.email})` : null)
                 || entry.targetId;
             const previewText = entry.targetPreview
-                || entry.post?.content?.slice(0, 90)
-                || entry.account?.email
+                || (entry.post ? String(entry.post.content || "").replace(/<[^>]+>/g, " ").slice(0, 90) : null)
                 || `${entry.reportCount} báo cáo đang chờ duyệt`;
 
             const card = makeEl("button", "mod-queue-card");
@@ -1739,8 +2141,13 @@
     function openModInspectModal(entry, targetType) {
         const body = document.getElementById("mod-inspect-body");
         const actions = document.getElementById("mod-inspect-actions");
+        const postContentHtml = entry.post?.content
+            ? `<div style="padding:10px; border-radius:10px; background:var(--bg-surface-soft); margin-bottom:10px; font-size:13.5px;">${escapeHtml(String(entry.post.content).replace(/<[^>]+>/g, " ").slice(0, 320))}</div>`
+            : "";
+
         body.innerHTML = `
             <p style="font-weight:700; margin-bottom:8px;">${escapeHtml(entry.targetTitle || entry.targetId)}</p>
+            ${postContentHtml}
             <div class="mod-reasons-list">
                 ${(entry.reasons || []).map(r => `<div class="mod-reason-item"><strong>${escapeHtml(r.reporterName || "Ẩn danh")}:</strong> ${escapeHtml(r.reason)}</div>`).join("")}
             </div>
@@ -1777,7 +2184,7 @@
     document.getElementById("mod-inspect-close")?.addEventListener("click", () => closeModal("mod-inspect-overlay"));
 
     // =========================================================
-    // TABS & ACCORDION FORMS
+    // TABS, POSTS SUBFILTER (CỦA TÔI / BÀI ĐÃ LƯU) & ACCORDION FORMS
     // =========================================================
     document.querySelectorAll("[data-profile-tab]").forEach(btn => {
         btn.addEventListener("click", () => {
@@ -1787,6 +2194,84 @@
                 p.hidden = p.getAttribute("data-tab-panel") !== tab;
             });
             if (tab === "saved-materials") loadSavedMaterialsTab();
+        });
+    });
+
+    async function renderSavedPostsList() {
+        const container = document.getElementById("my-posts-container");
+        if (!container) return;
+        container.innerHTML = `<p class="profile-extra-empty">Đang tải bài viết đã lưu...</p>`;
+        try {
+            const data = await api("/api/bookmarks");
+            const savedPosts = data.posts || [];
+            container.replaceChildren();
+            if (!savedPosts.length) {
+                container.innerHTML = `<p class="profile-extra-empty">Bạn chưa lưu bài viết nào từ Bảng tin.</p>`;
+                return;
+            }
+            savedPosts.forEach(p => {
+                const card = makeEl("article", "post-card");
+                const head = makeEl("div", "post-header");
+                const left = makeEl("div", "", "");
+                left.style.cssText = "display:flex; align-items:center; gap:10px;";
+                const av = makeEl("img", "post-avatar");
+                av.src = resolveMediaUrl(p.avatar || "./DIEU.png");
+                av.alt = p.name || "Thành viên";
+                const meta = makeEl("div", "", "");
+                meta.append(makeEl("strong", "", p.name || "Thành viên"));
+                const dt = makeEl("div", "profile-extra-hint", p.createdAt ? new Date(p.createdAt).toLocaleString("vi-VN") : "");
+                meta.append(dt);
+                left.append(av, meta);
+
+                const unsaveBtn = makeEl("button", "profile-extra-delete", "Bỏ lưu");
+                unsaveBtn.type = "button";
+                unsaveBtn.onclick = async () => {
+                    await api("/api/bookmarks/toggle", {
+                        method: "POST",
+                        body: JSON.stringify({ itemType: "post", itemId: p.id })
+                    });
+                    renderSavedPostsList();
+                };
+                head.append(left, unsaveBtn);
+
+                const body = makeEl("div", "post-content");
+                if (p.isRichHtml) {
+                    body.innerHTML = String(p.content || "");
+                } else {
+                    body.textContent = p.content || "";
+                }
+                card.append(head, body);
+                if (p.image) {
+                    const im = makeEl("img", "post-image");
+                    im.src = resolveMediaUrl(p.image);
+                    im.alt = "Ảnh bài viết";
+                    card.append(im);
+                }
+                container.append(card);
+            });
+        } catch (err) {
+            container.innerHTML = `<p class="profile-extra-empty">${escapeHtml(err.message)}</p>`;
+        }
+    }
+
+    document.querySelectorAll("#posts-subfilter-pills [data-post-filter]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const filter = btn.getAttribute("data-post-filter") || "mine";
+            state.activePostFilter = filter;
+            document.querySelectorAll("#posts-subfilter-pills [data-post-filter]").forEach(b => b.classList.toggle("active", b === btn));
+            const heading = document.getElementById("posts-section-heading");
+            if (heading) heading.textContent = filter === "saved" ? "Bài viết đã lưu" : "Bài viết đã đăng";
+
+            if (filter === "saved") {
+                renderSavedPostsList();
+            } else {
+                window.dispatchEvent(new CustomEvent("dieu-profile-post-filter", { detail: { filter: "mine" } }));
+                if (typeof window.loadProfilePosts === "function") {
+                    window.loadProfilePosts();
+                } else {
+                    location.reload();
+                }
+            }
         });
     });
 
@@ -1881,14 +2366,12 @@
             status.textContent = "Đang lưu...";
             const file = document.getElementById("showcase-image-file").files[0];
             const image = file ? await toOptimizedImage(file, 900) : "";
-            const urlVal = document.getElementById("showcase-url-input").value.trim();
             await api("/api/profile/showcase", {
                 method: "POST",
                 body: JSON.stringify({
                     title: document.getElementById("showcase-title-input").value.trim(),
                     description: document.getElementById("showcase-desc-input").value.trim(),
-                    link: urlVal,
-                    url: urlVal,
+                    link: document.getElementById("showcase-url-input").value.trim(),
                     image
                 })
             });
@@ -1904,17 +2387,13 @@
     document.getElementById("study-tag-form")?.addEventListener("submit", async e => {
         e.preventDefault();
         const status = document.getElementById("study-tag-status");
-        const val = document.getElementById("study-tag-input").value.trim();
-        const kind = document.getElementById("study-tag-type").value;
         try {
             status.textContent = "Đang thêm...";
             await api("/api/profile/study-tags", {
                 method: "POST",
                 body: JSON.stringify({
-                    subject: val,
-                    subjectTag: val,
-                    kind,
-                    tagType: kind
+                    subject: document.getElementById("study-tag-input").value.trim(),
+                    kind: document.getElementById("study-tag-type").value
                 })
             });
             e.currentTarget.reset();
@@ -1985,11 +2464,68 @@
     });
 
     // =========================================================
+    // CLUB FANPAGE JOIN BUTTON HOOK (profile.html?clubId=...)
+    // =========================================================
+    async function initClubFanpageJoinButton(clubId) {
+        if (!clubId) return;
+        const bar = document.getElementById("profile-actions-bar");
+        if (!bar) return;
+
+        try {
+            const data = await api(`/api/clubs/${encodeURIComponent(clubId)}`);
+            const club = data.club;
+            if (!club) return;
+
+            let btn = document.getElementById("btn-fanpage-join-club");
+            if (!btn) {
+                btn = makeEl("button", "btn-club-join");
+                btn.id = "btn-fanpage-join-club";
+                btn.type = "button";
+                const editBtn = document.getElementById("btn-edit-profile");
+                if (editBtn && editBtn.parentNode === bar) {
+                    editBtn.insertAdjacentElement("afterend", btn);
+                } else {
+                    bar.prepend(btn);
+                }
+            }
+
+            let joined = Boolean(club.isMember);
+            const syncBtn = () => {
+                btn.classList.toggle("is-joined", joined);
+                btn.textContent = joined ? "✓ Đã tham gia" : "Tham gia CLB";
+                btn.setAttribute("aria-pressed", String(joined));
+            };
+            syncBtn();
+
+            btn.onclick = async () => {
+                btn.disabled = true;
+                try {
+                    await api(`/api/clubs/${encodeURIComponent(club.id)}/join`, {
+                        method: joined ? "DELETE" : "POST"
+                    });
+                    joined = !joined;
+                    syncBtn();
+                } catch (err) {
+                    alert(err.message || "Vui lòng đăng nhập tài khoản DIEUNW để tham gia CLB.");
+                } finally {
+                    btn.disabled = false;
+                }
+            };
+        } catch {
+            // Silent fallback if club cannot be loaded
+        }
+    }
+
+    // =========================================================
     // MASTER LOADER
     // =========================================================
     async function loadFullProfile() {
         const params = new URLSearchParams(window.location.search);
-        if (params.get("clubId")) return;
+        const clubId = params.get("clubId");
+        if (clubId) {
+            initClubFanpageJoinButton(clubId);
+            return;
+        }
         const targetId = params.get("userId") || state.targetUserId || "me";
         try {
             const data = await api(`/api/users/${encodeURIComponent(targetId)}/profile`);
@@ -2019,7 +2555,11 @@
 
     window.addEventListener("dieu-profile-loaded", event => {
         const detail = event.detail || {};
-        if (detail.isClub) return;
+        if (detail.isClub) {
+            const clubId = detail.clubId || new URLSearchParams(window.location.search).get("clubId");
+            if (clubId) initClubFanpageJoinButton(clubId);
+            return;
+        }
         state.viewerUser = detail.viewerUser || null;
         state.targetUserId = detail.targetUserId || "me";
         loadFullProfile();
@@ -2027,6 +2567,11 @@
 
     window.addEventListener("dieu-profile-ready", () => {
         loadFullProfile();
+    });
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const clubId = new URLSearchParams(window.location.search).get("clubId");
+        if (clubId) initClubFanpageJoinButton(clubId);
     });
 
     window.DIEUNW_PROFILE = {

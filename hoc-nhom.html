@@ -4,27 +4,18 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta name="theme-color" content="#1769aa">
-	<link rel="stylesheet" href="./style.css?v=11">
+	<link rel="stylesheet" href="./style.css?v=12">
 	<link rel="icon" type="image/png" href="./DIEU.png?v=1">
 	<title>Học Nhóm - DIEUNW</title>
 </head>
 <body class="group-page">
 	<header class="navbar nav-scroll">
-		<div class="nav-corner-dock">
-			<button class="nav-brand-toggle" type="button" aria-expanded="false" aria-controls="main-nav-menu" aria-label="Mở menu điều hướng">
-				<picture>
-					<source srcset="./DIEU.avif" type="image/avif">
-					<source srcset="./DIEU.webp" type="image/webp">
-					<img src="./DIEU.png" alt="DIEUNW" class="nav-brand-badge">
-				</picture>
-			</button>
-			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
-				<img class="nav-user-avatar" src="./DIEU.png" alt="">
-				<span class="nav-status-dot" aria-hidden="true"></span>
+		<div class="nav-left">
+			<a href="./index.html" class="brand-logo-link">
+				<img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo">
 			</a>
-			<button id="nav-theme-toggle" class="nav-theme-toggle" type="button" aria-label="Chuyển chế độ sáng tối" title="Chuyển chế độ sáng / tối">🌙</button>
 		</div>
-		<nav id="main-nav-menu" class="nav-menu nav-dropdown-panel" aria-label="Điều hướng chính" hidden>
+		<nav class="nav-menu" aria-label="Điều hướng chính">
 			<a href="./index.html" class="nav-item">Trang chủ</a>
 			<a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
 			<a href="./hoc-nhom.html" class="nav-item active" aria-current="page">Học nhóm</a>
@@ -34,16 +25,12 @@
 			<a href="./clubs.html" class="nav-item">CLB</a>
 			<a href="./announcements.html" class="nav-item">Thông báo</a>
 		</nav>
+		<div class="nav-right">
+			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
+				<img class="nav-user-avatar" src="./DIEU.png" alt="">
+			</a>
+		</div>
 	</header>
-
-	<section id="hero-banner" class="hero-banner" aria-label="DIEUNW Banner">
-		<picture>
-			<source srcset="./DIEUNW.avif" type="image/avif">
-			<source srcset="./DIEUNW.webp" type="image/webp">
-			<img src="./DIEUNW.png" alt="DIEUNW" class="hero-banner-img" loading="eager">
-		</picture>
-		<div class="hero-banner-fade" aria-hidden="true"></div>
-	</section>
 
 	<main class="group-main page-enter">
 		<section class="group-intro">
@@ -89,12 +76,19 @@
 					<input class="group-input" id="resource-link" name="link" type="text" placeholder="https://... (có thể bỏ trống nếu đã chọn tệp)">
 
 					<label class="form-label" for="resource-file">Tệp tài liệu (PDF, Word, ảnh... — tùy chọn nếu đã có liên kết)</label>
-					<input class="group-input" id="resource-file" name="resource_file" type="file" accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.avif,.zip">
+					<div class="image-upload-box resource-file-box" id="resource-file-box">
+						<div class="image-upload-row">
+							<label class="image-upload-label resource-file-trigger" for="resource-file" id="resource-file-trigger">Chọn tệp từ máy</label>
+							<input id="resource-file" name="resource_file" type="file" class="sr-only" accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.gif,.zip,.rar">
+							<span id="resource-file-name" class="image-upload-filename">Chưa chọn tệp nào</span>
+							<button type="button" id="resource-file-clear" class="btn-clear-upload" hidden>Xóa tệp</button>
+						</div>
+					</div>
 
-					<label class="form-label" for="resource-cover-color">Màu bìa sách</label>
+					<label class="form-label" for="resource-cover-color" style="margin-top: 12px;">Màu bìa sách</label>
 					<div class="cover-color-row">
 						<input class="color-picker" id="resource-cover-color" name="resource_cover_color" type="color" value="#6aa68d">
-						<span class="color-picker-label">#6aa68d</span>
+						<span class="color-picker-label">#6AA68D</span>
 					</div>
 
 					<button class="group-submit" id="resource-submit" type="submit">Đăng tài liệu</button>
@@ -136,6 +130,23 @@
 						<button id="resource-refresh" class="refresh-button" type="button" aria-label="Tải lại kệ sách" title="Tải lại">↻</button>
 					</div>
 
+					<div class="resource-filters-bar">
+						<select id="filter-grade" class="group-input" aria-label="Lọc theo khối">
+							<option value="">Tất cả khối</option>
+							<option value="10">Khối 10</option>
+							<option value="11">Khối 11</option>
+							<option value="12">Khối 12</option>
+						</select>
+						<select id="filter-track" class="group-input" aria-label="Lọc theo hệ">
+							<option value="">Tất cả hệ</option>
+							<option value="Chuyên">Chuyên</option>
+							<option value="Thường">Thường</option>
+						</select>
+						<select id="filter-subject" class="group-input" aria-label="Lọc theo môn">
+							<option value="">Tất cả môn</option>
+						</select>
+					</div>
+
 					<div id="resource-list" class="resource-list book-shelf" aria-live="polite">
 						<p class="feed-state">Đang tải kệ sách...</p>
 					</div>
@@ -174,8 +185,8 @@
 	<div id="book-reader-overlay" class="book-reader-overlay" hidden>
 		<section class="book-reader-modal" id="book-reader-modal" role="dialog" aria-modal="true" aria-labelledby="reader-book-title">
 			<header class="book-reader-topbar">
-				<div>
-					<p class="group-eyebrow" id="reader-meta-eyebrow">TÀI LIỆU HỌC TẬP</p>
+				<div style="min-width:0;">
+					<p class="group-eyebrow" id="reader-meta-eyebrow" style="color:rgba(255,255,255,0.88);">TÀI LIỆU HỌC TẬP</p>
 					<h2 id="reader-book-title">Tên tài liệu</h2>
 				</div>
 				<button type="button" id="book-reader-close" class="book-reader-close" aria-label="Đóng sách">&times;</button>
