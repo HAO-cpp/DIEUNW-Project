@@ -4058,3 +4058,52 @@ body.dark-mode .ecard-custom-accordion {
 		min-height: 132px;
 	}
 }
+
+/* Bổ sung cho .btn-auth.outline và .subfilter-btn trên profile.html */
+.btn-auth.outline {
+	background: #ffffff;
+	color: var(--dnw-primary);
+	border: 1.5px solid #9cc7ee;
+	box-shadow: 0 3px 10px rgba(23, 105, 170, 0.1);
+}
+
+.btn-auth.outline:hover:not(:disabled) {
+	background: #eef6ff;
+	border-color: var(--dnw-primary-bright);
+	color: var(--dnw-primary-dark);
+	box-shadow: 0 8px 18px rgba(23, 105, 170, 0.18);
+}
+
+.subfilter-btn {
+	border-radius: 10px;
+	cursor: pointer;
+	border: 1.5px solid #d2e2f0;
+	background: #ffffff;
+	color: var(--dnw-navy);
+}
+
+.subfilter-btn:hover:not(.active):not(:disabled) {
+	transform: translateY(-2px);
+	border-color: var(--dnw-primary-bright);
+	background: #eef6ff;
+	color: var(--dnw-primary);
+	box-shadow: 0 6px 14px rgba(23, 105, 170, 0.14);
+}
+
+.subfilter-btn.active {
+	background: linear-gradient(135deg, var(--dnw-primary) 0%, var(--dnw-primary-bright) 100%);
+	border-color: transparent;
+	color: #ffffff;
+	box-shadow: 0 6px 15px rgba(23, 105, 170, 0.24);
+}
+
+body.theme-dark .btn-auth.outline,
+body.theme-dark .subfilter-btn:not(.active),
+body.dark .btn-auth.outline,
+body.dark .subfilter-btn:not(.active),
+html[data-theme="dark"] .btn-auth.outline,
+html[data-theme="dark"] .subfilter-btn:not(.active) {
+	background: #1c2a3a;
+	border-color: #35506d;
+	color: #e4effa;
+}
