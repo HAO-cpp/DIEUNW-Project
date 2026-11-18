@@ -76,7 +76,6 @@
                     continue;
                 }
 
-                // Giữ các thuộc tính an toàn
                 for (const attr of Array.from(child.attributes)) {
                     const name = attr.name.toLowerCase();
                     if (tag === "A" && name === "href") {
@@ -106,7 +105,62 @@
         return template.innerHTML.trim();
     }
 
+    // Dự phòng bật/tắt menu nav trên Trang chủ (chống double-toggle với nav-profile.js)
+    function ensureHomeNavMenuToggle() {
+        const toggleBtn = document.querySelector(".nav-brand-toggle");
+        const menu = document.getElementById("main-nav-menu") || document.querySelector(".nav-menu");
+        if (!toggleBtn || !menu) return;
+
+        let preClickHidden = menu.hidden;
+        let preClickExpanded = toggleBtn.getAttribute("aria-expanded");
+
+        document.addEventListener("click", e => {
+            if (e.target.closest(".nav-brand-toggle")) {
+                preClickHidden = menu.hidden;
+                preClickExpanded = toggleBtn.getAttribute("aria-expanded");
+            }
+        }, true);
+
+        const setMenuOpen = open => {
+            menu.hidden = !open;
+            if (open) {
+                menu.removeAttribute("hidden");
+                menu.style.display = "grid";
+            } else {
+                menu.setAttribute("hidden", "");
+                menu.style.display = "";
+            }
+            toggleBtn.setAttribute("aria-expanded", String(open));
+        };
+
+        toggleBtn.addEventListener("click", () => {
+            setTimeout(() => {
+                const handledByNavProfile =
+                    menu.hidden !== preClickHidden ||
+                    toggleBtn.getAttribute("aria-expanded") !== preClickExpanded;
+                if (handledByNavProfile) return;
+                setMenuOpen(preClickHidden);
+            }, 0);
+        });
+
+        document.addEventListener("click", e => {
+            if (menu.hidden) return;
+            const header = toggleBtn.closest(".navbar");
+            if (header && !header.contains(e.target)) {
+                setMenuOpen(false);
+            }
+        });
+
+        document.addEventListener("keydown", e => {
+            if (e.key === "Escape" && !menu.hidden) {
+                setMenuOpen(false);
+            }
+        });
+    }
+
     function initHomePage() {
+        ensureHomeNavMenuToggle();
+
         const modalOverlay = document.getElementById("post-modal-overlay");
         const reportOverlay = document.getElementById("report-modal-overlay");
         const triggerInput = document.getElementById("trigger-modal-input");
@@ -129,7 +183,6 @@
         const feedTriggerBox = document.getElementById("feed-trigger-box");
         const feedTriggerAvatar = document.getElementById("feed-trigger-avatar");
 
-        // Bảo đảm overlay luôn đóng khi mới mở trang để không bao giờ chặn thao tác
         if (modalOverlay) {
             modalOverlay.classList.remove("open");
             modalOverlay.hidden = true;
@@ -223,7 +276,6 @@
 
         window.updateHomeAccess = updateHomeAccess;
 
-        // Khởi tạo ngay theo cache localStorage nếu có, sau đó xác thực lại với backend
         try {
             const cached = JSON.parse(localStorage.getItem("dieuNwUser") || "null");
             if (cached?.id) {
@@ -645,7 +697,6 @@
             };
             renderCommentsIntoList(savedComments);
 
-            // Thích bài viết
             const likeBtn = postCard.querySelector(".btn-like");
             const likeCountEl = postCard.querySelector(".like-count-text .count");
             likeBtn?.addEventListener("click", async () => {
@@ -654,7 +705,6 @@
                 const currentNum = Number(likeCountEl?.textContent || 0);
                 likeBtn.disabled = true;
 
-                // Cập nhật mượt trước
                 likeBtn.classList.toggle("liked", nextLiked);
                 likeBtn.style.color = nextLiked ? "#0078ff" : "";
                 likeBtn.style.fontWeight = nextLiked ? "700" : "";
@@ -673,7 +723,6 @@
                         likeCountEl.textContent = String(data.likes);
                     }
                 } catch (err) {
-                    // Hoàn tác nếu lỗi
                     likeBtn.classList.toggle("liked", !nextLiked);
                     likeBtn.style.color = !nextLiked ? "#0078ff" : "";
                     likeBtn.style.fontWeight = !nextLiked ? "700" : "";
@@ -684,7 +733,6 @@
                 }
             });
 
-            // Mở khung bình luận
             const commentBtn = postCard.querySelector(".btn-comment");
             const commentSection = postCard.querySelector(".comment-section");
             const commentField = postCard.querySelector(".comment-field");
@@ -695,7 +743,6 @@
                 if (isHidden) commentField?.focus();
             });
 
-            // Gửi bình luận
             commentField?.addEventListener("keydown", async e => {
                 if (e.key !== "Enter" || !commentField.value.trim()) return;
                 if (!homeAccessEnabled) return;
@@ -733,7 +780,6 @@
                 }
             });
 
-            // Hành động: Xóa (chủ bài / admin) hoặc Báo cáo
             const actionsRow = document.createElement("div");
             actionsRow.className = "post-card-actions";
             const isOwner = String(post.userId || "") === viewerId;
@@ -825,7 +871,6 @@
             }
         }
 
-        // --- Đăng bài mới (hỗ trợ Rich Text, Ảnh WebP, Nhạc đính kèm, Thanh tiến trình %) ---
         btnSubmit?.addEventListener("click", async () => {
             if (!homeAccessEnabled || !currentHomeUser) {
                 updateHomeAccess(null);
@@ -915,7 +960,6 @@
             }
         });
 
-        // Xác thực lại phiên đăng nhập với Backend
         fetch(`${API_BASE}/api/auth/me`, {
             credentials: "include",
             headers: getAuthHeaders()
