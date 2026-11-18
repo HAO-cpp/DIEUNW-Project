@@ -4123,4 +4123,149 @@ html[data-theme="dark"] .subfilter-btn:not(.active) {
 }
 #btn-toggle-ecard-custom:hover{
      background: var(--brand-soft); 
+     color: black;
+}
+
+/* ==========================================================================
+   DESIGN LẠI NÚT THU GỌN & KHUNG TÙY CHỈNH THẺ HỌC SINH (#ecard-custom-section)
+   ========================================================================== */
+#ecard-custom-section,
+.ecard-custom-section {
+	margin-top: 14px;
+	width: 100%;
+}
+
+#btn-toggle-ecard-custom,
+.ecard-custom-toggle {
+	width: 100% !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: space-between !important;
+	gap: 10px !important;
+	padding: 11px 16px !important;
+	border-radius: 12px !important;
+	border: 1.5px solid #bfd8ef !important;
+	background: linear-gradient(135deg, #f3f8ff 0%, #e7f1fc 100%) !important;
+	color: #173853 !important;
+	font-size: 13.5px !important;
+	font-weight: 700 !important;
+	line-height: 1.3 !important;
+	cursor: pointer !important;
+	box-shadow: 0 4px 12px rgba(23, 56, 83, 0.08) !important;
+	transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+	            border-color 0.22s ease,
+	            background 0.22s ease,
+	            box-shadow 0.22s ease,
+	            color 0.2s ease !important;
+}
+
+#btn-toggle-ecard-custom:hover,
+.ecard-custom-toggle:hover {
+	transform: translateY(-2px) !important;
+	border-color: #2298f8 !important;
+	background: linear-gradient(135deg, #eaf4ff 0%, #dbeeff 100%) !important;
+	color: #104b7a !important;
+	box-shadow: 0 8px 20px rgba(34, 152, 248, 0.22) !important;
+}
+
+#btn-toggle-ecard-custom:active,
+.ecard-custom-toggle:active {
+	transform: translateY(0) scale(0.985) !important;
+}
+
+#btn-toggle-ecard-custom .ecard-toggle-caret,
+.ecard-custom-toggle .ecard-toggle-caret {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	border-radius: 50%;
+	background: rgba(23, 105, 170, 0.12);
+	color: #1769aa;
+	font-size: 12px;
+	transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s ease;
+}
+
+#btn-toggle-ecard-custom[aria-expanded="true"] .ecard-toggle-caret,
+.ecard-custom-toggle[aria-expanded="true"] .ecard-toggle-caret {
+	transform: rotate(180deg);
+	background: rgba(34, 152, 248, 0.22);
+}
+
+#ecard-custom-accordion,
+.ecard-custom-accordion {
+	margin-top: 10px;
+	padding: 14px 16px !important;
+	border-radius: 14px;
+	border: 1px solid #cfe0f0;
+	background: #f8fbff;
+	animation: dieunwAccordionOpen 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+#ecard-custom-accordion[hidden],
+.ecard-custom-accordion[hidden] {
+	display: none !important;
+}
+
+body.theme-dark #btn-toggle-ecard-custom,
+body.dark #btn-toggle-ecard-custom,
+body.dark-mode #btn-toggle-ecard-custom,
+html.dark #btn-toggle-ecard-custom,
+html[data-theme="dark"] #btn-toggle-ecard-custom,
+body[data-theme="dark"] #btn-toggle-ecard-custom,
+body.theme-dark .ecard-custom-toggle,
+body.dark .ecard-custom-toggle,
+body.dark-mode .ecard-custom-toggle,
+html.dark .ecard-custom-toggle,
+html[data-theme="dark"] .ecard-custom-toggle,
+body[data-theme="dark"] .ecard-custom-toggle {
+	border: 1.5px solid rgba(114, 182, 240, 0.34) !important;
+	background: linear-gradient(135deg, rgba(28, 49, 71, 0.92) 0%, rgba(21, 38, 56, 0.96) 100%) !important;
+	color: #e6f1fc !important;
+	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28) !important;
+}
+
+body.theme-dark #btn-toggle-ecard-custom:hover,
+body.dark #btn-toggle-ecard-custom:hover,
+body.dark-mode #btn-toggle-ecard-custom:hover,
+html.dark #btn-toggle-ecard-custom:hover,
+html[data-theme="dark"] #btn-toggle-ecard-custom:hover,
+body[data-theme="dark"] #btn-toggle-ecard-custom:hover,
+body.theme-dark .ecard-custom-toggle:hover,
+body.dark .ecard-custom-toggle:hover,
+body.dark-mode .ecard-custom-toggle:hover,
+html.dark .ecard-custom-toggle:hover,
+html[data-theme="dark"] .ecard-custom-toggle:hover,
+body[data-theme="dark"] .ecard-custom-toggle:hover {
+	border-color: #38a8ff !important;
+	background: linear-gradient(135deg, rgba(35, 63, 92, 0.98) 0%, rgba(24, 46, 69, 0.98) 100%) !important;
+	color: #ffffff !important;
+	box-shadow: 0 10px 24px rgba(34, 152, 248, 0.28) !important;
+}
+
+body.theme-dark #btn-toggle-ecard-custom .ecard-toggle-caret,
+body.dark #btn-toggle-ecard-custom .ecard-toggle-caret,
+body.dark-mode #btn-toggle-ecard-custom .ecard-toggle-caret,
+html.dark #btn-toggle-ecard-custom .ecard-toggle-caret,
+html[data-theme="dark"] #btn-toggle-ecard-custom .ecard-toggle-caret,
+body[data-theme="dark"] #btn-toggle-ecard-custom .ecard-toggle-caret {
+	background: rgba(56, 168, 255, 0.2);
+	color: #7cc4ff;
+}
+
+body.theme-dark #ecard-custom-accordion,
+body.dark #ecard-custom-accordion,
+body.dark-mode #ecard-custom-accordion,
+html.dark #ecard-custom-accordion,
+html[data-theme="dark"] #ecard-custom-accordion,
+body[data-theme="dark"] #ecard-custom-accordion {
+	border-color: rgba(114, 182, 240, 0.22);
+	background: rgba(17, 32, 48, 0.88);
+	color: #dce9f5;
+}
+
+@keyframes dieunwAccordionOpen {
+	from { opacity: 0; transform: translateY(-6px) scale(0.99); }
+	to { opacity: 1; transform: translateY(0) scale(1); }
 }
