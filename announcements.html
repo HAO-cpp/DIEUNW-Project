@@ -4,46 +4,27 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta name="theme-color" content="#1769aa">
-	<link rel="stylesheet" href="./style.css?v=11">
-	<link rel="icon" type="image/png" href="./DIEU.avif?v=1">
+	<link rel="stylesheet" href="./style.css?v=3">
+	<link rel="icon" type="image/png" href="./DIEU.png?v=1">
 	<title>Thông báo CLB - DIEUNW</title>
 </head>
 <body class="clubs-page announcements-page">
 	<header class="navbar nav-scroll">
-		<div class="nav-corner-dock">
-			<button class="nav-brand-toggle" type="button" aria-expanded="false" aria-controls="main-nav-menu" aria-label="Mở menu điều hướng">
-				<picture>
-					<source srcset="./DIEU.avif" type="image/avif">
-					<source srcset="./DIEU.webp" type="image/webp">
-					<img src="./DIEU.avif" alt="DIEUNW" class="nav-brand-badge">
-				</picture>
-			</button>
-			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
-				<img class="nav-user-avatar" src="./DIEU.avif" alt="">
-				<span class="nav-status-dot" aria-hidden="true"></span>
-			</a>
-			<button id="nav-theme-toggle" class="nav-theme-toggle" type="button" aria-label="Chuyển chế độ sáng tối" title="Chuyển chế độ sáng / tối">⏾</button>
-		</div>
-		<nav id="main-nav-menu" class="nav-menu nav-dropdown-panel" aria-label="Điều hướng chính" hidden>
+		<div class="nav-left"><a href="./index.html" class="brand-logo-link"><img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo"></a></div>
+		<nav class="nav-menu" aria-label="Điều hướng chính">
 			<a href="./index.html" class="nav-item">Trang chủ</a>
+			<a href="./videos.html" class="nav-item">Video</a>
+			<a href="./music.html" class="nav-item">Kho nhạc</a>
 			<a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
 			<a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
-			<a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
 			<a href="./friends.html" class="nav-item">Bạn bè</a>
 			<a href="./messages.html" class="nav-item">Tin nhắn</a>
+			<a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
 			<a href="./clubs.html" class="nav-item">CLB</a>
 			<a href="./announcements.html" class="nav-item active" aria-current="page">Thông báo</a>
 		</nav>
+		<div class="nav-right"><a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân"><img class="nav-user-avatar" src="./DIEU.png" alt=""></a></div>
 	</header>
-
-	<section id="hero-banner" class="hero-banner" aria-label="DIEUNW Banner">
-		<picture>
-			<source srcset="./DIEUNW.avif" type="image/avif">
-			<source srcset="./DIEUNW.webp" type="image/webp">
-			<img src="./DIEUNW.png" alt="DIEUNW" class="hero-banner-img" loading="eager">
-		</picture>
-		<div class="hero-banner-fade" aria-hidden="true"></div>
-	</section>
 
 	<main class="announcements-main page-enter">
 		<header class="clubs-heading announcements-heading">
@@ -67,7 +48,7 @@
 				<div class="announcement-attachments-row">
 					<div class="announcement-attach-card">
 						<div class="image-upload-row">
-							<label class="image-upload-label" for="announcement-image-file">Đính kèm ảnh (tùy chọn)</label>
+							<label class="image-upload-label dieunw-file-btn" for="announcement-image-file">Đính kèm ảnh (tùy chọn)</label>
 							<input id="announcement-image-file" type="file" accept="image/*" hidden>
 							<span id="announcement-image-name" class="image-upload-filename">Không có ảnh</span>
 							<button type="button" id="announcement-image-clear" class="btn-clear-upload" hidden>Xóa</button>
@@ -79,18 +60,19 @@
 
 					<div class="announcement-attach-card">
 						<div class="image-upload-row">
-							<label class="image-upload-label" for="announcement-file">Đính kèm tệp (tùy chọn)</label>
-							<input id="announcement-file" type="file" accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.xls,.xlsx,.zip,.rar,.png,.jpg,.jpeg,.webp,.avif" hidden>
+							<label class="image-upload-label dieunw-file-btn" for="announcement-file">Đính kèm tệp (tùy chọn)</label>
+							<input id="announcement-file" type="file" accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.xls,.xlsx,.zip,.rar,.png,.jpg,.jpeg" hidden>
 							<span id="announcement-file-name" class="image-upload-filename">Không có tệp</span>
 							<button type="button" id="announcement-file-clear" class="btn-clear-upload" hidden>Xóa</button>
 						</div>
 					</div>
 				</div>
 
-				<div class="announcement-schedule-row">
-					<label for="announcement-schedule">Hẹn giờ đăng (tùy chọn — để trống nếu muốn đăng ngay):</label>
-					<input id="announcement-schedule" type="datetime-local">
-				</div>
+				<!-- Đính kèm nhạc từ Kho nhạc online hoặc tệp nhạc từ máy -->
+				<div id="ann-music-picker"></div>
+
+				<!-- Thanh loading % khi đăng thông báo -->
+				<div id="ann-upload-progress"></div>
 
 				<p id="announcement-status" class="clubs-form-status" role="status" aria-live="polite"></p>
 			</form>

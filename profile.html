@@ -4,7 +4,7 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<link rel="stylesheet" href="./style.css?v=12">
-	<link rel="icon" type="image/png" href="./DIEU.avif?v=3">
+	<link rel="icon" type="image/png" href="./DIEU.png?v=3">
 	<title>DIEUNW - Trang Cá Nhân</title>
 </head>
 <body class="profile-page">
@@ -14,23 +14,27 @@
 				<picture>
 					<source srcset="./DIEU.avif" type="image/avif">
 					<source srcset="./DIEU.webp" type="image/webp">
-					<img src="./DIEU.avif" alt="DIEUNW" class="nav-brand-icon">
+					<img src="./DIEU.png" alt="DIEUNW" class="nav-brand-icon">
 				</picture>
 				<span class="nav-brand-caret">▾</span>
 			</button>
-			<a href="./profile.html" class="nav-avatar-link active" aria-label="Trang cá nhân" title="Trang cá nhân" aria-current="page">
-				<img class="nav-user-avatar" src="./DIEU.avif" alt="Trang cá nhân">
-				<span class="nav-status-dot" data-status="offline" aria-hidden="true"></span>
-			</a>
+			<div class="nav-right" style="display:flex; align-items:center; gap:8px;">
+				<a href="./profile.html" class="nav-avatar-link active" aria-label="Trang cá nhân" title="Trang cá nhân" aria-current="page">
+					<img class="nav-user-avatar" src="./DIEU.png" alt="Trang cá nhân">
+					<span class="nav-status-dot" data-status="offline" aria-hidden="true"></span>
+				</a>
+			</div>
 			<button type="button" class="nav-theme-toggle" id="nav-theme-toggle" aria-label="Bật/tắt chế độ tối" title="Chế độ Sáng / Tối">🌙</button>
 		</div>
 		<nav id="main-nav-menu" class="nav-menu nav-dropdown-panel" aria-label="Điều hướng chính" hidden>
 			<a href="./index.html" class="nav-item">Trang chủ</a>
+			<a href="./videos.html" class="nav-item">Video</a>
+			<a href="./music.html" class="nav-item">Kho nhạc</a>
 			<a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
 			<a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
-			<a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
 			<a href="./friends.html" class="nav-item">Bạn bè</a>
 			<a href="./messages.html" class="nav-item">Tin nhắn</a>
+			<a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
 			<a href="./clubs.html" class="nav-item">CLB</a>
 			<a href="./announcements.html" class="nav-item">Thông báo</a>
 		</nav>
@@ -40,7 +44,7 @@
 		<picture>
 			<source srcset="./DIEUNW.avif" type="image/avif">
 			<source srcset="./DIEUNW.webp" type="image/webp">
-			<img src="./DIEU.avif" alt="DIEUNW Banner">
+			<img src="./DIEU.png" alt="DIEUNW Banner">
 		</picture>
 	</div>
 
@@ -107,9 +111,9 @@
 			</div>
 		</div>
 
-		<!-- 2. Hồ sơ 2 Cột (35% Cột trái cố định / 65% Cột phải nội dung) -->
+		<!-- 2. Hồ sơ 2 Cột -->
 		<div id="profile-container" class="profile-two-col" style="display: none;">
-			<!-- CỘT TRÁI (35% STICKY) -->
+			<!-- CỘT TRÁI -->
 			<aside class="profile-col-left" aria-label="Hồ sơ học tập">
 				<section class="profile-sidebar-card profile-identity-card">
 					<div>
@@ -153,7 +157,7 @@
 						<button id="btn-logout" class="btn-logout" type="button">Đăng xuất</button>
 					</div>
 
-					<!-- Form chỉnh sửa thông tin cơ bản & upload ảnh -->
+					<!-- Form chỉnh sửa thông tin cá nhân -->
 					<div id="edit-profile-form" class="edit-form-box" style="display: none;">
 						<h2 id="update">Cập nhật thông tin cá nhân</h2>
 						<div class="input-group">
@@ -221,7 +225,12 @@
 							<label class="input-group-label" for="edit-gh-input">Link GitHub</label>
 							<input type="url" id="edit-gh-input" placeholder="https://github.com/...">
 						</div>
-						<div style="display: flex; gap: 10px; justify-content: center;">
+						<div class="input-group">
+							<label class="input-group-label" for="edit-tiktok-input">Link TikTok</label>
+							<input type="url" id="edit-tiktok-input" placeholder="https://www.tiktok.com/@...">
+						</div>
+						<div id="edit-profile-progress"></div>
+						<div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
 							<button id="btn-save-profile" class="btn-auth btn-success" type="button" style="width: auto; padding: 10px 20px;">Lưu thay đổi</button>
 							<button id="btn-cancel-edit" class="btn-logout" type="button">Hủy</button>
 						</div>
@@ -288,9 +297,9 @@
 				</section>
 			</aside>
 
-			<!-- CỘT PHẢI (65% NỘI DUNG CHÍNH) -->
+			<!-- CỘT PHẢI -->
 			<div class="profile-col-right">
-				<!-- Ảnh bìa, Note 24h, Avatar + Khung + Trạng thái + Story ring -->
+				<!-- Ảnh bìa, Note 24h (có nhạc), Avatar + Story ring -->
 				<section class="profile-hero-card">
 					<div class="profile-cover">
 						<img id="profile-cover-image" alt="Ảnh bìa hồ sơ" hidden>
@@ -299,10 +308,11 @@
 						<div class="avatar-stage-wrap">
 							<div id="profile-note-display" class="profile-note-bubble" hidden>
 								<span id="profile-note-text"></span>
+								<button type="button" id="profile-note-music-btn" class="note-music-chip" hidden title="Nghe nhạc trạng thái"></button>
 							</div>
-							<button type="button" id="btn-open-note-modal" class="btn-note-trigger" hidden>+ Ghi chú 24h (Note)</button>
+							<button type="button" id="btn-open-note-modal" class="btn-note-trigger" hidden>+ Ghi chú 24h &amp; Nhạc</button>
 							<div id="profile-avatar-ring" class="avatar-ring-wrap frame-none">
-								<img id="user-display-avatar" src="./DIEU.avif" alt="Avatar" class="profile-avatar-large">
+								<img id="user-display-avatar" src="./DIEU.png" alt="Avatar" class="profile-avatar-large">
 								<span id="profile-avatar-status-dot" class="profile-status-dot" data-status="offline" title="Trạng thái hoạt động"></span>
 							</div>
 						</div>
@@ -311,6 +321,18 @@
 							<button type="button" id="btn-open-moment-modal" class="btn-auth outline" style="width:auto;">+ Khoảnh khắc 24h</button>
 						</div>
 					</div>
+				</section>
+
+				<!-- TIN NỔI BẬT (FEATURED HIGHLIGHTS GIỐNG FACEBOOK) -->
+				<section id="profile-highlights-section" class="profile-extra-section" hidden>
+					<header class="profile-extra-heading">
+						<div>
+							<p class="profile-extra-eyebrow">TIN NỔI BẬT</p>
+							<h2>Bộ sưu tập đáng chú ý</h2>
+						</div>
+						<button type="button" id="btn-open-highlight-modal" class="section-add-btn" hidden>+ Tạo tin nổi bật</button>
+					</header>
+					<div id="profile-highlights-shelf" class="highlights-shelf"></div>
 				</section>
 
 				<!-- Moment 24h đang ghim -->
@@ -328,7 +350,7 @@
 					<div id="profile-showcase-grid" class="pinned-showcase-grid"></div>
 				</section>
 
-				<!-- Khung đăng bài cho Fanpage CLB (Rich Text + Lên lịch + Upload ảnh) -->
+				<!-- Khung đăng bài cho Fanpage CLB -->
 				<form id="club-post-composer" class="edit-form-box profile-extra-section" style="display: none; flex-direction: column; gap: 12px; margin: 0;">
 					<h3 style="margin: 0;">Đăng bài với tư cách Fanpage CLB</h3>
 					<div class="rte-wrapper" id="club-rte-wrapper">
@@ -365,6 +387,9 @@
 						</div>
 					</div>
 
+					<div id="club-music-picker"></div>
+					<div id="club-post-progress"></div>
+
 					<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
 						<label style="font-size:12px; font-weight:700; display:flex; align-items:center; gap:6px;">
 							Lên lịch đăng (tùy chọn):
@@ -383,7 +408,7 @@
 					<button type="button" class="profile-tab-btn" data-profile-tab="album">Album ảnh</button>
 				</nav>
 
-				<!-- TAB 1: BÀI VIẾT & BÀI ĐÃ LƯU -->
+				<!-- TAB 1: BÀI VIẾT -->
 				<section class="profile-tab-panel" data-tab-panel="posts">
 					<div class="posts-subfilter-row">
 						<h3 id="posts-section-heading" style="color: var(--text-main);">Bài viết đã đăng</h3>
@@ -395,7 +420,7 @@
 					<div id="my-posts-container"></div>
 				</section>
 
-				<!-- TAB 2: BỘ THẺ & ĐỀ ÔN TẬP (STUDY SETS) -->
+				<!-- TAB 2: STUDY SETS -->
 				<section class="profile-tab-panel profile-extra-section" data-tab-panel="study-sets" hidden>
 					<header class="profile-extra-heading">
 						<div>
@@ -407,7 +432,7 @@
 					<div id="profile-studysets-list" class="study-sets-grid"></div>
 				</section>
 
-				<!-- TAB 3: TÀI LIỆU ĐÃ CHIA SẺ / ĐÃ LƯU -->
+				<!-- TAB 3: TÀI LIỆU -->
 				<section class="profile-tab-panel profile-extra-section" data-tab-panel="saved-materials" hidden>
 					<header class="profile-extra-heading">
 						<div>
@@ -485,21 +510,23 @@
 					<div id="profile-album-list" class="profile-album-list" aria-live="polite"></div>
 				</section>
 
-				<!-- KHUNG GẮN KẾT QUẢN TRỊ & BAN DUYỆT BÀI (RENDER ĐỘNG 100% TỪ BACKEND RBAC) -->
 				<div id="privileged-workspace-mount"></div>
 			</div>
 		</div>
 	</main>
 
-	<!-- MODAL: Note 24h -->
+	<!-- MODAL: Note 24h (Kèm Nhạc) -->
 	<div id="note-modal-overlay" class="report-modal-overlay" hidden>
 		<section class="report-modal-box" role="dialog" aria-modal="true" aria-labelledby="note-modal-title">
 			<div class="report-modal-header">
-				<h3 id="note-modal-title">Ghi chú nhanh 24h</h3>
+				<h3 id="note-modal-title">Ghi chú nhanh 24h trên Avatar</h3>
 				<button type="button" class="close-badge" data-close-modal="note-modal-overlay">&times;</button>
 			</div>
-			<p class="profile-extra-hint">Ghi chú hiển thị trên ảnh đại diện của bạn trong 24 giờ (tối đa 60 ký tự). Để trống để xóa ghi chú.</p>
+			<p class="profile-extra-hint">Hiển thị trên ảnh đại diện trong 24 giờ (tối đa 60 ký tự) + chọn bài nhạc bạn đang nghe.</p>
 			<input type="text" id="note-text-input" maxlength="60" placeholder="VD: Đang cày đề Toán THPTQG...">
+			<div id="note-music-picker"></div>
+			<div id="note-upload-progress"></div>
+			<p id="note-form-status" class="profile-extra-status"></p>
 			<div class="mod-actions-row">
 				<button type="button" id="btn-clear-note" class="btn-auth outline" style="width:auto;">Xóa Note</button>
 				<button type="button" id="btn-save-note" class="btn-auth" style="width:auto;">Lưu Note 24h</button>
@@ -519,13 +546,14 @@
 				<input type="file" id="moment-image-file" accept="image/*" required>
 				<label for="moment-caption-input">Chú thích ngắn</label>
 				<input type="text" id="moment-caption-input" maxlength="140" placeholder="Góc học tập hôm nay...">
+				<div id="moment-upload-progress"></div>
 				<p id="moment-form-status" class="profile-extra-status"></p>
 				<button type="submit" class="btn-auth">Đăng Moment 24h</button>
 			</form>
 		</section>
 	</div>
 
-	<!-- MODAL: Đăng Story 24h / 48h -->
+	<!-- MODAL: Đăng Story 24h / 48h (Kèm Nhạc + Thanh %) -->
 	<div id="story-modal-overlay" class="report-modal-overlay" hidden>
 		<section class="report-modal-box" role="dialog" aria-modal="true" aria-labelledby="story-modal-title">
 			<div class="report-modal-header">
@@ -534,7 +562,7 @@
 			</div>
 			<form id="story-form" class="profile-extra-form">
 				<label for="story-media-file">Chọn ảnh hoặc video ngắn (.mp4/.webm)</label>
-				<input type="file" id="story-media-file" accept="image/*,video/mp4,video/webm" required>
+				<input type="file" id="story-media-file" accept="image/*,video/mp4,video/webm,video/quicktime" required>
 				<label for="story-caption-input">Chú thích Story</label>
 				<input type="text" id="story-caption-input" maxlength="160" placeholder="Chia sẻ khoảnh khắc cùng bạn bè NQD...">
 				<label for="story-duration-select">Thời gian tồn tại</label>
@@ -542,32 +570,57 @@
 					<option value="24">24 giờ</option>
 					<option value="48">48 giờ</option>
 				</select>
+				<div id="story-music-picker"></div>
+				<div id="story-upload-progress"></div>
 				<p id="story-form-status" class="profile-extra-status"></p>
 				<button type="submit" class="btn-auth">Đăng Story ngay</button>
 			</form>
 		</section>
 	</div>
 
-	<!-- MODAL: Trình xem Story -->
+	<!-- MODAL: Tạo Tin nổi bật (Featured Highlights) -->
+	<div id="highlight-modal-overlay" class="report-modal-overlay" hidden>
+		<section class="report-modal-box" role="dialog" aria-modal="true" aria-labelledby="highlight-modal-title">
+			<div class="report-modal-header">
+				<h3 id="highlight-modal-title">Tạo Tin nổi bật (Highlight)</h3>
+				<button type="button" class="close-badge" data-close-modal="highlight-modal-overlay">&times;</button>
+			</div>
+			<form id="highlight-form" class="profile-extra-form">
+				<label for="highlight-title-input">Tên bộ sưu tập Tin nổi bật</label>
+				<input type="text" id="highlight-title-input" maxlength="40" placeholder="VD: Kỷ niệm lớp 10TH, Trại hè NQD..." required>
+				<label for="highlight-files-input">Chọn ảnh hoặc video (có thể chọn nhiều tệp cùng lúc)</label>
+				<input type="file" id="highlight-files-input" accept="image/*,video/mp4,video/webm" multiple>
+				<label for="highlight-caption-input">Chú thích (tùy chọn)</label>
+				<input type="text" id="highlight-caption-input" maxlength="140" placeholder="Ghi chú chung cho tin nổi bật...">
+				<div id="highlight-music-picker"></div>
+				<div id="highlight-upload-progress"></div>
+				<p id="highlight-form-status" class="profile-extra-status"></p>
+				<button type="submit" class="btn-auth">Lưu Tin nổi bật</button>
+			</form>
+		</section>
+	</div>
+
+	<!-- MODAL: Trình xem Story / Tin nổi bật -->
 	<div id="story-viewer-overlay" class="story-viewer-overlay" hidden>
 		<div class="story-viewer-box" role="dialog" aria-modal="true">
 			<div id="story-progress-track" class="story-progress-track"></div>
 			<div class="story-viewer-header">
 				<div class="story-viewer-author">
-					<img id="story-viewer-avatar" src="./DIEU.avif" alt="">
+					<img id="story-viewer-avatar" src="./DIEU.png" alt="">
 					<div>
 						<strong id="story-viewer-name" style="font-size:13.5px;">Tên học sinh</strong>
 						<p id="story-viewer-time" style="font-size:11px; color:#9eb7cc;"></p>
 					</div>
 				</div>
-				<div style="display:flex; gap:6px;">
+				<div style="display:flex; gap:6px; align-items:center;">
+					<button type="button" id="story-viewer-music-pill" class="note-music-chip" hidden title="Bật/tắt nhạc Story"></button>
 					<button type="button" id="story-viewer-delete" class="btn-clear-upload" hidden>Xóa</button>
 					<button type="button" class="close-badge" data-close-modal="story-viewer-overlay">&times;</button>
 				</div>
 			</div>
 			<div class="story-media-stage" id="story-media-stage">
-				<button type="button" id="story-prev-btn" class="story-nav-btn prev" aria-label="Story trước">‹</button>
-				<button type="button" id="story-next-btn" class="story-nav-btn next" aria-label="Story tiếp">›</button>
+				<button type="button" id="story-prev-btn" class="story-nav-btn prev" aria-label="Tin trước">‹</button>
+				<button type="button" id="story-next-btn" class="story-nav-btn next" aria-label="Tin tiếp">›</button>
 			</div>
 			<div class="story-viewer-footer">
 				<p id="story-viewer-caption" class="story-caption-text"></p>
@@ -635,7 +688,7 @@
 		</section>
 	</div>
 
-	<!-- MODAL: Học Flashcard 3D & Thách đấu Quiz + BXH Top 3 -->
+	<!-- MODAL: Học Flashcard 3D & Thách đấu Quiz -->
 	<div id="studyset-player-overlay" class="report-modal-overlay" hidden>
 		<section class="report-modal-box" style="width:min(620px, 100%);" role="dialog" aria-modal="true" aria-labelledby="studyset-player-title">
 			<div class="report-modal-header">
@@ -646,106 +699,58 @@
 		</section>
 	</div>
 
-	<!-- MODAL: Thẻ Học Sinh Điện Tử QR (Nền trái-giữa custom + phần tùy chỉnh thu gọn + QR vừa khung) -->
+	<!-- MODAL: Thẻ Học Sinh Điện Tử QR (SỬA LỖI QR LỒI + TẢI ẢNH 3X 2280x1290 SIÊU NÉT) -->
 	<div id="ecard-modal-overlay" class="report-modal-overlay" hidden>
-		<section class="report-modal-box ecard-modal-box" style="width:min(560px, 100%);" role="dialog" aria-modal="true" aria-labelledby="ecard-modal-title">
+		<section class="report-modal-box" style="width:min(560px, 100%);" role="dialog" aria-modal="true" aria-labelledby="ecard-modal-title">
 			<div class="report-modal-header">
-				<h3 id="ecard-modal-title">Thẻ điện tử DIEUNW</h3>
+				<h3 id="ecard-modal-title">Thẻ Học Sinh Điện Tử NQD</h3>
 				<button type="button" class="close-badge" data-close-modal="ecard-modal-overlay">&times;</button>
 			</div>
-
-			<div class="ecard-preview" id="ecard-preview-card" data-tone="light">
-				<div class="ecard-custom-bg" aria-hidden="true">
-					<div id="ecard-custom-bg-photo"></div>
-					<div id="ecard-custom-bg-overlay"></div>
-				</div>
+			<div class="ecard-preview" id="ecard-preview-card" style="overflow:hidden;">
 				<div class="ecard-header">
 					<span>DIEUNW · E-STUDENT CARD</span>
 					<span id="ecard-cohort-label">NQD</span>
 				</div>
-				<div class="ecard-body">
-					<div class="ecard-identity">
-						<img id="ecard-avatar-img" src="./DIEU.avif" alt="Avatar" class="ecard-avatar-thumb">
-						<strong id="ecard-name-label" class="ecard-student-name">Tên Học Sinh</strong>
-						<span id="ecard-class-label" class="ecard-student-class">Lớp</span>
-						<span id="ecard-email-label" class="ecard-student-email"></span>
-						<span id="ecard-tagline-label" class="ecard-tagline-chip" hidden></span>
+				<div class="ecard-body" style="display:flex; align-items:center; justify-content:space-between; gap:14px;">
+					<div style="display:grid; gap:5px; min-width:0; flex:1;">
+						<img id="ecard-avatar-img" src="./DIEU.png" alt="Avatar" style="width:52px; height:52px; border-radius:50%; object-fit:cover; border:2px solid #fff;">
+						<strong id="ecard-name-label" style="font-size:17px;">Tên Học Sinh</strong>
+						<span id="ecard-class-label" style="font-size:13px; opacity:0.92;">Lớp</span>
+						<span id="ecard-email-label" style="font-size:11.5px; opacity:0.85; overflow-wrap:anywhere;"></span>
+						<span id="ecard-tagline-label" style="font-size:11px; opacity:0.8; font-style:italic;" hidden></span>
 					</div>
-					<div class="ecard-qr-box" title="Quét để mở hồ sơ bạn học">
-						<canvas id="ecard-qr-canvas" width="140" height="140"></canvas>
+					<div class="ecard-qr-box" style="width:128px; height:128px; flex:0 0 128px; padding:8px; background:#fff; border-radius:12px; display:grid; place-items:center; overflow:hidden; box-sizing:border-box;" title="Quét để mở hồ sơ bạn học">
+						<canvas id="ecard-qr-canvas" width="112" height="112" style="width:100%; height:100%; display:block; image-rendering:pixelated;"></canvas>
 					</div>
 				</div>
 			</div>
 
-			<div class="mod-actions-row">
-				<button type="button" id="btn-copy-profile-link" class="btn-auth outline" style="width:auto;">Sao chép liên kết hồ sơ</button>
-				<button type="button" id="btn-download-ecard" class="btn-auth" style="width:auto;">Tải Thẻ HS (PNG)</button>
+			<div style="margin-top:10px;">
+				<button type="button" id="btn-toggle-ecard-custom" class="ecard-custom-toggle">Tùy chỉnh thẻ học sinh ▾</button>
+				<div id="ecard-custom-panel" hidden style="margin-top:10px; padding:12px; border-radius:10px; border:1px solid #d7e4f0; display:grid; gap:8px;">
+					<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+						<label style="font-size:12px; font-weight:700; display:flex; align-items:center; gap:6px;">
+							Màu 1: <input type="color" id="ecard-bg1" value="#0f6c5c">
+						</label>
+						<label style="font-size:12px; font-weight:700; display:flex; align-items:center; gap:6px;">
+							Màu 2: <input type="color" id="ecard-bg2" value="#122b49">
+						</label>
+					</div>
+					<input type="text" id="ecard-tagline-input" maxlength="60" placeholder="Câu khẩu hiệu trên thẻ (VD: Chinh phục mục tiêu 2026!)">
+					<button type="button" id="btn-save-ecard-custom" class="profile-extra-button">Lưu kiểu thẻ</button>
+				</div>
 			</div>
 
-			<!-- Phần Custom nền Thẻ học sinh điện tử (tách riêng, thu gọn mặc định) -->
-			<div id="ecard-custom-section" class="ecard-custom-section">
-				<button type="button" id="btn-toggle-ecard-custom" class="ecard-custom-toggle-btn" aria-expanded="false" aria-controls="ecard-custom-accordion">
-					Tùy chỉnh nền &amp; giao diện thẻ ▾
-				</button>
-				<div id="ecard-custom-accordion" class="ecard-custom-accordion" hidden>
-					<div class="ecard-custom-grid">
-						<div class="ecard-custom-field full">
-							<label for="ecard-bg-file">Ảnh nền vùng trái đến giữa thẻ</label>
-							<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-								<input type="file" id="ecard-bg-file" accept="image/*" style="flex:1; min-width:180px;">
-								<button type="button" id="btn-clear-ecard-bg" class="btn-clear-upload" hidden>Gỡ ảnh nền</button>
-							</div>
-						</div>
-						<div class="ecard-custom-field">
-							<label for="ecard-bg-pos">Canh vị trí ảnh</label>
-							<select id="ecard-bg-pos">
-								<option value="center center">Giữa trung tâm</option>
-								<option value="left center">Canh trái</option>
-								<option value="right center">Canh phải</option>
-								<option value="center top">Canh trên</option>
-								<option value="center bottom">Canh dưới</option>
-							</select>
-						</div>
-						<div class="ecard-custom-field">
-							<label for="ecard-text-tone">Màu chữ trên thẻ</label>
-							<select id="ecard-text-tone">
-								<option value="light">Chữ trắng (nền tối/đậm)</option>
-								<option value="dark">Chữ tối (nền sáng)</option>
-							</select>
-						</div>
-						<div class="ecard-custom-field full">
-							<label>Màu Gradient nền (Trái → Giữa)</label>
-							<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-								<input type="color" id="ecard-c1" value="#1769aa" aria-label="Màu gradient 1">
-								<input type="color" id="ecard-c2" value="#2298f8" aria-label="Màu gradient 2">
-								<button type="button" class="ecard-swatch-btn" data-ec1="#1769aa" data-ec2="#2298f8" style="background:linear-gradient(135deg,#1769aa,#2298f8);" title="Xanh NQD"></button>
-								<button type="button" class="ecard-swatch-btn" data-ec1="#0f766e" data-ec2="#10b981" style="background:linear-gradient(135deg,#0f766e,#10b981);" title="Xanh Ngọc"></button>
-								<button type="button" class="ecard-swatch-btn" data-ec1="#4338ca" data-ec2="#ec4899" style="background:linear-gradient(135deg,#4338ca,#ec4899);" title="Cực quang"></button>
-								<button type="button" class="ecard-swatch-btn" data-ec1="#c2410c" data-ec2="#f59e0b" style="background:linear-gradient(135deg,#c2410c,#f59e0b);" title="Hoàng hôn"></button>
-							</div>
-						</div>
-						<div class="ecard-custom-field full">
-							<label for="ecard-overlay-range">Độ tối lớp phủ (<span id="ecard-overlay-label">25%</span>)</label>
-							<input type="range" id="ecard-overlay-range" min="0" max="80" value="25">
-						</div>
-						<div class="ecard-custom-field full">
-							<label for="ecard-tagline-input">Khẩu hiệu / Tagline nhỏ trên thẻ</label>
-							<input type="text" id="ecard-tagline-input" maxlength="60" placeholder="VD: Mục tiêu 27+ THPTQG · K18 NQD">
-						</div>
-					</div>
-					<p id="ecard-custom-status" class="profile-extra-status"></p>
-					<div class="ecard-custom-actions">
-						<button type="button" id="btn-reset-ecard-custom" class="btn-auth outline" style="width:auto;">Khôi phục mặc định</button>
-						<button type="button" id="btn-save-ecard-custom" class="btn-auth" style="width:auto;">Lưu mẫu thẻ</button>
-					</div>
-				</div>
+			<div class="mod-actions-row" style="margin-top:12px;">
+				<button type="button" id="btn-copy-profile-link" class="btn-auth outline" style="width:auto;">Sao chép liên kết</button>
+				<button type="button" id="btn-download-ecard" class="btn-auth" style="width:auto;">Tải ảnh thẻ PNG (Siêu nét 3x)</button>
 			</div>
 		</section>
 	</div>
 
-	<!-- MODAL: DIEUNW+ (Gradient, Khung Avatar, Ghost Mode, Quyền riêng tư, Sticker) -->
+	<!-- MODAL: DIEUNW+ (Gradient, Khung Avatar, Nền Website cá nhân, Ghost Mode, Quyền riêng tư, Sticker) -->
 	<div id="dieunw-plus-overlay" class="report-modal-overlay" hidden>
-		<section class="report-modal-box" style="width:min(580px, 100%);" role="dialog" aria-modal="true" aria-labelledby="dieunw-plus-title">
+		<section class="report-modal-box" style="width:min(600px, 100%); max-height:90vh; overflow-y:auto;" role="dialog" aria-modal="true" aria-labelledby="dieunw-plus-title">
 			<div class="report-modal-header">
 				<h3 id="dieunw-plus-title">DIEUNW+ Tùy chỉnh Nâng cao</h3>
 				<button type="button" class="close-badge" data-close-modal="dieunw-plus-overlay">&times;</button>
@@ -763,6 +768,28 @@
 							<button type="button" class="gradient-swatch-btn" data-g1="#c2410c" data-g2="#f59e0b" style="background:linear-gradient(135deg,#c2410c,#f59e0b);" title="Hoàng hôn"></button>
 						</div>
 					</div>
+				</div>
+
+				<!-- TÙY CHỈNH NỀN WEBSITE CÁ NHÂN -->
+				<div style="padding-top:8px; border-top:1px solid var(--border-color); display:grid; gap:8px;">
+					<label class="input-group-label" style="margin:0;">Nền Website cá nhân (Áp dụng toàn web cho tài khoản của bạn)</label>
+					<div style="display:flex; gap:6px; flex-wrap:wrap;" id="plus-sitebg-presets">
+						<button type="button" class="subfilter-btn" data-bg-mode="default" data-bg-val="">Mặc định</button>
+						<button type="button" class="subfilter-btn" data-bg-mode="preset" data-bg-val="aurora">Cực quang</button>
+						<button type="button" class="subfilter-btn" data-bg-mode="preset" data-bg-val="sunset">Hoàng hôn</button>
+						<button type="button" class="subfilter-btn" data-bg-mode="preset" data-bg-val="forest">Rừng thông</button>
+						<button type="button" class="subfilter-btn" data-bg-mode="preset" data-bg-val="cherry">Anh đào</button>
+						<button type="button" class="subfilter-btn" data-bg-mode="preset" data-bg-val="midnight">Đêm sâu</button>
+					</div>
+					<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+						<label style="font-size:12px; font-weight:700; display:flex; align-items:center; gap:6px;">
+							Màu đơn sắc: <input type="color" id="plus-sitebg-color" value="#eef7ff">
+						</label>
+						<div style="flex:1; min-width:190px;">
+							<input type="file" id="plus-sitebg-file" accept="image/*" title="Chọn ảnh nền web riêng">
+						</div>
+					</div>
+					<p id="plus-sitebg-label" class="profile-extra-hint">Đang chọn: Mặc định</p>
 				</div>
 
 				<div>
@@ -796,7 +823,7 @@
 						</select>
 					</div>
 					<div class="privacy-toggle-row">
-						<span>Hiển thị Trạng thái hoạt động (Online / Đang tự học)?</span>
+						<span>Hiển thị Trạng thái hoạt động?</span>
 						<select id="plus-privacy-activity" style="width:auto;">
 							<option value="public">Mọi người</option>
 							<option value="friends">Chỉ Bạn bè</option>
@@ -821,7 +848,7 @@
 		</section>
 	</div>
 
-	<!-- MODAL: Xác nhận Study Tag (+1 & Lời nhận xét) -->
+	<!-- MODAL: Xác nhận Study Tag -->
 	<div id="endorse-modal-overlay" class="report-modal-overlay" hidden>
 		<section class="report-modal-box" role="dialog" aria-modal="true" aria-labelledby="endorse-modal-title">
 			<div class="report-modal-header">
@@ -876,8 +903,8 @@
 			emailjs.init({ publicKey: "dViu70h7kpGKrNHN0" });
 		}
 	</script>
-	<script src="./nav-profile.js?v=3" defer></script>
-	<script src="./profile-auth.js?v=3" defer></script>
-	<script src="./profile-sections.js?v=5" defer></script>
+	<script src="./nav-profile.js?v=4" defer></script>
+	<script src="./profile-auth.js?v=4" defer></script>
+	<script src="./profile-sections.js?v=4" defer></script>
 </body>
 </html>

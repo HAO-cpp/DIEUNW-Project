@@ -1,447 +1,468 @@
 document.addEventListener("DOMContentLoaded", () => {
-	const API_BASE = "https://dieunw.onrender.com";
+    const API_BASE = "https://dieunw.onrender.com";
 
-	// 1. ĐỒNG HỒ POMODORO & LƯU GIỜ TỰ HỌC
-	let timerInterval = null;
-	let activeModeMinutes = 25;
-	let timeLeft = 25 * 60;
-	let currentMode = "focus";
-	let completedSessions = parseInt(localStorage.getItem("dieunw_study_sessions"), 10) || 0;
+    function notify(message, type = "info") {
+        if (typeof window.dieunwToast === "function") {
+            window.dieunwToast(message, type);
+        }
+    }
 
-	const timerDisplay = document.getElementById("timer-display");
-	const timerStatus = document.getElementById("timer-status-text");
-	const streakBadge = document.getElementById("study-streak-badge");
-	const btnStart = document.getElementById("btn-start-timer");
-	const btnPause = document.getElementById("btn-pause-timer");
-	const btnReset = document.getElementById("btn-reset-timer");
-	const modeButtons = [...document.querySelectorAll(".mode-btn")];
+    function resolveMedia(url) {
+        if (typeof window.dieunwResolveMedia === "function") {
+            return window.dieunwResolveMedia(url);
+        }
+        const raw = String(url || "").trim();
+        if (!raw) return "";
+        if (raw.startsWith("/uploads/")) return `${API_BASE}${raw}`;
+        return raw;
+    }
 
-	function updateStreakBadgeText(extraText = "") {
-		streakBadge.textContent = `Đã hoàn thành: ${completedSessions} phiên${extraText}`;
-	}
-	updateStreakBadgeText();
+    // 1. ĐỒNG HỒ POMODORO
+    let timerInterval = null;
+    let timeLeft = 25 * 60;
+    let currentMode = "focus";
+    let completedSessions = parseInt(localStorage.getItem("dieunw_study_sessions"), 10) || 0;
 
-	function updateTimerUI() {
-		const minutes = Math.floor(timeLeft / 60).toString().padStart(2, "0");
-		const seconds = (timeLeft % 60).toString().padStart(2, "0");
-		const formattedTime = `${minutes}:${seconds}`;
-		timerDisplay.textContent = formattedTime;
-		document.title = `(${formattedTime}) Phòng Tự Học - DIEUNW`;
-	}
+    const timerDisplay = document.getElementById("timer-display");
+    const timerStatus = document.getElementById("timer-status-text");
+    const streakBadge = document.getElementById("study-streak-badge");
+    const btnStart = document.getElementById("btn-start-timer");
+    const btnPause = document.getElementById("btn-pause-timer");
+    const btnReset = document.getElementById("btn-reset-timer");
+    const modeButtons = document.querySelectorAll(".mode-btn");
 
-	function playBellSound() {
-		try {
-			const AudioCtx = window.AudioContext || window.webkitAudioContext;
-			if (!AudioCtx) return;
-			const ctx = new AudioCtx();
-			const osc = ctx.createOscillator();
-			const gain = ctx.createGain();
-			osc.type = "sine";
-			osc.frequency.setValueAtTime(880, ctx.currentTime);
-			gain.gain.setValueAtTime(0.25, ctx.currentTime);
-			gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.65);
-			osc.connect(gain);
-			gain.connect(ctx.destination);
-			osc.start();
-			osc.stop(ctx.currentTime + 0.65);
-		} catch {
-			// Bỏ qua nếu trình duyệt chặn âm thanh tự động
-		}
-	}
+    if (streakBadge) streakBadge.innerText = `Đã hoàn thành: ${completedSessions} phiên`;
 
-	async function recordStudySessionOnServer(minutes) {
-		const token = localStorage.getItem("session_token") || localStorage.getItem("dieuNwToken") || "";
-		if (!token) return;
-		try {
-			const res = await fetch(`${API_BASE}/api/study/session`, {
-				method: "POST",
-				credentials: "include",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${token}`
-				},
-				body: JSON.stringify({ minutes })
-			});
-			if (!res.ok) return;
-			const data = await res.json().catch(() => ({}));
-			if (data.studyPoints || data.streak) {
-				updateStreakBadgeText(` · Chuỗi ${data.streak || 1} ngày · +15đ`);
-			}
-		} catch {
-			// Không làm gián đoạn trải nghiệm học tập nếu mất mạng
-		}
-	}
+    function updateTimerUI() {
+        const minutes = Math.floor(timeLeft / 60).toString().padStart(2, "0");
+        const seconds = (timeLeft % 60).toString().padStart(2, "0");
+        const formattedTime = `${minutes}:${seconds}`;
+        if (timerDisplay) timerDisplay.innerText = formattedTime;
+        document.title = `(${formattedTime}) Phòng Tự Học - DIEUNW`;
+    }
 
-	function handleTimerComplete() {
-		playBellSound();
-		if (currentMode === "focus") {
-			completedSessions += 1;
-			localStorage.setItem("dieunw_study_sessions", String(completedSessions));
-			updateStreakBadgeText();
-			recordStudySessionOnServer(activeModeMinutes);
-			timerStatus.textContent = `🎉 Tuyệt vời! Bạn vừa hoàn thành phiên tập trung ${activeModeMinutes} phút. Hãy nghỉ ngắn nhé!`;
-		} else {
-			timerStatus.textContent = "⏰ Hết giờ nghỉ rồi! Sẵn sàng bắt đầu phiên tập trung mới nào!";
-		}
-		btnStart.style.display = "inline-block";
-		btnPause.style.display = "none";
-		document.title = "Hoàn thành phiên - DIEUNW";
-	}
+    modeButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            clearInterval(timerInterval);
+            timerInterval = null;
 
-	modeButtons.forEach(btn => {
-		btn.addEventListener("click", () => {
-			clearInterval(timerInterval);
-			timerInterval = null;
-			modeButtons.forEach(b => b.classList.remove("active"));
-			btn.classList.add("active");
+            modeButtons.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
 
-			activeModeMinutes = parseInt(btn.getAttribute("data-time"), 10) || 25;
-			currentMode = btn.getAttribute("data-mode") || "focus";
-			timeLeft = activeModeMinutes * 60;
+            const mins = parseInt(btn.getAttribute("data-time"), 10) || 25;
+            currentMode = btn.getAttribute("data-mode") || "focus";
+            timeLeft = mins * 60;
 
-			btnStart.style.display = "inline-block";
-			btnPause.style.display = "none";
-			timerStatus.textContent = currentMode === "focus"
-				? "Sẵn sàng tập trung cao độ!"
-				: "Thời gian thư giãn nghỉ ngơi!";
-			updateTimerUI();
-		});
-	});
+            if (btnStart) btnStart.style.display = "inline-block";
+            if (btnPause) btnPause.style.display = "none";
+            if (timerStatus) {
+                timerStatus.innerText = currentMode === "focus"
+                    ? "Sẵn sàng tập trung cao độ!"
+                    : "Thời gian thư giãn nghỉ ngơi!";
+            }
+            updateTimerUI();
+        });
+    });
 
-	btnStart.addEventListener("click", () => {
-		if (timerInterval) return;
-		btnStart.style.display = "none";
-		btnPause.style.display = "inline-block";
-		timerStatus.textContent = currentMode === "focus"
-			? "Đang trong giờ học tập trung..."
-			: "Đang nghỉ ngơi...";
+    btnStart?.addEventListener("click", () => {
+        if (timerInterval) return;
+        btnStart.style.display = "none";
+        if (btnPause) btnPause.style.display = "inline-block";
+        if (timerStatus) {
+            timerStatus.innerText = currentMode === "focus"
+                ? "Đang trong giờ học tập trung..."
+                : "Đang nghỉ ngơi...";
+        }
 
-		timerInterval = setInterval(() => {
-			if (timeLeft > 0) {
-				timeLeft -= 1;
-				updateTimerUI();
-			} else {
-				clearInterval(timerInterval);
-				timerInterval = null;
-				handleTimerComplete();
-			}
-		}, 1000);
-	});
+        timerInterval = setInterval(() => {
+            if (timeLeft > 0) {
+                timeLeft--;
+                updateTimerUI();
+            } else {
+                clearInterval(timerInterval);
+                timerInterval = null;
+                handleTimerComplete();
+            }
+        }, 1000);
+    });
 
-	btnPause.addEventListener("click", () => {
-		clearInterval(timerInterval);
-		timerInterval = null;
-		btnStart.style.display = "inline-block";
-		btnPause.style.display = "none";
-		timerStatus.textContent = "Đã tạm dừng đồng hồ.";
-	});
+    btnPause?.addEventListener("click", () => {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        if (btnStart) btnStart.style.display = "inline-block";
+        btnPause.style.display = "none";
+        if (timerStatus) timerStatus.innerText = "Đã tạm dừng đồng hồ.";
+    });
 
-	btnReset.addEventListener("click", () => {
-		clearInterval(timerInterval);
-		timerInterval = null;
-		const activeBtn = document.querySelector(".mode-btn.active");
-		activeModeMinutes = parseInt(activeBtn?.getAttribute("data-time") || "25", 10);
-		timeLeft = activeModeMinutes * 60;
+    btnReset?.addEventListener("click", () => {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        const activeBtn = document.querySelector(".mode-btn.active");
+        timeLeft = (parseInt(activeBtn?.getAttribute("data-time"), 10) || 25) * 60;
 
-		btnStart.style.display = "inline-block";
-		btnPause.style.display = "none";
-		timerStatus.textContent = "Đã đặt lại thời gian.";
-		updateTimerUI();
-	});
+        if (btnStart) btnStart.style.display = "inline-block";
+        if (btnPause) btnPause.style.display = "none";
+        if (timerStatus) timerStatus.innerText = "Đã đặt lại thời gian.";
+        updateTimerUI();
+    });
 
-	// 2. CHỦ ĐỀ NỀN & ĐỒNG BỘ DARK MODE TOÀN TRANG
-	const themeSelector = document.getElementById("theme-selector");
-	const navThemeToggle = document.getElementById("nav-theme-toggle");
+    function handleTimerComplete() {
+        playBellSound();
+        if (currentMode === "focus") {
+            completedSessions++;
+            localStorage.setItem("dieunw_study_sessions", String(completedSessions));
+            if (streakBadge) streakBadge.innerText = `Đã hoàn thành: ${completedSessions} phiên`;
+            notify("Chúc mừng bạn đã hoàn thành 1 phiên tập trung! Hãy nghỉ ngơi nhé.", "success");
+        } else {
+            notify("Hết giờ nghỉ ngơi rồi! Quay lại bàn học thôi nào!", "info");
+        }
+        if (btnStart) btnStart.style.display = "inline-block";
+        if (btnPause) btnPause.style.display = "none";
+        if (timerStatus) timerStatus.innerText = "Hoàn thành phiên!";
+    }
 
-	function applyStudyTheme(themeName, syncGlobalDark = true) {
-		document.body.classList.remove("theme-dark", "theme-forest", "theme-sunset");
-		if (themeName && themeName !== "default") {
-			document.body.classList.add(`theme-${themeName}`);
-		}
-		localStorage.setItem("dieunw_study_theme", themeName || "default");
+    function playBellSound() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            osc.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.55);
+        } catch {}
+    }
 
-		if (syncGlobalDark) {
-			if (themeName === "dark") {
-				document.documentElement.classList.add("dark-mode");
-				document.body.classList.add("dark-mode");
-				localStorage.setItem("dieunw_dark_mode", "1");
-				if (navThemeToggle) navThemeToggle.textContent = "☀";
-			} else if (themeName === "default") {
-				document.documentElement.classList.remove("dark-mode");
-				document.body.classList.remove("dark-mode");
-				localStorage.setItem("dieunw_dark_mode", "0");
-				if (navThemeToggle) navThemeToggle.textContent = "⏾";
-			}
-		}
-	}
+    // 2. CHỦ ĐỀ MÀU NỀN (Giữ nguyên nền web cá nhân nếu có)
+    const themeSelector = document.getElementById("theme-selector");
+    function applyStudyTheme(val) {
+        document.body.classList.remove("theme-dark", "theme-forest", "theme-sunset");
+        if (val && val !== "default") {
+            document.body.classList.add(`theme-${val}`);
+        }
+        localStorage.setItem("dieunw_study_theme", val || "default");
+    }
 
-	const savedGlobalDark = localStorage.getItem("dieunw_dark_mode") === "1";
-	const savedStudyTheme = localStorage.getItem("dieunw_study_theme") || (savedGlobalDark ? "dark" : "default");
-	themeSelector.value = savedGlobalDark && savedStudyTheme === "default" ? "dark" : savedStudyTheme;
-	applyStudyTheme(themeSelector.value, false);
+    if (themeSelector) {
+        const savedTheme = localStorage.getItem("dieunw_study_theme") || "default";
+        themeSelector.value = savedTheme;
+        applyStudyTheme(savedTheme);
+        themeSelector.addEventListener("change", (e) => applyStudyTheme(e.target.value));
+    }
 
-	themeSelector.addEventListener("change", event => {
-		applyStudyTheme(event.target.value, true);
-	});
+    // 3. TRÌNH PHÁT NHẠC PLAYLIST + KHO NHẠC ONLINE + ĐĨA QUAY
+    const audioPanel = document.getElementById("audio-player-panel");
+    const audioPlayer = document.getElementById("bg-audio-player");
+    const customAudioInput = document.getElementById("custom-audio-upload");
+    const audioFileName = document.getElementById("audio-file-name");
+    const btnToggleAudio = document.getElementById("btn-toggle-audio");
+    const btnPrevAudio = document.getElementById("btn-prev-audio");
+    const btnNextAudio = document.getElementById("btn-next-audio");
+    const btnReplayPlaylist = document.getElementById("btn-replay-playlist");
+    const speedButtons = document.querySelectorAll(".audio-speed-btn[data-speed]");
+    const audioVolume = document.getElementById("audio-volume");
+    const playlistEl = document.getElementById("audio-playlist");
 
-	if (navThemeToggle) {
-		navThemeToggle.addEventListener("click", () => {
-			setTimeout(() => {
-				const isNowDark = document.documentElement.classList.contains("dark-mode");
-				if (isNowDark) {
-					themeSelector.value = "dark";
-					applyStudyTheme("dark", false);
-				} else if (themeSelector.value === "dark") {
-					themeSelector.value = "default";
-					applyStudyTheme("default", false);
-				}
-			}, 20);
-		});
-	}
+    const librarySelect = document.getElementById("pomodoro-library-select");
+    const btnAddLibrary = document.getElementById("btn-add-library-track");
+    const btnLoadAllLibrary = document.getElementById("btn-load-all-library");
 
-	// 3. TRÌNH PHÁT NHẠC ĐĨA THAN + PLAYLIST + TỐC ĐỘ
-	const audioPanel = document.getElementById("audio-player-panel");
-	const audioPlayer = document.getElementById("bg-audio-player");
-	const customAudioInput = document.getElementById("custom-audio-upload");
-	const audioFileName = document.getElementById("audio-file-name");
-	const btnPrevAudio = document.getElementById("btn-prev-audio");
-	const btnToggleAudio = document.getElementById("btn-toggle-audio");
-	const btnNextAudio = document.getElementById("btn-next-audio");
-	const btnReplayPlaylist = document.getElementById("btn-replay-playlist");
-	const speedButtons = [...document.querySelectorAll(".audio-speed-btn")];
-	const audioVolume = document.getElementById("audio-volume");
-	const playlistEl = document.getElementById("audio-playlist");
+    let playlist = [];
+    let currentTrackIndex = -1;
+    let loopPlaylist = false;
+    let libraryTracks = [];
 
-	let tracks = [];
-	let currentTrackIndex = -1;
-	let isReplay = false;
-	let playbackRate = 1;
+    if (audioVolume && audioPlayer) {
+        const savedVol = parseFloat(localStorage.getItem("dieunw_study_volume"));
+        if (!Number.isNaN(savedVol)) {
+            audioVolume.value = String(Math.min(1, Math.max(0, savedVol)));
+        }
+        audioPlayer.volume = parseFloat(audioVolume.value) || 0.5;
+    }
 
-	function syncPlayingState() {
-		const isPlaying = Boolean(audioPlayer.src) && !audioPlayer.paused && !audioPlayer.ended;
-		audioPanel?.classList.toggle("is-playing", isPlaying);
-		btnToggleAudio.textContent = isPlaying ? "⏸" : "▶";
-	}
+    function syncPlayStateUI() {
+        const isPlaying = Boolean(audioPlayer && !audioPlayer.paused && audioPlayer.src);
+        if (btnToggleAudio) btnToggleAudio.textContent = isPlaying ? "⏸" : "▶";
+        if (audioPanel) audioPanel.classList.toggle("is-playing", isPlaying);
+    }
 
-	function renderPlaylist() {
-		playlistEl.replaceChildren();
-		playlistEl.hidden = tracks.length === 0;
-		tracks.forEach((track, idx) => {
-			const li = document.createElement("li");
-			li.className = `audio-playlist-item${idx === currentTrackIndex ? " active" : ""}`;
+    function renderPlaylist() {
+        if (!playlistEl) return;
+        playlistEl.innerHTML = "";
+        if (!playlist.length) {
+            playlistEl.hidden = true;
+            if (audioFileName) audioFileName.textContent = "Chưa có bài hát nào trong playlist";
+            return;
+        }
+        playlistEl.hidden = false;
 
-			const selectBtn = document.createElement("button");
-			selectBtn.type = "button";
-			selectBtn.className = "audio-playlist-track";
-			selectBtn.textContent = `${idx + 1}. ${track.name}`;
-			selectBtn.addEventListener("click", () => playTrackAt(idx));
+        playlist.forEach((track, idx) => {
+            const li = document.createElement("li");
+            li.className = `audio-playlist-item ${idx === currentTrackIndex ? "active" : ""}`;
 
-			const removeBtn = document.createElement("button");
-			removeBtn.type = "button";
-			removeBtn.className = "audio-playlist-remove";
-			removeBtn.setAttribute("aria-label", `Xóa ${track.name}`);
-			removeBtn.textContent = "×";
-			removeBtn.addEventListener("click", () => removeTrackAt(idx));
+            const playBtn = document.createElement("button");
+            playBtn.type = "button";
+            playBtn.className = "audio-playlist-select";
+            playBtn.textContent = `${idx + 1}. ${track.title}${track.source === "library" ? " (Kho nhạc)" : ""}`;
+            playBtn.addEventListener("click", () => playTrackAt(idx));
 
-			li.append(selectBtn, removeBtn);
-			playlistEl.appendChild(li);
-		});
-	}
+            const delBtn = document.createElement("button");
+            delBtn.type = "button";
+            delBtn.className = "audio-playlist-remove";
+            delBtn.title = "Xóa khỏi playlist";
+            delBtn.textContent = "×";
+            delBtn.addEventListener("click", () => removeTrackAt(idx));
 
-	function playTrackAt(index) {
-		if (!tracks.length) return;
-		const safeIndex = ((index % tracks.length) + tracks.length) % tracks.length;
-		currentTrackIndex = safeIndex;
-		const track = tracks[currentTrackIndex];
-		audioPlayer.src = track.url;
-		audioPlayer.volume = Number(audioVolume.value);
-		audioPlayer.playbackRate = playbackRate;
-		audioFileName.textContent = `🎶 Đang phát: ${track.name}`;
-		renderPlaylist();
-		audioPlayer.play().catch(() => {});
-		syncPlayingState();
-	}
+            li.append(playBtn, delBtn);
+            playlistEl.appendChild(li);
+        });
+    }
 
-	function removeTrackAt(index) {
-		const [removed] = tracks.splice(index, 1);
-		if (removed?.url) URL.revokeObjectURL(removed.url);
+    function playTrackAt(idx) {
+        if (!playlist.length || !audioPlayer) return;
+        const normalized = ((idx % playlist.length) + playlist.length) % playlist.length;
+        const track = playlist[normalized];
+        if (!track?.url) return;
 
-		if (!tracks.length) {
-			currentTrackIndex = -1;
-			audioPlayer.pause();
-			audioPlayer.removeAttribute("src");
-			audioFileName.textContent = "Chưa có bài hát nào trong playlist";
-			renderPlaylist();
-			syncPlayingState();
-			return;
-		}
+        currentTrackIndex = normalized;
+        if (typeof window.dieunwPauseGlobalMusic === "function") {
+            window.dieunwPauseGlobalMusic();
+        }
+        audioPlayer.src = track.url;
+        audioPlayer.playbackRate = parseFloat(document.querySelector(".audio-speed-btn[data-speed].active")?.dataset.speed || "1");
+        audioPlayer.volume = parseFloat(audioVolume?.value || "0.5");
+        audioPlayer.play().catch(() => {});
 
-		if (index === currentTrackIndex) {
-			const nextIdx = index >= tracks.length ? 0 : index;
-			playTrackAt(nextIdx);
-		} else {
-			if (index < currentTrackIndex) currentTrackIndex -= 1;
-			renderPlaylist();
-		}
-	}
+        if (audioFileName) audioFileName.textContent = `♪ Đang phát: ${track.title}`;
+        renderPlaylist();
+        syncPlayStateUI();
+    }
 
-	customAudioInput.addEventListener("change", event => {
-		const files = [...(event.target.files || [])];
-		if (!files.length) return;
-		const firstNewIndex = tracks.length;
-		files.forEach(file => {
-			tracks.push({
-				name: file.name,
-				url: URL.createObjectURL(file)
-			});
-		});
-		customAudioInput.value = "";
-		if (currentTrackIndex === -1) {
-			playTrackAt(firstNewIndex);
-		} else {
-			renderPlaylist();
-		}
-	});
+    function removeTrackAt(idx) {
+        const removed = playlist[idx];
+        if (removed?.isObjectUrl) {
+            try { URL.revokeObjectURL(removed.url); } catch {}
+        }
+        playlist.splice(idx, 1);
 
-	btnToggleAudio.addEventListener("click", () => {
-		if (!tracks.length) {
-			customAudioInput.click();
-			return;
-		}
-		if (currentTrackIndex === -1) {
-			playTrackAt(0);
-			return;
-		}
-		if (audioPlayer.paused) {
-			audioPlayer.playbackRate = playbackRate;
-			audioPlayer.play().catch(() => {});
-		} else {
-			audioPlayer.pause();
-		}
-		syncPlayingState();
-	});
+        if (!playlist.length) {
+            currentTrackIndex = -1;
+            audioPlayer?.pause();
+            if (audioPlayer) audioPlayer.removeAttribute("src");
+            syncPlayStateUI();
+        } else if (idx === currentTrackIndex) {
+            playTrackAt(idx % playlist.length);
+        } else if (idx < currentTrackIndex) {
+            currentTrackIndex--;
+        }
+        renderPlaylist();
+    }
 
-	btnPrevAudio.addEventListener("click", () => {
-		if (!tracks.length) return;
-		playTrackAt(currentTrackIndex <= 0 ? tracks.length - 1 : currentTrackIndex - 1);
-	});
+    // Nạp nhạc từ máy (hỗ trợ nhiều file)
+    customAudioInput?.addEventListener("change", (e) => {
+        const files = Array.from(e.target.files || []);
+        if (!files.length) return;
+        const startIndex = playlist.length;
+        files.forEach(file => {
+            playlist.push({
+                id: `local-${Date.now()}-${Math.random()}`,
+                title: file.name.replace(/\.[^.]+$/, ""),
+                url: URL.createObjectURL(file),
+                source: "local",
+                isObjectUrl: true
+            });
+        });
+        e.target.value = "";
+        playTrackAt(startIndex);
+        notify(`Đã thêm ${files.length} bài nhạc từ máy.`, "success");
+    });
 
-	btnNextAudio.addEventListener("click", () => {
-		if (!tracks.length) return;
-		playTrackAt((currentTrackIndex + 1) % tracks.length);
-	});
+    // Tải danh sách Kho nhạc DIEUNW
+    fetch(`${API_BASE}/api/music`, { credentials: "include" })
+        .then(res => res.ok ? res.json() : { tracks: [] })
+        .then(data => {
+            libraryTracks = Array.isArray(data.tracks) ? data.tracks : [];
+            if (!librarySelect) return;
+            libraryTracks.forEach(tr => {
+                const opt = document.createElement("option");
+                opt.value = tr.id;
+                opt.textContent = `${tr.title} — ${tr.artist || tr.authorName || "Thành viên"}`;
+                librarySelect.appendChild(opt);
+            });
+        })
+        .catch(() => {});
 
-	btnReplayPlaylist.addEventListener("click", () => {
-		isReplay = !isReplay;
-		btnReplayPlaylist.classList.toggle("active", isReplay);
-		btnReplayPlaylist.setAttribute("aria-pressed", String(isReplay));
-	});
+    btnAddLibrary?.addEventListener("click", () => {
+        const pickedId = librarySelect?.value;
+        if (!pickedId) {
+            notify("Hãy chọn một bài từ Kho nhạc DIEUNW trước nhé.", "warning");
+            return;
+        }
+        const tr = libraryTracks.find(item => String(item.id) === String(pickedId));
+        if (!tr) return;
+        const idx = playlist.length;
+        playlist.push({
+            id: `lib-${tr.id}-${Date.now()}`,
+            title: `${tr.title}${tr.artist ? ` - ${tr.artist}` : ""}`,
+            url: resolveMedia(tr.audioUrl || tr.audio_url),
+            source: "library",
+            isObjectUrl: false
+        });
+        if (currentTrackIndex === -1 || audioPlayer?.paused) {
+            playTrackAt(idx);
+        } else {
+            renderPlaylist();
+        }
+        notify(`Đã thêm "${tr.title}" vào playlist.`, "success");
+    });
 
-	speedButtons.forEach(btn => {
-		btn.addEventListener("click", () => {
-			playbackRate = parseFloat(btn.dataset.speed || "1") || 1;
-			audioPlayer.playbackRate = playbackRate;
-			speedButtons.forEach(b => b.classList.toggle("active", b === btn));
-		});
-	});
+    btnLoadAllLibrary?.addEventListener("click", () => {
+        if (!libraryTracks.length) {
+            notify("Kho nhạc hiện chưa có bài hát nào.", "info");
+            return;
+        }
+        const startIndex = playlist.length;
+        libraryTracks.forEach(tr => {
+            playlist.push({
+                id: `lib-${tr.id}-${Math.random()}`,
+                title: `${tr.title}${tr.artist ? ` - ${tr.artist}` : ""}`,
+                url: resolveMedia(tr.audioUrl || tr.audio_url),
+                source: "library",
+                isObjectUrl: false
+            });
+        });
+        playTrackAt(startIndex);
+        notify(`Đã nạp ${libraryTracks.length} bài hát từ Kho nhạc DIEUNW!`, "success");
+    });
 
-	audioVolume.addEventListener("input", event => {
-		audioPlayer.volume = Number(event.target.value);
-	});
+    btnToggleAudio?.addEventListener("click", () => {
+        if (!playlist.length) {
+            notify("Hãy thêm nhạc từ máy hoặc từ Kho nhạc DIEUNW trước nhé!", "info");
+            return;
+        }
+        if (currentTrackIndex === -1) {
+            playTrackAt(0);
+            return;
+        }
+        if (audioPlayer.paused) {
+            window.dieunwPauseGlobalMusic?.();
+            audioPlayer.play().catch(() => {});
+        } else {
+            audioPlayer.pause();
+        }
+        syncPlayStateUI();
+    });
 
-	audioPlayer.addEventListener("play", syncPlayingState);
-	audioPlayer.addEventListener("pause", syncPlayingState);
-	audioPlayer.addEventListener("ended", () => {
-		if (!tracks.length) {
-			syncPlayingState();
-			return;
-		}
-		if (currentTrackIndex < tracks.length - 1) {
-			playTrackAt(currentTrackIndex + 1);
-		} else if (isReplay) {
-			playTrackAt(0);
-		} else {
-			syncPlayingState();
-		}
-	});
+    btnPrevAudio?.addEventListener("click", () => {
+        if (!playlist.length) return;
+        playTrackAt(currentTrackIndex - 1);
+    });
 
-	// 4. DANH SÁCH MỤC TIÊU HỌC TẬP (TO-DO LIST AN TOÀN DOM)
-	const todoInput = document.getElementById("todo-input");
-	const btnAddTodo = document.getElementById("btn-add-todo");
-	const todoList = document.getElementById("todo-list");
+    btnNextAudio?.addEventListener("click", () => {
+        if (!playlist.length) return;
+        playTrackAt(currentTrackIndex + 1);
+    });
 
-	let tasks = (() => {
-		try {
-			return JSON.parse(localStorage.getItem("dieunw_study_tasks") || "[]");
-		} catch {
-			return [];
-		}
-	})();
+    btnReplayPlaylist?.addEventListener("click", () => {
+        loopPlaylist = !loopPlaylist;
+        btnReplayPlaylist.setAttribute("aria-pressed", String(loopPlaylist));
+        btnReplayPlaylist.classList.toggle("active", loopPlaylist);
+        notify(loopPlaylist ? "Đã bật lặp lại playlist." : "Đã tắt lặp lại playlist.", "info");
+    });
 
-	function saveTasks() {
-		localStorage.setItem("dieunw_study_tasks", JSON.stringify(tasks));
-	}
+    speedButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            speedButtons.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            if (audioPlayer) {
+                audioPlayer.playbackRate = parseFloat(btn.dataset.speed || "1") || 1;
+            }
+        });
+    });
 
-	function renderTasks() {
-		todoList.replaceChildren();
-		if (!tasks.length) {
-			const empty = document.createElement("li");
-			empty.className = "todo-empty";
-			empty.textContent = "Chưa có mục tiêu nào. Thêm bài tập bạn muốn hoàn thành hôm nay nhé!";
-			todoList.appendChild(empty);
-			return;
-		}
+    audioVolume?.addEventListener("input", (e) => {
+        const val = parseFloat(e.target.value);
+        if (audioPlayer) audioPlayer.volume = val;
+        localStorage.setItem("dieunw_study_volume", String(val));
+    });
 
-		tasks.forEach((task, index) => {
-			const li = document.createElement("li");
-			li.className = `todo-item${task.done ? " completed" : ""}`;
+    audioPlayer?.addEventListener("play", syncPlayStateUI);
+    audioPlayer?.addEventListener("pause", syncPlayStateUI);
+    audioPlayer?.addEventListener("ended", () => {
+        if (!playlist.length) return;
+        if (currentTrackIndex < playlist.length - 1) {
+            playTrackAt(currentTrackIndex + 1);
+        } else if (loopPlaylist) {
+            playTrackAt(0);
+        } else {
+            syncPlayStateUI();
+        }
+    });
 
-			const labelBtn = document.createElement("button");
-			labelBtn.type = "button";
-			labelBtn.className = "todo-toggle-btn";
-			labelBtn.textContent = `${task.done ? "✅" : "⬜"} ${task.text}`;
-			labelBtn.addEventListener("click", () => {
-				tasks[index].done = !tasks[index].done;
-				saveTasks();
-				renderTasks();
-			});
+    // 4. DANH SÁCH VIỆC CẦN LÀM (TO-DO LIST AN TOÀN KHÔNG XSS)
+    const todoInput = document.getElementById("todo-input");
+    const btnAddTodo = document.getElementById("btn-add-todo");
+    const todoList = document.getElementById("todo-list");
 
-			const actionsDiv = document.createElement("div");
-			actionsDiv.className = "todo-actions";
-			const deleteBtn = document.createElement("button");
-			deleteBtn.type = "button";
-			deleteBtn.title = "Xóa";
-			deleteBtn.setAttribute("aria-label", `Xóa mục tiêu ${task.text}`);
-			deleteBtn.textContent = "🗑️";
-			deleteBtn.addEventListener("click", () => {
-				tasks.splice(index, 1);
-				saveTasks();
-				renderTasks();
-			});
+    let tasks = [];
+    try {
+        tasks = JSON.parse(localStorage.getItem("dieunw_study_tasks") || "[]");
+        if (!Array.isArray(tasks)) tasks = [];
+    } catch {
+        tasks = [];
+    }
 
-			actionsDiv.appendChild(deleteBtn);
-			li.append(labelBtn, actionsDiv);
-			todoList.appendChild(li);
-		});
-	}
+    function saveTasks() {
+        localStorage.setItem("dieunw_study_tasks", JSON.stringify(tasks));
+    }
 
-	function addTask() {
-		const text = todoInput.value.trim();
-		if (!text) return;
-		tasks.push({ text, done: false });
-		saveTasks();
-		todoInput.value = "";
-		renderTasks();
-	}
+    function renderTasks() {
+        if (!todoList) return;
+        todoList.innerHTML = "";
+        tasks.forEach((task, index) => {
+            const li = document.createElement("li");
+            li.className = `todo-item ${task.done ? "completed" : ""}`;
 
-	btnAddTodo.addEventListener("click", addTask);
-	todoInput.addEventListener("keypress", event => {
-		if (event.key === "Enter") {
-			event.preventDefault();
-			addTask();
-		}
-	});
+            const label = document.createElement("span");
+            label.style.cursor = "pointer";
+            label.textContent = `${task.done ? "✓" : "○"} ${task.text}`;
+            label.addEventListener("click", () => {
+                tasks[index].done = !tasks[index].done;
+                saveTasks();
+                renderTasks();
+            });
 
-	renderTasks();
-	updateTimerUI();
+            const actions = document.createElement("div");
+            actions.className = "todo-actions";
+            const delBtn = document.createElement("button");
+            delBtn.type = "button";
+            delBtn.title = "Xóa";
+            delBtn.textContent = "Xóa";
+            delBtn.addEventListener("click", () => {
+                tasks.splice(index, 1);
+                saveTasks();
+                renderTasks();
+            });
+            actions.appendChild(delBtn);
+
+            li.append(label, actions);
+            todoList.appendChild(li);
+        });
+    }
+
+    function addTask() {
+        const text = (todoInput?.value || "").trim();
+        if (!text) return;
+        tasks.push({ text, done: false });
+        saveTasks();
+        if (todoInput) todoInput.value = "";
+        renderTasks();
+    }
+
+    btnAddTodo?.addEventListener("click", addTask);
+    todoInput?.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") addTask();
+    });
+
+    renderTasks();
 });

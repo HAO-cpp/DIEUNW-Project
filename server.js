@@ -9,27 +9,35 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const SESSION_COOKIE = "dieu_session";
 const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000;
 const OTP_DURATION = 10 * 60 * 1000;
-const MAX_BODY_BYTES = 4 * 1024 * 1024;
-const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+const MAX_BODY_BYTES = 6 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 40 * 1024 * 1024;
 const UPLOAD_DIR = path.join(ROOT, "uploads");
 const STATIC_EXTENSIONS = new Set([
 	".html", ".js", ".css", ".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif",
-	".ico", ".svg", ".pdf", ".doc", ".docx", ".txt", ".mp4", ".webm"
+	".ico", ".svg", ".pdf", ".doc", ".docx", ".txt", ".mp4", ".webm", ".mov",
+	".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac",
+	".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".rar", ".csv", ".md"
 ]);
 const MIME_TYPES = {
+	".aac": "audio/aac",
 	".avif": "image/avif",
 	".css": "text/css; charset=utf-8",
 	".csv": "text/csv; charset=utf-8",
 	".doc": "application/msword",
 	".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+	".flac": "audio/flac",
 	".gif": "image/gif",
 	".html": "text/html; charset=utf-8",
 	".ico": "image/x-icon",
 	".jpeg": "image/jpeg",
 	".jpg": "image/jpeg",
 	".js": "text/javascript; charset=utf-8",
+	".m4a": "audio/mp4",
 	".md": "text/markdown; charset=utf-8",
+	".mov": "video/quicktime",
+	".mp3": "audio/mpeg",
 	".mp4": "video/mp4",
+	".ogg": "audio/ogg",
 	".pdf": "application/pdf",
 	".png": "image/png",
 	".ppt": "application/vnd.ms-powerpoint",
@@ -37,6 +45,7 @@ const MIME_TYPES = {
 	".rar": "application/vnd.rar",
 	".svg": "image/svg+xml",
 	".txt": "text/plain; charset=utf-8",
+	".wav": "audio/wav",
 	".webm": "video/webm",
 	".webp": "image/webp",
 	".xls": "application/vnd.ms-excel",
@@ -51,6 +60,29 @@ const AVATAR_FRAME_COSTS = {
 	"exam-season": 100,
 	"nqd-anniversary": 150
 };
+
+const ALLOWED_ORIGINS = new Set([
+	"https://hao-cpp.github.io",
+	"http://localhost:4173",
+	"http://127.0.0.1:4173"
+]);
+
+function isAllowedCorsOrigin(origin) {
+	if (!origin) return true;
+	return ALLOWED_ORIGINS.has(origin) || origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:");
+}
+
+function applyCorsHeaders(request, response) {
+	const origin = request.headers.origin;
+	if (origin && isAllowedCorsOrigin(origin)) {
+		response.setHeader("Access-Control-Allow-Origin", origin);
+		response.setHeader("Access-Control-Allow-Credentials", "true");
+		response.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS");
+		response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Range");
+		response.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges");
+		response.setHeader("Vary", "Origin");
+	}
+}
 
 function serializeCookie(name, value, { maxAge, secure }) {
 	const parts = [`${name}=${encodeURIComponent(value)}`, "HttpOnly", "Path=/"];
@@ -97,7 +129,7 @@ async function parseMultipart(request) {
 	let size = 0;
 	for await (const chunk of request) {
 		size += chunk.length;
-		if (size > MAX_UPLOAD_BYTES) throw makeError(413, "Tệp tải lên quá lớn (tối đa 25 MB).");
+		if (size > MAX_UPLOAD_BYTES) throw makeError(413, "Tệp tải lên quá lớn (tối đa 40 MB).");
 		chunks.push(chunk);
 	}
 
@@ -138,12 +170,15 @@ function saveUploadedFile(filePart, allowedType = "any") {
 	if (!filePart || !filePart.fileName || !filePart.body.length) return null;
 	const ext = path.extname(filePart.fileName).toLowerCase();
 	const imageExts = new Set([".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif"]);
-	const videoExts = new Set([".mp4", ".webm"]);
-	const docExts = new Set([".pdf", ".doc", ".docx", ".txt", ".md", ".csv", ".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".rar"]);
+	const videoExts = new Set([".mp4", ".webm", ".mov"]);
+	const audioExts = new Set([".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac", ".webm"]);
+	const docExts = new Set([".pdf", ".doc", ".docx", ".txt", ".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".rar", ".csv", ".md"]);
 	let valid = false;
 	if (allowedType === "image") valid = imageExts.has(ext);
+	else if (allowedType === "audio") valid = audioExts.has(ext);
+	else if (allowedType === "video") valid = videoExts.has(ext);
 	else if (allowedType === "story") valid = imageExts.has(ext) || videoExts.has(ext);
-	else valid = imageExts.has(ext) || videoExts.has(ext) || docExts.has(ext);
+	else valid = imageExts.has(ext) || videoExts.has(ext) || audioExts.has(ext) || docExts.has(ext);
 
 	if (!valid) {
 		throw makeError(400, "Định dạng tệp không được hỗ trợ.");
@@ -156,8 +191,18 @@ function saveUploadedFile(filePart, allowedType = "any") {
 		fileName: filePart.fileName,
 		fileType: filePart.contentType || ext.slice(1).toUpperCase(),
 		fileSize: filePart.body.length,
-		isVideo: videoExts.has(ext)
+		isVideo: videoExts.has(ext),
+		isAudio: audioExts.has(ext)
 	};
+}
+
+function sanitizeMediaRef(value, maxLen = 500) {
+	const str = String(value || "").trim();
+	if (!str) return "";
+	if (str.startsWith("/uploads/")) return str.slice(0, maxLen);
+	if (/^https?:\/\//i.test(str)) return str.slice(0, maxLen);
+	if (/^data:audio\/[a-z0-9.+-]+;base64,/i.test(str) && str.length <= 2800000) return str;
+	return "";
 }
 
 function getIsoWeekKey(date = new Date()) {
@@ -214,12 +259,60 @@ function parseUnlockedFrames(raw) {
 }
 
 function parseEcardConfig(raw) {
-	if (!raw) return null;
+	const fallback = {
+		bgType: "gradient",
+		gradFrom: "#173853",
+		gradTo: "#2298f8",
+		bgImage: "",
+		overlayOpacity: 42,
+		textTone: "light",
+		tagline: "Học sinh THPT Nguyễn Quán Nho"
+	};
+	if (!raw) return fallback;
 	try {
-		const parsed = JSON.parse(raw);
-		return parsed && typeof parsed === "object" ? parsed : null;
+		const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+		if (!parsed || typeof parsed !== "object") return fallback;
+		const hexRegex = /^#[0-9a-f]{6}$/i;
+		const overlay = Number(parsed.overlayOpacity);
+		return {
+			bgType: parsed.bgType === "image" && parsed.bgImage ? "image" : "gradient",
+			gradFrom: hexRegex.test(parsed.gradFrom) ? parsed.gradFrom : fallback.gradFrom,
+			gradTo: hexRegex.test(parsed.gradTo) ? parsed.gradTo : fallback.gradTo,
+			bgImage: typeof parsed.bgImage === "string" ? parsed.bgImage : "",
+			overlayOpacity: Number.isFinite(overlay) ? Math.max(0, Math.min(85, Math.round(overlay))) : fallback.overlayOpacity,
+			textTone: parsed.textTone === "dark" ? "dark" : "light",
+			tagline: typeof parsed.tagline === "string" ? parsed.tagline.trim().slice(0, 60) : fallback.tagline
+		};
 	} catch {
-		return null;
+		return fallback;
+	}
+}
+
+function parseSiteBg(raw) {
+	const fallback = {
+		mode: "default",
+		color1: "#f0f5fb",
+		color2: "#dcebfa",
+		image: "",
+		overlay: 18
+	};
+	if (!raw) return fallback;
+	try {
+		const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+		if (!parsed || typeof parsed !== "object") return fallback;
+		const hexRegex = /^#[0-9a-f]{6}$/i;
+		const mode = ["default", "color", "gradient", "image"].includes(parsed.mode) ? parsed.mode : "default";
+		const overlay = Number(parsed.overlay);
+		const img = typeof parsed.image === "string" && parsed.image.length <= 1500000 ? parsed.image : "";
+		return {
+			mode: mode === "image" && !img ? "default" : mode,
+			color1: hexRegex.test(parsed.color1) ? parsed.color1 : fallback.color1,
+			color2: hexRegex.test(parsed.color2) ? parsed.color2 : fallback.color2,
+			image: img,
+			overlay: Number.isFinite(overlay) ? Math.max(0, Math.min(80, Math.round(overlay))) : fallback.overlay
+		};
+	} catch {
+		return fallback;
 	}
 }
 
@@ -230,7 +323,7 @@ function cleanUser(db, row, viewerId = "") {
 	const currentWeek = getIsoWeekKey();
 	const weeklyMinutes = row.weekly_study_reset_key === currentWeek ? Number(row.weekly_study_minutes || 0) : 0;
 	const nowMs = Date.now();
-	const hasActiveNote = Boolean(row.note_text && Number(row.note_expires_at || 0) > nowMs);
+	const hasActiveNote = Boolean((row.note_text || row.note_music_url) && Number(row.note_expires_at || 0) > nowMs);
 	const hasActiveStory = Boolean(
 		db.prepare("SELECT 1 FROM user_stories WHERE user_id = ? AND expires_at > ? LIMIT 1").get(row.id, nowMs)
 	);
@@ -242,7 +335,7 @@ function cleanUser(db, row, viewerId = "") {
 		email: row.email,
 		studentClass: row.student_class,
 		cohort: row.cohort || "",
-		avatar: row.avatar || "./DIEU.avif",
+		avatar: row.avatar || "./DIEU.png",
 		cover: row.cover || "",
 		bio: row.bio || "",
 		isAdmin: Boolean(row.is_admin),
@@ -251,6 +344,7 @@ function cleanUser(db, row, viewerId = "") {
 		socialFacebook: row.social_facebook || "",
 		socialInstagram: row.social_instagram || "",
 		socialGithub: row.social_github || "",
+		socialTiktok: row.social_tiktok || "",
 		studySchedule: row.study_schedule || "",
 		privacyAlbum: row.privacy_album || "public",
 		privacyAchievements: row.privacy_achievements || "public",
@@ -258,24 +352,27 @@ function cleanUser(db, row, viewerId = "") {
 		ghostMode: isSelf ? Boolean(row.ghost_mode) : false,
 		themePrimary: row.theme_primary || "",
 		themeSecondary: row.theme_secondary || "",
+		siteBg: parseSiteBg(row.site_bg),
+		ecardConfig: parseEcardConfig(row.ecard_config),
 		activeAvatarFrame: row.active_avatar_frame || "none",
 		unlockedFrames: isSelf ? parseUnlockedFrames(row.unlocked_frames) : undefined,
-		ecardConfig: parseEcardConfig(row.ecard_config),
 		studyPoints: Number(row.study_points || 0),
 		studyStreakDays: Number(row.study_streak_days || 0),
 		weeklyStudyHours: Number((weeklyMinutes / 60).toFixed(1)),
 		weeklyStudyMinutes: weeklyMinutes,
 		presenceStatus,
-		noteText: hasActiveNote ? row.note_text : "",
+		noteText: hasActiveNote ? (row.note_text || "") : "",
+		noteMusicUrl: hasActiveNote ? (row.note_music_url || "") : "",
+		noteMusicTitle: hasActiveNote ? (row.note_music_title || "") : "",
 		noteExpiresAt: hasActiveNote ? Number(row.note_expires_at) : 0,
 		hasActiveStory,
 		createdAt: row.created_at
 	};
 }
 
-function getUserClubs(db, row) {
+function getUserClubs(db, row, approvedClubsCache = null) {
 	if (!row) return { profileTitles: [], memberClubs: [] };
-	const allApprovedClubs = db.prepare(`
+	const allApprovedClubs = approvedClubsCache || db.prepare(`
 		SELECT id, name, logo, tag_color AS color, manager_id, manager_email, manager_emails
 		FROM clubs WHERE status = 'approved'
 		ORDER BY created_at
@@ -335,7 +432,17 @@ function initializeDatabase(dbPath) {
 	});
 	if (process.env.TURSO_DATABASE_URL) syncDb(db);
 
-	db.exec("PRAGMA foreign_keys = ON;");
+	try {
+		db.exec("PRAGMA foreign_keys = ON;");
+		db.exec("PRAGMA busy_timeout = 5000;");
+		db.exec("PRAGMA temp_store = MEMORY;");
+		db.exec("PRAGMA cache_size = -16000;");
+		if (!process.env.TURSO_DATABASE_URL) {
+			db.exec("PRAGMA journal_mode = WAL;");
+			db.exec("PRAGMA synchronous = NORMAL;");
+		}
+	} catch {}
+
 	db.exec(`
 		CREATE TABLE IF NOT EXISTS users (
 			id TEXT PRIMARY KEY,
@@ -344,7 +451,7 @@ function initializeDatabase(dbPath) {
 			password_hash TEXT NOT NULL,
 			password_salt TEXT NOT NULL,
 			student_class TEXT NOT NULL DEFAULT 'Học sinh NQD',
-			avatar TEXT NOT NULL DEFAULT './DIEU.avif',
+			avatar TEXT NOT NULL DEFAULT './DIEU.png',
 			cover TEXT NOT NULL DEFAULT '',
 			bio TEXT NOT NULL DEFAULT '',
 			is_admin INTEGER NOT NULL DEFAULT 0,
@@ -391,6 +498,8 @@ function initializeDatabase(dbPath) {
 			file_url TEXT NOT NULL DEFAULT '',
 			file_name TEXT NOT NULL DEFAULT '',
 			file_type TEXT NOT NULL DEFAULT '',
+			music_url TEXT NOT NULL DEFAULT '',
+			music_title TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL
 		);
 		CREATE TABLE IF NOT EXISTS profile_achievements (
@@ -560,6 +669,8 @@ function initializeDatabase(dbPath) {
 			media_url TEXT NOT NULL,
 			media_type TEXT NOT NULL CHECK(media_type IN ('image', 'video')),
 			caption TEXT NOT NULL DEFAULT '',
+			music_url TEXT NOT NULL DEFAULT '',
+			music_title TEXT NOT NULL DEFAULT '',
 			duration_hours INTEGER NOT NULL DEFAULT 24 CHECK(duration_hours IN (24, 48)),
 			expires_at INTEGER NOT NULL,
 			created_at TEXT NOT NULL
@@ -569,6 +680,57 @@ function initializeDatabase(dbPath) {
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			viewed_at TEXT NOT NULL,
 			PRIMARY KEY(story_id, user_id)
+		);
+		CREATE TABLE IF NOT EXISTS story_highlights (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			title TEXT NOT NULL,
+			cover_image TEXT NOT NULL DEFAULT '',
+			items_json TEXT NOT NULL DEFAULT '[]',
+			created_at TEXT NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS music_tracks (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			title TEXT NOT NULL,
+			artist TEXT NOT NULL DEFAULT '',
+			genre TEXT NOT NULL DEFAULT 'Chill / Lofi',
+			cover_image TEXT NOT NULL DEFAULT '',
+			audio_url TEXT NOT NULL,
+			duration_sec INTEGER NOT NULL DEFAULT 0,
+			play_count INTEGER NOT NULL DEFAULT 0,
+			created_at TEXT NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS music_likes (
+			track_id TEXT NOT NULL REFERENCES music_tracks(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			created_at TEXT NOT NULL,
+			PRIMARY KEY(track_id, user_id)
+		);
+		CREATE TABLE IF NOT EXISTS short_videos (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			caption TEXT NOT NULL DEFAULT '',
+			video_url TEXT NOT NULL,
+			cover_image TEXT NOT NULL DEFAULT '',
+			music_id TEXT DEFAULT NULL,
+			music_title TEXT NOT NULL DEFAULT '',
+			music_url TEXT NOT NULL DEFAULT '',
+			views_count INTEGER NOT NULL DEFAULT 0,
+			created_at TEXT NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS short_video_likes (
+			video_id TEXT NOT NULL REFERENCES short_videos(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			created_at TEXT NOT NULL,
+			PRIMARY KEY(video_id, user_id)
+		);
+		CREATE TABLE IF NOT EXISTS short_video_comments (
+			id TEXT PRIMARY KEY,
+			video_id TEXT NOT NULL REFERENCES short_videos(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			content TEXT NOT NULL,
+			created_at TEXT NOT NULL
 		);
 		CREATE TABLE IF NOT EXISTS user_bookmarks (
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -627,6 +789,8 @@ function initializeDatabase(dbPath) {
 		CREATE INDEX IF NOT EXISTS messages_conversation_idx ON messages(conversation_id, created_at);
 		CREATE INDEX IF NOT EXISTS user_stories_expires_idx ON user_stories(expires_at);
 		CREATE INDEX IF NOT EXISTS quiz_attempts_set_idx ON quiz_attempts(set_id, score DESC, duration_ms ASC);
+		CREATE INDEX IF NOT EXISTS music_tracks_created_idx ON music_tracks(created_at DESC);
+		CREATE INDEX IF NOT EXISTS short_videos_created_idx ON short_videos(created_at DESC);
 	`);
 
 	const userCols = db.prepare("PRAGMA table_info(users)").all().map(c => c.name);
@@ -638,6 +802,7 @@ function initializeDatabase(dbPath) {
 		["social_facebook", "TEXT NOT NULL DEFAULT ''"],
 		["social_instagram", "TEXT NOT NULL DEFAULT ''"],
 		["social_github", "TEXT NOT NULL DEFAULT ''"],
+		["social_tiktok", "TEXT NOT NULL DEFAULT ''"],
 		["study_schedule", "TEXT NOT NULL DEFAULT ''"],
 		["privacy_album", "TEXT NOT NULL DEFAULT 'public'"],
 		["privacy_achievements", "TEXT NOT NULL DEFAULT 'public'"],
@@ -645,9 +810,10 @@ function initializeDatabase(dbPath) {
 		["ghost_mode", "INTEGER NOT NULL DEFAULT 0"],
 		["theme_primary", "TEXT NOT NULL DEFAULT ''"],
 		["theme_secondary", "TEXT NOT NULL DEFAULT ''"],
+		["site_bg", "TEXT NOT NULL DEFAULT ''"],
+		["ecard_config", "TEXT NOT NULL DEFAULT ''"],
 		["active_avatar_frame", "TEXT NOT NULL DEFAULT 'none'"],
 		["unlocked_frames", "TEXT NOT NULL DEFAULT '[\"none\"]'"],
-		["ecard_config", "TEXT NOT NULL DEFAULT ''"],
 		["study_points", "INTEGER NOT NULL DEFAULT 0"],
 		["study_streak_days", "INTEGER NOT NULL DEFAULT 0"],
 		["last_study_date", "TEXT NOT NULL DEFAULT ''"],
@@ -656,6 +822,8 @@ function initializeDatabase(dbPath) {
 		["status_mode", "TEXT NOT NULL DEFAULT 'online'"],
 		["last_seen_at", "INTEGER NOT NULL DEFAULT 0"],
 		["note_text", "TEXT NOT NULL DEFAULT ''"],
+		["note_music_url", "TEXT NOT NULL DEFAULT ''"],
+		["note_music_title", "TEXT NOT NULL DEFAULT ''"],
 		["note_expires_at", "INTEGER NOT NULL DEFAULT 0"]
 	];
 	for (const [col, def] of userAlters) {
@@ -672,6 +840,8 @@ function initializeDatabase(dbPath) {
 	if (!clubPostCols.includes("file_url")) db.exec("ALTER TABLE club_posts ADD COLUMN file_url TEXT NOT NULL DEFAULT ''");
 	if (!clubPostCols.includes("file_name")) db.exec("ALTER TABLE club_posts ADD COLUMN file_name TEXT NOT NULL DEFAULT ''");
 	if (!clubPostCols.includes("file_type")) db.exec("ALTER TABLE club_posts ADD COLUMN file_type TEXT NOT NULL DEFAULT ''");
+	if (!clubPostCols.includes("music_url")) db.exec("ALTER TABLE club_posts ADD COLUMN music_url TEXT NOT NULL DEFAULT ''");
+	if (!clubPostCols.includes("music_title")) db.exec("ALTER TABLE club_posts ADD COLUMN music_title TEXT NOT NULL DEFAULT ''");
 
 	const postCols = db.prepare("PRAGMA table_info(posts)").all().map(c => c.name);
 	const postAlters = [
@@ -691,11 +861,17 @@ function initializeDatabase(dbPath) {
 		["is_rich_html", "INTEGER NOT NULL DEFAULT 0"],
 		["study_set_id", "TEXT DEFAULT NULL"],
 		["scheduled_at", "TEXT DEFAULT NULL"],
-		["publish_status", "TEXT NOT NULL DEFAULT 'published'"]
+		["publish_status", "TEXT NOT NULL DEFAULT 'published'"],
+		["music_url", "TEXT NOT NULL DEFAULT ''"],
+		["music_title", "TEXT NOT NULL DEFAULT ''"]
 	];
 	for (const [col, def] of postAlters) {
 		if (!postCols.includes(col)) db.exec(`ALTER TABLE posts ADD COLUMN ${col} ${def}`);
 	}
+
+	const storyCols = db.prepare("PRAGMA table_info(user_stories)").all().map(c => c.name);
+	if (!storyCols.includes("music_url")) db.exec("ALTER TABLE user_stories ADD COLUMN music_url TEXT NOT NULL DEFAULT ''");
+	if (!storyCols.includes("music_title")) db.exec("ALTER TABLE user_stories ADD COLUMN music_title TEXT NOT NULL DEFAULT ''");
 
 	const commentCols = db.prepare("PRAGMA table_info(post_comments)").all().map(c => c.name);
 	if (!commentCols.includes("sticker_url")) db.exec("ALTER TABLE post_comments ADD COLUMN sticker_url TEXT NOT NULL DEFAULT ''");
@@ -704,17 +880,22 @@ function initializeDatabase(dbPath) {
 	if (!msgCols.includes("sticker_url")) db.exec("ALTER TABLE messages ADD COLUMN sticker_url TEXT NOT NULL DEFAULT ''");
 
 	const reportCols = db.prepare("PRAGMA table_info(reports)").all().map(c => c.name);
-	if (!reportCols.includes("status")) db.exec("ALTER TABLE reports ADD COLUMN status TEXT NOT NULL DEFAULT 'open'");
 	if (!reportCols.includes("reason")) db.exec("ALTER TABLE reports ADD COLUMN reason TEXT NOT NULL DEFAULT ''");
+	if (!reportCols.includes("status")) db.exec("ALTER TABLE reports ADD COLUMN status TEXT NOT NULL DEFAULT 'open'");
 
 	const studySetCols = db.prepare("PRAGMA table_info(study_sets)").all().map(c => c.name);
-	if (!studySetCols.includes("forked_from_id")) db.exec("ALTER TABLE study_sets ADD COLUMN forked_from_id TEXT REFERENCES study_sets(id) ON DELETE SET NULL");
-	if (!studySetCols.includes("subject")) db.exec("ALTER TABLE study_sets ADD COLUMN subject TEXT NOT NULL DEFAULT 'Chung'");
-	if (!studySetCols.includes("description")) db.exec("ALTER TABLE study_sets ADD COLUMN description TEXT NOT NULL DEFAULT ''");
-	if (!studySetCols.includes("cards_json")) db.exec("ALTER TABLE study_sets ADD COLUMN cards_json TEXT NOT NULL DEFAULT '[]'");
-	if (!studySetCols.includes("pinned")) db.exec("ALTER TABLE study_sets ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0");
-	if (!studySetCols.includes("study_count")) db.exec("ALTER TABLE study_sets ADD COLUMN study_count INTEGER NOT NULL DEFAULT 0");
-	if (!studySetCols.includes("updated_at")) db.exec("ALTER TABLE study_sets ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''");
+	const studySetAlters = [
+		["forked_from_id", "TEXT REFERENCES study_sets(id) ON DELETE SET NULL"],
+		["subject", "TEXT NOT NULL DEFAULT 'Chung'"],
+		["description", "TEXT NOT NULL DEFAULT ''"],
+		["cards_json", "TEXT NOT NULL DEFAULT '[]'"],
+		["pinned", "INTEGER NOT NULL DEFAULT 0"],
+		["study_count", "INTEGER NOT NULL DEFAULT 0"],
+		["updated_at", "TEXT NOT NULL DEFAULT ''"]
+	];
+	for (const [col, def] of studySetAlters) {
+		if (!studySetCols.includes(col)) db.exec(`ALTER TABLE study_sets ADD COLUMN ${col} ${def}`);
+	}
 
 	if (process.env.TURSO_DATABASE_URL) syncDb(db);
 	const now = new Date().toISOString();
@@ -743,15 +924,6 @@ async function readJson(request) {
 function sendJson(response, statusCode, payload, headers = {}) {
 	response.writeHead(statusCode, { "Cache-Control": "no-store", "Content-Type": "application/json; charset=utf-8", ...headers });
 	response.end(JSON.stringify(payload));
-}
-
-function isAllowedCorsOrigin(origin) {
-	if (!origin) return false;
-	return origin === "https://hao-cpp.github.io"
-		|| origin === "http://localhost:4173"
-		|| origin === "http://127.0.0.1:4173"
-		|| origin.startsWith("http://localhost:")
-		|| origin.startsWith("http://127.0.0.1:");
 }
 
 function parseCookies(request) {
@@ -869,13 +1041,13 @@ function autoPublishScheduledPosts(db) {
 	if (updated.changes) syncDb(db);
 }
 
-function serializeStudySet(db, row) {
+function serializeStudySet(db, row, authorCache = null) {
 	if (!row) return null;
 	let cards = [];
 	try {
 		cards = JSON.parse(row.cards_json || "[]");
 	} catch {}
-	const author = db.prepare("SELECT id, name, email, avatar FROM users WHERE id = ?").get(row.user_id);
+	const author = authorCache?.get(row.user_id) || db.prepare("SELECT id, name, email, avatar FROM users WHERE id = ?").get(row.user_id);
 	const leaderboard = row.kind === "quiz"
 		? db.prepare(`
 			SELECT quiz_attempts.score, quiz_attempts.total, quiz_attempts.duration_ms AS durationMs,
@@ -890,7 +1062,7 @@ function serializeStudySet(db, row) {
 		id: row.id,
 		userId: row.user_id,
 		authorName: author?.name || author?.email || "Thành viên",
-		authorAvatar: author?.avatar || "./DIEU.avif",
+		authorAvatar: author?.avatar || "./DIEU.png",
 		forkedFromId: row.forked_from_id || null,
 		kind: row.kind,
 		title: row.title,
@@ -905,9 +1077,31 @@ function serializeStudySet(db, row) {
 	};
 }
 
-function postForViewer(db, row, viewerId) {
-	const author = db.prepare("SELECT id, name, email, avatar, is_admin, is_moderator, is_alumni, active_avatar_frame, ghost_mode, privacy_activity, status_mode, last_seen_at FROM users WHERE id = ?").get(row.user_id);
-	const club = row.club_id ? db.prepare("SELECT id, name, logo, tag_color FROM clubs WHERE id = ?").get(row.club_id) : null;
+function buildPostBatchCache(db) {
+	const approvedClubs = db.prepare(`
+		SELECT id, name, logo, tag_color AS color, manager_id, manager_email, manager_emails
+		FROM clubs WHERE status = 'approved'
+		ORDER BY created_at
+	`).all();
+	return {
+		approvedClubs,
+		authors: new Map(),
+		clubs: new Map(approvedClubs.map(c => [c.id, c])),
+		authorTitles: new Map(),
+		activeStories: new Map()
+	};
+}
+
+function postForViewer(db, row, viewerId, cache = null) {
+	let author = cache?.authors.get(row.user_id);
+	if (!author) {
+		author = db.prepare("SELECT id, name, email, avatar, is_admin, is_moderator, is_alumni, active_avatar_frame, ghost_mode, privacy_activity, status_mode, last_seen_at FROM users WHERE id = ?").get(row.user_id);
+		if (cache && author) cache.authors.set(row.user_id, author);
+	}
+	let club = null;
+	if (row.club_id) {
+		club = cache?.clubs.get(row.club_id) || db.prepare("SELECT id, name, logo, tag_color FROM clubs WHERE id = ?").get(row.club_id);
+	}
 	const comments = db.prepare(`
 		SELECT comments.id, comments.user_id AS userId, comments.content AS text, comments.sticker_url AS stickerUrl, comments.created_at AS createdAt,
 			users.name, users.avatar, users.email, users.is_admin AS isAdmin, users.is_moderator AS isModerator
@@ -918,12 +1112,28 @@ function postForViewer(db, row, viewerId) {
 	const likedByMe = Boolean(viewerId && db.prepare("SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?").get(row.id, viewerId));
 	const itemType = row.type === "study-resource" ? "resource" : "post";
 	const bookmarkedByMe = Boolean(viewerId && db.prepare("SELECT 1 FROM user_bookmarks WHERE user_id = ? AND item_type = ? AND item_id = ?").get(viewerId, itemType, row.id));
-	const studySet = row.study_set_id ? serializeStudySet(db, db.prepare("SELECT * FROM study_sets WHERE id = ?").get(row.study_set_id)) : null;
+	const studySet = row.study_set_id ? serializeStudySet(db, db.prepare("SELECT * FROM study_sets WHERE id = ?").get(row.study_set_id), cache?.authors) : null;
 
-	const authorTitles = author ? getUserClubs(db, author).profileTitles : [];
+	let authorTitles = [];
+	if (author) {
+		if (cache?.authorTitles.has(author.id)) {
+			authorTitles = cache.authorTitles.get(author.id);
+		} else {
+			authorTitles = getUserClubs(db, author, cache?.approvedClubs || null).profileTitles;
+			if (cache) cache.authorTitles.set(author.id, authorTitles);
+		}
+	}
 	const relation = viewerId && author ? relationship(db, viewerId, author.id) : "none";
 	const authorPresence = author ? computePresenceStatus(author, viewerId, relation) : "offline";
-	const hasActiveStory = author ? Boolean(db.prepare("SELECT 1 FROM user_stories WHERE user_id = ? AND expires_at > ? LIMIT 1").get(author.id, Date.now())) : false;
+	let hasActiveStory = false;
+	if (author) {
+		if (cache?.activeStories.has(author.id)) {
+			hasActiveStory = cache.activeStories.get(author.id);
+		} else {
+			hasActiveStory = Boolean(db.prepare("SELECT 1 FROM user_stories WHERE user_id = ? AND expires_at > ? LIMIT 1").get(author.id, Date.now()));
+			if (cache) cache.activeStories.set(author.id, hasActiveStory);
+		}
+	}
 
 	return {
 		id: row.id,
@@ -933,11 +1143,11 @@ function postForViewer(db, row, viewerId) {
 		type: row.type || "post",
 		name: club ? club.name : (author?.name || author?.email || "Thành viên"),
 		authorEmail: author?.email || "",
-		avatar: club ? (club.logo || "./DIEU.avif") : (author?.avatar || "./DIEU.avif"),
+		avatar: club ? (club.logo || "./DIEU.png") : (author?.avatar || "./DIEU.png"),
 		authorFrame: club ? "none" : (author?.active_avatar_frame || "none"),
 		authorPresence: club ? "offline" : authorPresence,
 		authorHasStory: club ? false : hasActiveStory,
-		authorBadges: club ? [{ label: "FANPAGE CLB", color: club.tag_color || "#1769aa", type: "club" }] : [
+		authorBadges: club ? [{ label: "FANPAGE CLB", color: club.color || club.tag_color || "#1769aa", type: "club" }] : [
 			...(author?.is_admin ? [{ label: "Admin", type: "admin" }] : []),
 			...(author?.is_moderator ? [{ label: "Ban duyệt bài", type: "mod" }] : []),
 			...(author?.is_alumni ? [{ label: "Cựu học sinh", type: "alumni" }] : []),
@@ -946,6 +1156,8 @@ function postForViewer(db, row, viewerId) {
 		content: row.content,
 		isRichHtml: Boolean(row.is_rich_html),
 		image: row.image,
+		musicUrl: row.music_url || "",
+		musicTitle: row.music_title || "",
 		visibility: row.visibility,
 		publishStatus: row.publish_status || "published",
 		scheduledAt: row.scheduled_at || null,
@@ -1114,7 +1326,25 @@ function getFullUserProfilePayload(db, targetRow, viewerId) {
 		};
 	}
 
-	const stories = db.prepare("SELECT id, media_url AS mediaUrl, media_type AS mediaType, caption, duration_hours AS durationHours, expires_at AS expiresAt, created_at AS createdAt FROM user_stories WHERE user_id = ? AND expires_at > ? ORDER BY created_at ASC").all(targetRow.id, nowMs);
+	const stories = db.prepare(`
+		SELECT s.id, s.user_id AS userId, s.media_url AS mediaUrl, s.media_type AS mediaType, s.caption,
+			s.music_url AS musicUrl, s.music_title AS musicTitle,
+			s.duration_hours AS durationHours, s.expires_at AS expiresAt, s.created_at AS createdAt,
+			(SELECT COUNT(*) FROM story_views sv WHERE sv.story_id = s.id) AS viewCount
+		FROM user_stories s WHERE s.user_id = ? AND s.expires_at > ? ORDER BY s.created_at ASC
+	`).all(targetRow.id, nowMs).map(s => ({
+		...s,
+		userName: targetRow.name,
+		userAvatar: targetRow.avatar || "./DIEU.png"
+	}));
+
+	const highlights = db.prepare("SELECT id, title, cover_image AS coverImage, items_json AS itemsJson, created_at AS createdAt FROM story_highlights WHERE user_id = ? ORDER BY created_at DESC").all(targetRow.id)
+		.map(h => {
+			let items = [];
+			try { items = JSON.parse(h.itemsJson || "[]"); } catch {}
+			return { id: h.id, title: h.title, coverImage: h.coverImage, items: Array.isArray(items) ? items : [], createdAt: h.createdAt };
+		});
+
 	const studySets = db.prepare("SELECT * FROM study_sets WHERE user_id = ? ORDER BY pinned DESC, updated_at DESC").all(targetRow.id).map(s => serializeStudySet(db, s));
 
 	const postRows = db.prepare(`
@@ -1125,6 +1355,7 @@ function getFullUserProfilePayload(db, targetRow, viewerId) {
 		ORDER BY created_at DESC LIMIT 60
 	`).all(targetRow.id, viewerId || "", viewerId || "");
 
+	const batchCache = buildPostBatchCache(db);
 	return {
 		user: userObj,
 		relationship: relation,
@@ -1136,8 +1367,56 @@ function getFullUserProfilePayload(db, targetRow, viewerId) {
 		showcase,
 		activeMoment,
 		stories,
+		highlights,
 		studySets,
-		posts: postRows.map(p => postForViewer(db, p, viewerId || ""))
+		posts: postRows.map(p => postForViewer(db, p, viewerId || "", batchCache))
+	};
+}
+
+function serializeMusicTrack(db, row, viewerId = "") {
+	const uploader = db.prepare("SELECT id, name, avatar FROM users WHERE id = ?").get(row.user_id);
+	const likesCount = db.prepare("SELECT COUNT(*) AS count FROM music_likes WHERE track_id = ?").get(row.id)?.count || 0;
+	const likedByMe = viewerId ? Boolean(db.prepare("SELECT 1 FROM music_likes WHERE track_id = ? AND user_id = ?").get(row.id, viewerId)) : false;
+	return {
+		id: row.id,
+		userId: row.user_id,
+		uploaderName: uploader?.name || "Học sinh NQD",
+		uploaderAvatar: uploader?.avatar || "./DIEU.png",
+		title: row.title,
+		artist: row.artist || uploader?.name || "DIEUNW Creator",
+		genre: row.genre || "Chill / Lofi",
+		coverImage: row.cover_image || "",
+		audioUrl: row.audio_url,
+		durationSec: Number(row.duration_sec || 0),
+		playCount: Number(row.play_count || 0),
+		likesCount,
+		likedByMe,
+		createdAt: row.created_at
+	};
+}
+
+function serializeShortVideo(db, row, viewerId = "") {
+	const author = db.prepare("SELECT id, name, avatar, student_class FROM users WHERE id = ?").get(row.user_id);
+	const likesCount = db.prepare("SELECT COUNT(*) AS count FROM short_video_likes WHERE video_id = ?").get(row.id)?.count || 0;
+	const commentsCount = db.prepare("SELECT COUNT(*) AS count FROM short_video_comments WHERE video_id = ?").get(row.id)?.count || 0;
+	const likedByMe = viewerId ? Boolean(db.prepare("SELECT 1 FROM short_video_likes WHERE video_id = ? AND user_id = ?").get(row.id, viewerId)) : false;
+	return {
+		id: row.id,
+		userId: row.user_id,
+		authorName: author?.name || "Học sinh NQD",
+		authorAvatar: author?.avatar || "./DIEU.png",
+		authorClass: author?.student_class || "Học sinh NQD",
+		caption: row.caption || "",
+		videoUrl: row.video_url,
+		coverImage: row.cover_image || "",
+		musicId: row.music_id || null,
+		musicTitle: row.music_title || "",
+		musicUrl: row.music_url || "",
+		viewsCount: Number(row.views_count || 0),
+		likesCount,
+		commentsCount,
+		likedByMe,
+		createdAt: row.created_at
 	};
 }
 
@@ -1148,40 +1427,54 @@ function createServer(options = {}) {
 	const server = createHttpServer(async (request, response) => {
 		const host = request.headers.host || "localhost";
 		const url = new URL(request.url || "/", `http://${host}`);
-		const secure = Boolean(request.socket.encrypted || env.COOKIE_SECURE === "1" || request.headers["x-forwarded-proto"] === "https");
-		const origin = request.headers.origin;
+		const secure = Boolean(request.socket.encrypted || env.COOKIE_SECURE === "1");
 		try {
 			if (url.pathname.startsWith("/api/")) {
 				await handleApi({ request, response, url, db, env, secure });
 				return;
 			}
-			if (["GET", "HEAD", "OPTIONS"].includes(request.method || "GET") && url.pathname.startsWith("/uploads/")) {
-				const uploadHeaders = { "Vary": "Origin" };
-				if (isAllowedCorsOrigin(origin)) {
-					uploadHeaders["Access-Control-Allow-Origin"] = origin;
-					uploadHeaders["Access-Control-Allow-Credentials"] = "true";
-					uploadHeaders["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS";
-					uploadHeaders["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
-				}
+			if (url.pathname.startsWith("/uploads/")) {
+				applyCorsHeaders(request, response);
 				if (request.method === "OPTIONS") {
-					response.writeHead(204, uploadHeaders);
+					response.writeHead(204);
 					response.end();
 					return;
+				}
+				if (!["GET", "HEAD"].includes(request.method || "GET")) {
+					throw makeError(405, "Phương thức không được hỗ trợ.");
 				}
 				const fileName = path.basename(decodeURIComponent(url.pathname.slice("/uploads/".length)));
 				const filePath = path.join(UPLOAD_DIR, fileName);
 				if (!existsSync(filePath) || !statSync(filePath).isFile()) throw makeError(404, "Không tìm thấy tệp.");
-				const forceDownload = url.searchParams.get("download") === "1";
-				const requestedName = String(url.searchParams.get("name") || fileName).replace(/["\r\n\\/]+/g, "_").trim() || fileName;
+				const stat = statSync(filePath);
+				const contentType = MIME_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream";
 				const headers = {
-					...uploadHeaders,
-					"Content-Type": MIME_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream",
+					"Content-Type": contentType,
+					"Accept-Ranges": "bytes",
 					"Cache-Control": "public, max-age=86400"
 				};
-				if (forceDownload) {
-					headers["Content-Disposition"] = `attachment; filename*=UTF-8''${encodeURIComponent(requestedName)}`;
+				if (url.searchParams.get("download") === "1") {
+					const rawName = String(url.searchParams.get("name") || fileName).replace(/["\r\n]/g, "").trim() || fileName;
+					headers["Content-Disposition"] = `attachment; filename*=UTF-8''${encodeURIComponent(rawName)}`;
 				}
-				response.writeHead(200, headers);
+				const rangeHeader = request.headers.range;
+				if (rangeHeader && request.method === "GET") {
+					const match = /bytes=(\d*)-(\d*)/.exec(rangeHeader);
+					if (match) {
+						const start = match[1] ? Number(match[1]) : 0;
+						const end = match[2] ? Math.min(stat.size - 1, Number(match[2])) : stat.size - 1;
+						if (start >= 0 && start <= end && start < stat.size) {
+							response.writeHead(206, {
+								...headers,
+								"Content-Range": `bytes ${start}-${end}/${stat.size}`,
+								"Content-Length": end - start + 1
+							});
+							createReadStream(filePath, { start, end }).pipe(response);
+							return;
+						}
+					}
+				}
+				response.writeHead(200, { ...headers, "Content-Length": stat.size });
 				if (request.method === "HEAD") {
 					response.end();
 					return;
@@ -1192,14 +1485,9 @@ function createServer(options = {}) {
 			serveStatic(request, response, url);
 		} catch (error) {
 			if (!response.headersSent) {
+				applyCorsHeaders(request, response);
 				console.error("Chi tiết lỗi máy chủ:", error);
-				const errHeaders = {};
-				if (isAllowedCorsOrigin(origin)) {
-					errHeaders["Access-Control-Allow-Origin"] = origin;
-					errHeaders["Access-Control-Allow-Credentials"] = "true";
-					errHeaders["Vary"] = "Origin";
-				}
-				sendJson(response, error.statusCode || 500, { error: error.statusCode ? error.message : "Lỗi máy chủ." }, errHeaders);
+				sendJson(response, error.statusCode || 500, { error: error.statusCode ? error.message : "Lỗi máy chủ." });
 			} else {
 				response.destroy();
 			}
@@ -1217,13 +1505,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	if (origin && !isAllowedCorsOrigin(origin)) {
 		throw makeError(403, "Nguồn yêu cầu không được phép.");
 	}
-	if (origin) {
-		response.setHeader("Access-Control-Allow-Origin", origin);
-		response.setHeader("Access-Control-Allow-Credentials", "true");
-		response.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS");
-		response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-		response.setHeader("Vary", "Origin");
-	}
+	applyCorsHeaders(request, response);
 	if (method === "OPTIONS") {
 		response.writeHead(204);
 		response.end();
@@ -1288,7 +1570,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const now = new Date().toISOString();
 		db.prepare(`
 			INSERT INTO users(id, name, email, password_hash, password_salt, student_class, avatar, cover, bio, is_admin, is_moderator, last_seen_at, created_at)
-			VALUES (?, ?, ?, ?, ?, 'Học sinh NQD', './DIEU.avif', '', 'Chào mừng đến với góc học tập của mình trên DIEUNW!',
+			VALUES (?, ?, ?, ?, ?, 'Học sinh NQD', './DIEU.png', '', 'Chào mừng đến với góc học tập của mình trên DIEUNW!',
 				EXISTS(SELECT 1 FROM admin_emails WHERE email = ? COLLATE NOCASE),
 				EXISTS(SELECT 1 FROM moderator_emails WHERE email = ? COLLATE NOCASE), ?, ?)
 		`).run(userId, pending.name, email, pending.password_hash, pending.password_salt, email, email, Date.now(), now);
@@ -1369,7 +1651,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const clubPosts = isManager
 			? db.prepare("SELECT * FROM posts WHERE club_id = ? AND visibility = 'public' ORDER BY CASE publish_status WHEN 'scheduled' THEN 0 ELSE 1 END, created_at DESC LIMIT 100").all(clubId)
 			: db.prepare("SELECT * FROM posts WHERE club_id = ? AND visibility = 'public' AND publish_status = 'published' ORDER BY created_at DESC LIMIT 100").all(clubId);
-		sendJson(response, 200, { club, posts: clubPosts.map(post => postForViewer(db, post, optionalUser?.id || "")) });
+		const cache = buildPostBatchCache(db);
+		sendJson(response, 200, { club, posts: clubPosts.map(post => postForViewer(db, post, optionalUser?.id || "", cache)) });
 		return;
 	}
 
@@ -1390,6 +1673,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			fileUrl: row.file_url || "",
 			fileName: row.file_name || "",
 			fileType: row.file_type || "",
+			musicUrl: row.music_url || "",
+			musicTitle: row.music_title || "",
 			author: { name: row.author_name },
 			createdAt: row.created_at
 		}));
@@ -1424,10 +1709,11 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
-	if (method === "GET" && pathname === "/api/stories") {
+	if (method === "GET" && (pathname === "/api/stories" || pathname === "/api/stories/")) {
 		const nowMs = Date.now();
 		const rows = db.prepare(`
-			SELECT s.*, u.name AS user_name, u.avatar AS user_avatar, u.student_class AS user_class
+			SELECT s.*, u.name AS user_name, u.avatar AS user_avatar, u.student_class AS user_class,
+				(SELECT COUNT(*) FROM story_views sv WHERE sv.story_id = s.id) AS view_count
 			FROM user_stories s JOIN users u ON u.id = s.user_id
 			WHERE s.expires_at > ?
 			ORDER BY s.created_at ASC
@@ -1439,7 +1725,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 				byUser.set(row.user_id, {
 					userId: row.user_id,
 					userName: row.user_name,
-					userAvatar: row.user_avatar || "./DIEU.avif",
+					userAvatar: row.user_avatar || "./DIEU.png",
 					userClass: row.user_class,
 					stories: []
 				});
@@ -1447,9 +1733,15 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			const viewed = optionalUser ? Boolean(db.prepare("SELECT 1 FROM story_views WHERE story_id = ? AND user_id = ?").get(row.id, optionalUser.id)) : false;
 			byUser.get(row.user_id).stories.push({
 				id: row.id,
+				userId: row.user_id,
+				userName: row.user_name,
+				userAvatar: row.user_avatar || "./DIEU.png",
 				mediaUrl: row.media_url,
 				mediaType: row.media_type,
 				caption: row.caption,
+				musicUrl: row.music_url || "",
+				musicTitle: row.music_title || "",
+				viewCount: Number(row.view_count || 0),
 				durationHours: row.duration_hours,
 				expiresAt: Number(row.expires_at),
 				createdAt: row.created_at,
@@ -1457,6 +1749,67 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			});
 		}
 		sendJson(response, 200, { storyGroups: [...byUser.values()] });
+		return;
+	}
+
+	// KHO NHẠC TRỰC TUYẾN (PUBLIC GET + PLAY)
+	if (method === "GET" && pathname === "/api/music") {
+		const q = String(url.searchParams.get("q") || "").trim();
+		const genre = String(url.searchParams.get("genre") || "").trim();
+		const ownerId = String(url.searchParams.get("userId") || "").trim();
+		const clauses = [];
+		const params = [];
+		if (q) {
+			clauses.push("(title LIKE ? OR artist LIKE ?)");
+			params.push(`%${q}%`, `%${q}%`);
+		}
+		if (genre && genre !== "Tất cả") {
+			clauses.push("genre = ?");
+			params.push(genre);
+		}
+		if (ownerId) {
+			clauses.push("user_id = ?");
+			params.push(ownerId);
+		}
+		const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+		const rows = db.prepare(`SELECT * FROM music_tracks ${where} ORDER BY created_at DESC LIMIT 120`).all(...params);
+		sendJson(response, 200, { tracks: rows.map(r => serializeMusicTrack(db, r, optionalUser?.id || "")) });
+		return;
+	}
+	const playMusicMatch = pathname.match(/^\/api\/music\/([^/]+)\/play$/);
+	if (method === "POST" && playMusicMatch) {
+		const trackId = decodeURIComponent(playMusicMatch[1]);
+		db.prepare("UPDATE music_tracks SET play_count = play_count + 1 WHERE id = ?").run(trackId);
+		syncDb(db);
+		sendJson(response, 200, { ok: true });
+		return;
+	}
+
+	// VIDEO NGẮN KIỂU TIKTOK (PUBLIC GET + VIEW)
+	if (method === "GET" && pathname === "/api/videos") {
+		const userIdFilter = String(url.searchParams.get("userId") || "").trim();
+		const rows = userIdFilter
+			? db.prepare("SELECT * FROM short_videos WHERE user_id = ? ORDER BY created_at DESC LIMIT 60").all(userIdFilter)
+			: db.prepare("SELECT * FROM short_videos ORDER BY created_at DESC LIMIT 60").all();
+		sendJson(response, 200, { videos: rows.map(r => serializeShortVideo(db, r, optionalUser?.id || "")) });
+		return;
+	}
+	const videoCommentsGet = pathname.match(/^\/api\/videos\/([^/]+)\/comments$/);
+	if (method === "GET" && videoCommentsGet) {
+		const videoId = decodeURIComponent(videoCommentsGet[1]);
+		const comments = db.prepare(`
+			SELECT c.id, c.content, c.created_at AS createdAt, u.id AS userId, u.name, u.avatar
+			FROM short_video_comments c JOIN users u ON u.id = c.user_id
+			WHERE c.video_id = ? ORDER BY c.created_at DESC LIMIT 100
+		`).all(videoId);
+		sendJson(response, 200, { comments });
+		return;
+	}
+	const videoViewMatch = pathname.match(/^\/api\/videos\/([^/]+)\/view$/);
+	if (method === "POST" && videoViewMatch) {
+		db.prepare("UPDATE short_videos SET views_count = views_count + 1 WHERE id = ?").run(decodeURIComponent(videoViewMatch[1]));
+		syncDb(db);
+		sendJson(response, 200, { ok: true });
 		return;
 	}
 
@@ -1473,7 +1826,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
-	// UPDATE PROFILE & DIEUNW+ SETTINGS
+	// UPDATE PROFILE, SITE BACKGROUND & DIEUNW+ SETTINGS
 	if (method === "PATCH" && pathname === "/api/users/me") {
 		const body = await readJson(request);
 		const currentRow = db.prepare("SELECT * FROM users WHERE id = ?").get(user.id);
@@ -1482,12 +1835,13 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const email = body.email !== undefined ? validateEmail(body.email) : currentRow.email;
 		const studentClass = body.studentClass !== undefined ? String(body.studentClass || "Học sinh NQD").trim().slice(0, 80) : currentRow.student_class;
 		const cohort = body.cohort !== undefined ? String(body.cohort || "").trim().slice(0, 40) : (currentRow.cohort || "");
-		const avatar = body.avatar !== undefined ? (body.avatar ? validateProfileImage(body.avatar, false) : "./DIEU.avif") : currentRow.avatar;
-		const cover = body.cover !== undefined ? (body.cover ? validateProfileImage(body.cover, false, 1200000) : "") : currentRow.cover;
+		const avatar = body.avatar !== undefined ? (body.avatar ? validateProfileImage(body.avatar, false) : "./DIEU.png") : currentRow.avatar;
+		const cover = body.cover !== undefined ? (body.cover ? validateProfileImage(body.cover, false, 1500000) : "") : currentRow.cover;
 		const bio = body.bio !== undefined ? String(body.bio || "").trim().slice(0, 500) : currentRow.bio;
 		const socialFb = body.socialFacebook !== undefined ? String(body.socialFacebook || "").trim().slice(0, 250) : currentRow.social_facebook;
 		const socialIg = body.socialInstagram !== undefined ? String(body.socialInstagram || "").trim().slice(0, 250) : currentRow.social_instagram;
 		const socialGh = body.socialGithub !== undefined ? String(body.socialGithub || "").trim().slice(0, 250) : currentRow.social_github;
+		const socialTt = body.socialTiktok !== undefined ? String(body.socialTiktok || "").trim().slice(0, 250) : (currentRow.social_tiktok || "");
 		const studySchedule = body.studySchedule !== undefined ? String(body.studySchedule || "").trim().slice(0, 200) : currentRow.study_schedule;
 
 		const validPrivacy = new Set(["public", "friends", "private"]);
@@ -1499,6 +1853,13 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const hexRegex = /^#[0-9a-f]{6}$/i;
 		const tPrim = body.themePrimary !== undefined ? (hexRegex.test(body.themePrimary) ? body.themePrimary : "") : currentRow.theme_primary;
 		const tSec = body.themeSecondary !== undefined ? (hexRegex.test(body.themeSecondary) ? body.themeSecondary : "") : currentRow.theme_secondary;
+		const siteBgStr = body.siteBg !== undefined ? JSON.stringify(parseSiteBg(body.siteBg)) : (currentRow.site_bg || "");
+		const ecardConfigStr = body.ecardConfig !== undefined
+			? JSON.stringify(parseEcardConfig({
+				...body.ecardConfig,
+				bgImage: body.ecardConfig?.bgImage ? validateProfileImage(body.ecardConfig.bgImage, false, 1500000) : ""
+			}))
+			: (currentRow.ecard_config || "");
 
 		let activeFrame = currentRow.active_avatar_frame || "none";
 		if (body.activeAvatarFrame !== undefined) {
@@ -1506,39 +1867,18 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			if (unlocked.includes(body.activeAvatarFrame)) activeFrame = body.activeAvatarFrame;
 		}
 
-		let ecardConfigRaw = currentRow.ecard_config || "";
-		if (body.ecardConfig !== undefined) {
-			if (body.ecardConfig === null) {
-				ecardConfigRaw = "";
-			} else if (typeof body.ecardConfig === "object") {
-				const cfg = body.ecardConfig;
-				const validPos = new Set(["center center", "left center", "right center", "center top", "center bottom"]);
-				const bgImage = cfg.bgImage ? validateProfileImage(cfg.bgImage, false, 950000) : "";
-				const cleanCfg = {
-					bgImage,
-					bgPos: validPos.has(cfg.bgPos) ? cfg.bgPos : "center center",
-					color1: hexRegex.test(cfg.color1 || "") ? cfg.color1 : "#1769aa",
-					color2: hexRegex.test(cfg.color2 || "") ? cfg.color2 : "#2298f8",
-					overlayOpacity: Math.max(0, Math.min(80, Math.round(Number(cfg.overlayOpacity ?? 25)))),
-					textTone: cfg.textTone === "dark" ? "dark" : "light",
-					tagline: String(cfg.tagline || "").trim().slice(0, 60)
-				};
-				ecardConfigRaw = JSON.stringify(cleanCfg);
-			}
-		}
-
 		try {
 			db.prepare(`
 				UPDATE users SET name = ?, email = ?, student_class = ?, cohort = ?, avatar = ?, cover = ?, bio = ?,
-					social_facebook = ?, social_instagram = ?, social_github = ?, study_schedule = ?,
+					social_facebook = ?, social_instagram = ?, social_github = ?, social_tiktok = ?, study_schedule = ?,
 					privacy_album = ?, privacy_achievements = ?, privacy_activity = ?, ghost_mode = ?,
-					theme_primary = ?, theme_secondary = ?, active_avatar_frame = ?, ecard_config = ?
+					theme_primary = ?, theme_secondary = ?, site_bg = ?, ecard_config = ?, active_avatar_frame = ?
 				WHERE id = ?
 			`).run(
 				name, email, studentClass, cohort, avatar, cover, bio,
-				socialFb, socialIg, socialGh, studySchedule,
+				socialFb, socialIg, socialGh, socialTt, studySchedule,
 				pAlbum, pAch, pAct, ghost,
-				tPrim, tSec, activeFrame, ecardConfigRaw, user.id
+				tPrim, tSec, siteBgStr, ecardConfigStr, activeFrame, user.id
 			);
 			syncDb(db);
 		} catch {
@@ -1548,14 +1888,40 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
-	// NOTE 24H
+	// NOTE 24H (CÓ ĐÍNH KÈM NHẠC)
 	if (method === "PUT" && pathname === "/api/profile/note") {
-		const body = await readJson(request);
-		const text = String(body.text || "").trim().slice(0, 80);
-		const expires = text ? Date.now() + 24 * 60 * 60 * 1000 : 0;
-		db.prepare("UPDATE users SET note_text = ?, note_expires_at = ? WHERE id = ?").run(text, expires, user.id);
+		const contentType = request.headers["content-type"] || "";
+		let text = "", noteMusicUrl = "", noteMusicTitle = "";
+		if (contentType.startsWith("multipart/form-data")) {
+			const parts = await parseMultipart(request);
+			const fields = {};
+			let audioPart = null;
+			for (const p of parts) {
+				if (p.fileName) audioPart = p;
+				else fields[p.name] = p.body.toString("utf8");
+			}
+			text = String(fields.text || "").trim().slice(0, 80);
+			if (audioPart) {
+				const saved = saveUploadedFile(audioPart, "audio");
+				if (saved) {
+					noteMusicUrl = saved.fileUrl;
+					noteMusicTitle = String(fields.musicTitle || audioPart.fileName).trim().slice(0, 120);
+				}
+			} else if (fields.musicUrl) {
+				noteMusicUrl = sanitizeMediaRef(fields.musicUrl, 500);
+				noteMusicTitle = String(fields.musicTitle || "Nhạc đính kèm").trim().slice(0, 120);
+			}
+		} else {
+			const body = await readJson(request);
+			text = String(body.text || "").trim().slice(0, 80);
+			noteMusicUrl = sanitizeMediaRef(body.musicUrl, 500);
+			noteMusicTitle = noteMusicUrl ? String(body.musicTitle || "Nhạc đính kèm").trim().slice(0, 120) : "";
+		}
+		const expires = (text || noteMusicUrl) ? Date.now() + 24 * 60 * 60 * 1000 : 0;
+		db.prepare("UPDATE users SET note_text = ?, note_music_url = ?, note_music_title = ?, note_expires_at = ? WHERE id = ?")
+			.run(text, noteMusicUrl, noteMusicTitle, expires, user.id);
 		syncDb(db);
-		sendJson(response, 200, { noteText: text, noteExpiresAt: expires });
+		sendJson(response, 200, { noteText: text, noteMusicUrl, noteMusicTitle, noteExpiresAt: expires });
 		return;
 	}
 
@@ -1743,6 +2109,38 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
+	// TIN NỔI BẬT (FEATURED HIGHLIGHTS GIỐNG FACEBOOK)
+	if (method === "POST" && pathname === "/api/profile/highlights") {
+		const body = await readJson(request);
+		const title = String(body.title || "").trim().slice(0, 50) || "Tin nổi bật";
+		const rawItems = Array.isArray(body.items) ? body.items.slice(0, 12) : [];
+		const items = rawItems.map(it => ({
+			mediaUrl: typeof it.mediaUrl === "string" ? it.mediaUrl : "",
+			mediaType: it.mediaType === "video" ? "video" : "image",
+			caption: String(it.caption || "").trim().slice(0, 160),
+			musicUrl: sanitizeMediaRef(it.musicUrl, 500),
+			musicTitle: String(it.musicTitle || "").trim().slice(0, 120)
+		})).filter(it => it.mediaUrl);
+		if (!items.length) throw makeError(400, "Chọn ít nhất 1 ảnh hoặc Story cho Tin nổi bật.");
+		const coverImage = body.coverImage ? validateProfileImage(body.coverImage, false, 1200000) : (items[0].mediaType === "image" ? items[0].mediaUrl : "");
+		const count = db.prepare("SELECT COUNT(*) AS count FROM story_highlights WHERE user_id = ?").get(user.id).count;
+		if (count >= 20) throw makeError(409, "Tối đa 20 bộ Tin nổi bật.");
+		const id = randomBytes(16).toString("hex");
+		const createdAt = new Date().toISOString();
+		db.prepare("INSERT INTO story_highlights(id, user_id, title, cover_image, items_json, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+			.run(id, user.id, title, coverImage, JSON.stringify(items), createdAt);
+		syncDb(db);
+		sendJson(response, 201, { highlight: { id, title, coverImage, items, createdAt } });
+		return;
+	}
+	const delHighlight = pathname.match(/^\/api\/profile\/highlights\/([^/]+)$/);
+	if (method === "DELETE" && delHighlight) {
+		db.prepare("DELETE FROM story_highlights WHERE id = ? AND user_id = ?").run(decodeURIComponent(delHighlight[1]), user.id);
+		syncDb(db);
+		sendJson(response, 200, { ok: true });
+		return;
+	}
+
 	// MOMENTS 24H
 	if (method === "POST" && pathname === "/api/profile/moments") {
 		const body = await readJson(request);
@@ -1781,21 +2179,28 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		sendJson(response, 200, { ok: true });
 		return;
 	}
-
-	// STORIES 24H / 48H
+	// STORIES 24H / 48H (HỖ TRỢ NHẠC NỀN TỪ KHO NHẠC HOẶC FILE UPLOAD)
 	if (method === "POST" && pathname === "/api/stories") {
 		const contentType = request.headers["content-type"] || "";
 		let mediaUrl = "";
 		let mediaType = "image";
 		let caption = "";
 		let durationHours = 24;
+		let musicUrl = "";
+		let musicTitle = "";
 		if (contentType.startsWith("multipart/form-data")) {
 			const parts = await parseMultipart(request);
 			const fields = {};
 			let filePart = null;
+			let musicPart = null;
 			for (const p of parts) {
-				if (p.fileName) filePart = p;
-				else fields[p.name] = p.body.toString("utf8");
+				if (p.fileName && (p.name === "music" || p.name === "audio")) {
+					musicPart = p;
+				} else if (p.fileName) {
+					filePart = p;
+				} else {
+					fields[p.name] = p.body.toString("utf8");
+				}
 			}
 			const saved = saveUploadedFile(filePart, "story");
 			if (!saved) throw makeError(400, "Chọn ảnh hoặc video ngắn cho Story.");
@@ -1803,19 +2208,35 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			mediaType = saved.isVideo ? "video" : "image";
 			caption = String(fields.caption || "").trim().slice(0, 200);
 			durationHours = Number(fields.durationHours) === 48 ? 48 : 24;
+			if (musicPart) {
+				const savedAudio = saveUploadedFile(musicPart, "audio");
+				if (savedAudio) {
+					musicUrl = savedAudio.fileUrl;
+					musicTitle = String(fields.musicTitle || savedAudio.fileName || "Nhạc đính kèm").trim().slice(0, 120);
+				}
+			} else if (fields.musicUrl) {
+				musicUrl = sanitizeMediaRef(fields.musicUrl, 600);
+				musicTitle = String(fields.musicTitle || "Nhạc kho DIEUNW").trim().slice(0, 120);
+			}
 		} else {
 			const body = await readJson(request);
-			mediaUrl = validateProfileImage(body.mediaUrl, true, 1200000);
+			mediaUrl = validateProfileImage(body.mediaUrl, true, 2500000);
 			mediaType = "image";
 			caption = String(body.caption || "").trim().slice(0, 200);
 			durationHours = Number(body.durationHours) === 48 ? 48 : 24;
+			if (body.musicUrl) {
+				musicUrl = sanitizeMediaRef(body.musicUrl, 600);
+				musicTitle = String(body.musicTitle || "Nhạc kho DIEUNW").trim().slice(0, 120);
+			}
 		}
 		const id = randomBytes(16).toString("hex");
 		const expiresAt = Date.now() + durationHours * 60 * 60 * 1000;
-		db.prepare("INSERT INTO user_stories(id, user_id, media_url, media_type, caption, duration_hours, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-			.run(id, user.id, mediaUrl, mediaType, caption, durationHours, expiresAt, new Date().toISOString());
+		db.prepare(`
+			INSERT INTO user_stories(id, user_id, media_url, media_type, caption, music_url, music_title, duration_hours, expires_at, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`).run(id, user.id, mediaUrl, mediaType, caption, musicUrl, musicTitle, durationHours, expiresAt, new Date().toISOString());
 		syncDb(db);
-		sendJson(response, 201, { ok: true, id });
+		sendJson(response, 201, { ok: true, id, mediaUrl, musicUrl, musicTitle });
 		return;
 	}
 	const viewStory = pathname.match(/^\/api\/stories\/([^/]+)\/view$/);
@@ -1832,6 +2253,221 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		sendJson(response, 200, { ok: true });
 		return;
 	}
+
+	// MUSIC LIBRARY (KHO NHẠC TRỰC TUYẾN KIỂU SOUNDCLOUD)
+	if (method === "POST" && pathname === "/api/music") {
+		const contentType = request.headers["content-type"] || "";
+		let title = "";
+		let artist = "";
+		let genre = "Lo-fi / Chill";
+		let coverImage = "";
+		let audioUrl = "";
+		let durationSec = 0;
+
+		if (contentType.startsWith("multipart/form-data")) {
+			const parts = await parseMultipart(request);
+			const fields = {};
+			let audioPart = null;
+			let coverPart = null;
+			for (const p of parts) {
+				if (p.fileName && (p.name === "audio" || p.name === "music" || p.name === "file")) {
+					audioPart = p;
+				} else if (p.fileName && (p.name === "cover" || p.name === "image")) {
+					coverPart = p;
+				} else {
+					fields[p.name] = p.body.toString("utf8");
+				}
+			}
+			title = String(fields.title || "").trim().slice(0, 120);
+			artist = String(fields.artist || user.name).trim().slice(0, 80);
+			genre = String(fields.genre || "Lo-fi / Chill").trim().slice(0, 40) || "Lo-fi / Chill";
+			durationSec = Math.max(0, Math.min(7200, Math.round(Number(fields.durationSec || 0))));
+			if (audioPart) {
+				const savedAudio = saveUploadedFile(audioPart, "audio");
+				if (savedAudio) audioUrl = savedAudio.fileUrl;
+			} else if (fields.audioUrl) {
+				audioUrl = sanitizeMediaRef(fields.audioUrl, 1200);
+			}
+			if (coverPart) {
+				const savedCover = saveUploadedFile(coverPart, "image");
+				if (savedCover) coverImage = savedCover.fileUrl;
+			} else if (fields.coverImage) {
+				coverImage = validateProfileImage(fields.coverImage, false, 1500000);
+			}
+		} else {
+			const body = await readJson(request);
+			title = String(body.title || "").trim().slice(0, 120);
+			artist = String(body.artist || user.name).trim().slice(0, 80);
+			genre = String(body.genre || "Lo-fi / Chill").trim().slice(0, 40) || "Lo-fi / Chill";
+			durationSec = Math.max(0, Math.min(7200, Math.round(Number(body.durationSec || 0))));
+			audioUrl = sanitizeMediaRef(body.audioUrl, 1200);
+			if (body.coverImage) coverImage = validateProfileImage(body.coverImage, false, 1500000);
+		}
+
+		if (!title) throw makeError(400, "Nhập tên bài hát.");
+		if (!audioUrl) throw makeError(400, "Chọn file nhạc (.mp3, .wav, .m4a, .ogg) hoặc đường dẫn âm thanh hợp lệ.");
+
+		const id = randomBytes(16).toString("hex");
+		const createdAt = new Date().toISOString();
+		db.prepare(`
+			INSERT INTO music_tracks(id, user_id, title, artist, genre, cover_image, audio_url, duration_sec, play_count, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+		`).run(id, user.id, title, artist || user.name, genre, coverImage, audioUrl, durationSec, createdAt);
+		syncDb(db);
+		const track = serializeMusicTrack(db, db.prepare("SELECT * FROM music_tracks WHERE id = ?").get(id), user.id);
+		sendJson(response, 201, { track });
+		return;
+	}
+	const musicLikeMatch = pathname.match(/^\/api\/music\/([^/]+)\/like$/);
+	if (method === "POST" && musicLikeMatch) {
+		const trackId = decodeURIComponent(musicLikeMatch[1]);
+		if (!db.prepare("SELECT 1 FROM music_tracks WHERE id = ?").get(trackId)) throw makeError(404, "Không tìm thấy bài nhạc.");
+		const exists = db.prepare("SELECT 1 FROM music_likes WHERE track_id = ? AND user_id = ?").get(trackId, user.id);
+		if (exists) db.prepare("DELETE FROM music_likes WHERE track_id = ? AND user_id = ?").run(trackId, user.id);
+		else db.prepare("INSERT INTO music_likes(track_id, user_id, created_at) VALUES (?, ?, ?)").run(trackId, user.id, new Date().toISOString());
+		syncDb(db);
+		const likeCount = db.prepare("SELECT COUNT(*) AS count FROM music_likes WHERE track_id = ?").get(trackId).count;
+		sendJson(response, 200, { liked: !exists, likeCount });
+		return;
+	}
+	const musicDeleteMatch = pathname.match(/^\/api\/music\/([^/]+)$/);
+	if (method === "DELETE" && musicDeleteMatch) {
+		const trackId = decodeURIComponent(musicDeleteMatch[1]);
+		const row = db.prepare("SELECT * FROM music_tracks WHERE id = ?").get(trackId);
+		if (!row) throw makeError(404, "Không tìm thấy bài nhạc.");
+		if (row.user_id !== user.id && !user.isAdmin) throw makeError(403, "Không có quyền xóa bài nhạc này.");
+		db.prepare("DELETE FROM music_tracks WHERE id = ?").run(trackId);
+		syncDb(db);
+		sendJson(response, 200, { ok: true });
+		return;
+	}
+
+	// SHORT VIDEOS (LƯỚT VIDEO NGẮN KIỂU TIKTOK)
+	if (method === "POST" && pathname === "/api/videos") {
+		const contentType = request.headers["content-type"] || "";
+		let title = "";
+		let description = "";
+		let videoUrl = "";
+		let coverImage = "";
+		let musicId = "";
+		let musicTitle = "";
+		let musicUrl = "";
+
+		if (contentType.startsWith("multipart/form-data")) {
+			const parts = await parseMultipart(request);
+			const fields = {};
+			let videoPart = null;
+			let coverPart = null;
+			let musicPart = null;
+			for (const p of parts) {
+				if (p.fileName && (p.name === "video" || p.name === "file")) {
+					videoPart = p;
+				} else if (p.fileName && (p.name === "cover" || p.name === "image")) {
+					coverPart = p;
+				} else if (p.fileName && (p.name === "music" || p.name === "audio")) {
+					musicPart = p;
+				} else {
+					fields[p.name] = p.body.toString("utf8");
+				}
+			}
+			title = String(fields.title || "").trim().slice(0, 140);
+			description = String(fields.description || "").trim().slice(0, 500);
+			musicId = String(fields.musicId || "").trim();
+			musicTitle = String(fields.musicTitle || "").trim().slice(0, 120);
+			musicUrl = sanitizeMediaRef(fields.musicUrl, 600);
+
+			if (videoPart) {
+				const savedVideo = saveUploadedFile(videoPart, "video");
+				if (savedVideo) videoUrl = savedVideo.fileUrl;
+			} else if (fields.videoUrl) {
+				videoUrl = sanitizeMediaRef(fields.videoUrl, 1200);
+			}
+			if (coverPart) {
+				const savedCover = saveUploadedFile(coverPart, "image");
+				if (savedCover) coverImage = savedCover.fileUrl;
+			} else if (fields.coverImage) {
+				coverImage = validateProfileImage(fields.coverImage, false, 1500000);
+			}
+			if (musicPart) {
+				const savedAudio = saveUploadedFile(musicPart, "audio");
+				if (savedAudio) {
+					musicUrl = savedAudio.fileUrl;
+					musicTitle = musicTitle || savedAudio.fileName || "Âm thanh tải lên";
+					musicId = "";
+				}
+			}
+		} else {
+			const body = await readJson(request);
+			title = String(body.title || "").trim().slice(0, 140);
+			description = String(body.description || "").trim().slice(0, 500);
+			videoUrl = sanitizeMediaRef(body.videoUrl, 1200);
+			if (body.coverImage) coverImage = validateProfileImage(body.coverImage, false, 1500000);
+			musicId = String(body.musicId || "").trim();
+			musicTitle = String(body.musicTitle || "").trim().slice(0, 120);
+			musicUrl = sanitizeMediaRef(body.musicUrl, 600);
+		}
+
+		if (!videoUrl) throw makeError(400, "Chọn file video (.mp4, .webm, .mov) để đăng.");
+		if (!title) title = "Khoảnh khắc học tập trên DIEUNW";
+
+		if (musicId && !musicUrl) {
+			const track = db.prepare("SELECT title, artist, audio_url FROM music_tracks WHERE id = ?").get(musicId);
+			if (track) {
+				musicUrl = track.audio_url;
+				musicTitle = musicTitle || `${track.title} — ${track.artist}`;
+			}
+		}
+
+		const id = randomBytes(16).toString("hex");
+		const createdAt = new Date().toISOString();
+		db.prepare(`
+			INSERT INTO short_videos(id, user_id, title, description, video_url, cover_image, music_id, music_title, music_url, view_count, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+		`).run(id, user.id, title, description, videoUrl, coverImage, musicId, musicTitle, musicUrl, createdAt);
+		syncDb(db);
+		const video = serializeShortVideo(db, db.prepare("SELECT * FROM short_videos WHERE id = ?").get(id), user.id);
+		sendJson(response, 201, { video });
+		return;
+	}
+	const videoLikeMatch = pathname.match(/^\/api\/videos\/([^/]+)\/like$/);
+	if (method === "POST" && videoLikeMatch) {
+		const videoId = decodeURIComponent(videoLikeMatch[1]);
+		if (!db.prepare("SELECT 1 FROM short_videos WHERE id = ?").get(videoId)) throw makeError(404, "Không tìm thấy video.");
+		const exists = db.prepare("SELECT 1 FROM short_video_likes WHERE video_id = ? AND user_id = ?").get(videoId, user.id);
+		if (exists) db.prepare("DELETE FROM short_video_likes WHERE video_id = ? AND user_id = ?").run(videoId, user.id);
+		else db.prepare("INSERT INTO short_video_likes(video_id, user_id, created_at) VALUES (?, ?, ?)").run(videoId, user.id, new Date().toISOString());
+		syncDb(db);
+		const likeCount = db.prepare("SELECT COUNT(*) AS count FROM short_video_likes WHERE video_id = ?").get(videoId).count;
+		sendJson(response, 200, { liked: !exists, likeCount });
+		return;
+	}
+	const videoCommentPostMatch = pathname.match(/^\/api\/videos\/([^/]+)\/comments$/);
+	if (method === "POST" && videoCommentPostMatch) {
+		const videoId = decodeURIComponent(videoCommentPostMatch[1]);
+		if (!db.prepare("SELECT 1 FROM short_videos WHERE id = ?").get(videoId)) throw makeError(404, "Không tìm thấy video.");
+		const body = await readJson(request);
+		const content = String(body.content || "").trim().slice(0, 600);
+		if (!content) throw makeError(400, "Nhập nội dung bình luận.");
+		const id = randomBytes(16).toString("hex");
+		const createdAt = new Date().toISOString();
+		db.prepare("INSERT INTO short_video_comments(id, video_id, user_id, content, created_at) VALUES (?, ?, ?, ?, ?)")
+			.run(id, videoId, user.id, content, createdAt);
+		syncDb(db);
+		sendJson(response, 201, { comment: { id, userId: user.id, name: user.name, avatar: user.avatar, content, createdAt } });
+		return;
+	}
+	const videoDeleteMatch = pathname.match(/^\/api\/videos\/([^/]+)$/);
+	if (method === "DELETE" && videoDeleteMatch) {
+		const videoId = decodeURIComponent(videoDeleteMatch[1]);
+		const row = db.prepare("SELECT * FROM short_videos WHERE id = ?").get(videoId);
+		if (!row) throw makeError(404, "Không tìm thấy video.");
+		if (row.user_id !== user.id && !user.isAdmin && !user.isModerator) throw makeError(403, "Không có quyền xóa video này.");
+		db.prepare("DELETE FROM short_videos WHERE id = ?").run(videoId);
+		syncDb(db);
+		sendJson(response, 200, { ok: true });
+		return;
+	}
+
 	// STUDY SETS (FLASHCARD + QUIZ + FORK + CHALLENGE LEADERBOARD)
 	if (method === "GET" && pathname === "/api/study-sets") {
 		const targetUserId = url.searchParams.get("userId");
@@ -1843,15 +2479,14 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 	if (method === "POST" && pathname === "/api/study-sets") {
 		const body = await readJson(request);
-		const kind = body.kind === "quiz" || body.setType === "quiz" ? "quiz" : "flashcard";
+		const kind = body.kind === "quiz" ? "quiz" : "flashcard";
 		const title = String(body.title || "").trim().slice(0, 120);
 		if (!title) throw makeError(400, "Nhập tiêu đề bộ thẻ / đề ôn tập.");
 		const subject = String(body.subject || "Chung").trim().slice(0, 60);
 		const description = String(body.description || "").trim().slice(0, 400);
-		const rawCards = Array.isArray(body.cards) ? body.cards : (Array.isArray(body.items) ? body.items : []);
-		const cards = rawCards.slice(0, 80);
+		const cards = Array.isArray(body.cards) ? body.cards.slice(0, 80) : [];
 		if (!cards.length) throw makeError(400, "Cần ít nhất 1 thẻ hoặc 1 câu hỏi.");
-		const pinned = (body.pinned ?? body.isPinned) ? 1 : 0;
+		const pinned = body.pinned ? 1 : 0;
 		const id = randomBytes(16).toString("hex");
 		const now = new Date().toISOString();
 		db.prepare("INSERT INTO study_sets(id, user_id, kind, title, subject, description, cards_json, pinned, study_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)")
@@ -1875,10 +2510,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const title = body.title !== undefined ? String(body.title).trim().slice(0, 120) : row.title;
 		const subject = body.subject !== undefined ? String(body.subject).trim().slice(0, 60) : row.subject;
 		const description = body.description !== undefined ? String(body.description).trim().slice(0, 400) : row.description;
-		const incomingCards = Array.isArray(body.cards) ? body.cards : (Array.isArray(body.items) ? body.items : null);
-		const cardsJson = incomingCards ? JSON.stringify(incomingCards.slice(0, 80)) : row.cards_json;
-		const incomingPinned = body.pinned !== undefined ? body.pinned : body.isPinned;
-		const pinned = incomingPinned !== undefined ? (incomingPinned ? 1 : 0) : row.pinned;
+		const cardsJson = Array.isArray(body.cards) ? JSON.stringify(body.cards.slice(0, 80)) : row.cards_json;
+		const pinned = body.pinned !== undefined ? (body.pinned ? 1 : 0) : row.pinned;
 		db.prepare("UPDATE study_sets SET title = ?, subject = ?, description = ?, cards_json = ?, pinned = ?, updated_at = ? WHERE id = ?")
 			.run(title || row.title, subject, description, cardsJson, pinned, new Date().toISOString(), setId);
 		syncDb(db);
@@ -1923,12 +2556,12 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	// BOOKMARKS
 	if (method === "GET" && pathname === "/api/bookmarks") {
 		const rows = db.prepare("SELECT item_type, item_id FROM user_bookmarks WHERE user_id = ? ORDER BY created_at DESC LIMIT 100").all(user.id);
+		const matchedRows = rows.map(b => db.prepare("SELECT * FROM posts WHERE id = ?").get(b.item_id)).filter(Boolean);
+		const postCache = buildPostBatchCache(db, matchedRows);
 		const posts = [];
 		const resources = [];
-		for (const b of rows) {
-			const p = db.prepare("SELECT * FROM posts WHERE id = ?").get(b.item_id);
-			if (!p) continue;
-			const serialized = postForViewer(db, p, user.id);
+		for (const p of matchedRows) {
+			const serialized = postForViewer(db, p, user.id, postCache);
 			if (p.type === "study-resource") resources.push(serialized);
 			else posts.push(serialized);
 		}
@@ -2070,6 +2703,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		let content = "";
 		let image = "";
 		let fileUrl = "", fileName = "", fileType = "";
+		let musicUrl = "", musicTitle = "";
 		if (contentType.startsWith("multipart/form-data")) {
 			const parts = await parseMultipart(request);
 			const fields = {};
@@ -2077,6 +2711,12 @@ async function handleApi({ request, response, url, db, env, secure }) {
 				if (p.fileName && p.name === "image") {
 					const savedImg = saveUploadedFile(p, "image");
 					if (savedImg) image = savedImg.fileUrl;
+				} else if (p.fileName && (p.name === "music" || p.name === "audio")) {
+					const savedAudio = saveUploadedFile(p, "audio");
+					if (savedAudio) {
+						musicUrl = savedAudio.fileUrl;
+						musicTitle = savedAudio.fileName || "Nhạc đính kèm";
+					}
 				} else if (p.fileName) {
 					const savedFile = saveUploadedFile(p, "any");
 					if (savedFile) {
@@ -2089,18 +2729,30 @@ async function handleApi({ request, response, url, db, env, secure }) {
 				}
 			}
 			content = String(fields.content || "").trim();
-			if (!image && fields.imageData) image = validateProfileImage(fields.imageData, false);
+			if (!image && fields.imageData) image = validateProfileImage(fields.imageData, false, 2000000);
+			if (!musicUrl && fields.musicUrl) {
+				musicUrl = sanitizeMediaRef(fields.musicUrl, 600);
+				musicTitle = String(fields.musicTitle || "Nhạc kho DIEUNW").trim().slice(0, 120);
+			} else if (musicUrl && fields.musicTitle) {
+				musicTitle = String(fields.musicTitle).trim().slice(0, 120);
+			}
 		} else {
 			const body = await readJson(request);
 			content = String(body.content || "").trim();
-			if (body.image) image = validateProfileImage(body.image, false);
+			if (body.image) image = validateProfileImage(body.image, false, 2000000);
+			if (body.musicUrl) {
+				musicUrl = sanitizeMediaRef(body.musicUrl, 600);
+				musicTitle = String(body.musicTitle || "Nhạc kho DIEUNW").trim().slice(0, 120);
+			}
 		}
 		if (!content || content.length > 10000) throw makeError(400, "Nội dung thông báo không hợp lệ.");
 		const id = randomBytes(16).toString("hex");
-		db.prepare("INSERT INTO club_posts(id, club_id, author_id, content, image, file_url, file_name, file_type, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-			.run(id, clubId, user.id, content, image, fileUrl, fileName, fileType, new Date().toISOString());
+		db.prepare(`
+			INSERT INTO club_posts(id, club_id, author_id, content, image, file_url, file_name, file_type, music_url, music_title, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`).run(id, clubId, user.id, content, image, fileUrl, fileName, fileType, musicUrl, musicTitle, new Date().toISOString());
 		syncDb(db);
-		sendJson(response, 201, { ok: true, id });
+		sendJson(response, 201, { ok: true, id, musicUrl, musicTitle });
 		return;
 	}
 
@@ -2114,7 +2766,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const body = await readJson(request);
 		const newName = body.name !== undefined ? String(body.name).trim() : row.name;
 		const newLogo = body.logo !== undefined ? String(body.logo).trim().slice(0, 700000) : row.logo;
-		const newCover = body.cover !== undefined ? String(body.cover).trim().slice(0, 1200000) : (row.cover || "");
+		const newCover = body.cover !== undefined ? String(body.cover).trim().slice(0, 1500000) : (row.cover || "");
 		const newBio = body.bio !== undefined ? String(body.bio).trim().slice(0, 500) : (row.bio || "");
 		if (!newName || newName.length > 80) throw makeError(400, "Tên CLB không hợp lệ.");
 		db.prepare("UPDATE clubs SET name = ?, logo = ?, cover = ?, bio = ? WHERE id = ?").run(newName, newLogo, newCover, newBio, clubId);
@@ -2129,17 +2781,18 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const admins = user.isAdmin ? db.prepare("SELECT email FROM admin_emails ORDER BY email").all().map(r => r.email) : [];
 		const moderators = user.isAdmin ? db.prepare("SELECT email FROM moderator_emails ORDER BY email").all().map(r => r.email) : [];
 
-		// Max-Heap style sorted report queues (descending by reportCount > 0)
 		const postReportGroups = db.prepare(`
 			SELECT target_id, COUNT(*) AS report_count, MAX(created_at) AS latest_at
 			FROM reports WHERE target_type = 'post' AND status = 'open'
 			GROUP BY target_id ORDER BY report_count DESC, latest_at DESC LIMIT 100
 		`).all();
+		const reportedPostRows = postReportGroups.map(g => db.prepare("SELECT * FROM posts WHERE id = ?").get(g.target_id)).filter(Boolean);
+		const reportPostCache = buildPostBatchCache(db, reportedPostRows);
 		const reportQueuePosts = postReportGroups.map(g => {
-			const postRow = db.prepare("SELECT * FROM posts WHERE id = ?").get(g.target_id);
+			const postRow = reportedPostRows.find(r => r.id === g.target_id);
 			if (!postRow) return null;
 			const reasons = db.prepare("SELECT r.reason, r.created_at AS createdAt, u.name AS reporterName FROM reports r JOIN users u ON u.id = r.reporter_id WHERE r.target_type = 'post' AND r.target_id = ? AND r.status = 'open' ORDER BY r.created_at DESC").all(g.target_id);
-			return { targetId: g.target_id, reportCount: g.report_count, post: postForViewer(db, postRow, user.id), reasons };
+			return { targetId: g.target_id, reportCount: g.report_count, post: postForViewer(db, postRow, user.id, reportPostCache), reasons };
 		}).filter(Boolean);
 
 		const userReportGroups = db.prepare(`
@@ -2245,15 +2898,16 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
-	// POSTS (RICH TEXT + SCHEDULED CLUB POSTS + STUDY SET CARDS + STUDY RESOURCES)
+	// POSTS (TỐI ƯU TỐC ĐỘ VỚI BATCH CACHE + ĐÍNH KÈM NHẠC NỀN BLOG + STUDY RESOURCES)
 	if (method === "GET" && pathname === "/api/posts") {
 		const posts = db.prepare(`
 			SELECT * FROM posts
 			WHERE (visibility = 'public' OR user_id = ?)
 			AND (publish_status = 'published' OR user_id = ?)
-			ORDER BY created_at DESC LIMIT 100
+			ORDER BY created_at DESC LIMIT 80
 		`).all(user.id, user.id);
-		sendJson(response, 200, { posts: posts.map(post => postForViewer(db, post, user.id)) });
+		const postCache = buildPostBatchCache(db, posts);
+		sendJson(response, 200, { posts: posts.map(post => postForViewer(db, post, user.id, postCache)) });
 		return;
 	}
 
@@ -2261,17 +2915,26 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const contentType = request.headers["content-type"] || "";
 		let fields = {};
 		let filePart = null;
+		let imagePart = null;
+		let musicPart = null;
 		if (contentType.startsWith("multipart/form-data")) {
 			const parts = await parseMultipart(request);
 			for (const part of parts) {
-				if (part.fileName) filePart = part;
-				else fields[part.name] = part.body.toString("utf8");
+				if (part.fileName && (part.name === "music" || part.name === "audio")) {
+					musicPart = part;
+				} else if (part.fileName && part.name === "postImage") {
+					imagePart = part;
+				} else if (part.fileName) {
+					filePart = part;
+				} else {
+					fields[part.name] = part.body.toString("utf8");
+				}
 			}
 		} else {
 			fields = await readJson(request);
 		}
 
-		const isResource = contentType.startsWith("multipart/form-data")
+		const isResource = (contentType.startsWith("multipart/form-data") && fields.type === "study-resource")
 			|| fields.type === "study-resource"
 			|| Boolean(fields.resource_title);
 		const visibility = fields.visibility === "private" ? "private" : "public";
@@ -2313,7 +2976,24 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			syncDb(db);
 		} else {
 			const content = String(fields.content || "").trim();
-			const image = fields.image ? validateProfileImage(fields.image, false, 1200000) : "";
+			let image = fields.image ? validateProfileImage(fields.image, false, 2500000) : "";
+			if (!image && imagePart) {
+				const savedImg = saveUploadedFile(imagePart, "image");
+				if (savedImg) image = savedImg.fileUrl;
+			}
+			let musicUrl = "";
+			let musicTitle = "";
+			if (musicPart) {
+				const savedAudio = saveUploadedFile(musicPart, "audio");
+				if (savedAudio) {
+					musicUrl = savedAudio.fileUrl;
+					musicTitle = String(fields.musicTitle || savedAudio.fileName || "Nhạc đính kèm").trim().slice(0, 120);
+				}
+			} else if (fields.musicUrl) {
+				musicUrl = sanitizeMediaRef(fields.musicUrl, 600);
+				musicTitle = String(fields.musicTitle || "Nhạc kho DIEUNW").trim().slice(0, 120);
+			}
+
 			const clubId = fields.clubId ? String(fields.clubId).trim() : null;
 			const isRichHtml = fields.isRichHtml ? 1 : 0;
 			const studySetId = fields.studySetId ? String(fields.studySetId).trim() : null;
@@ -2338,9 +3018,9 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			}
 
 			db.prepare(`
-				INSERT INTO posts(id, user_id, club_id, type, content, image, visibility, is_rich_html, study_set_id, scheduled_at, publish_status, created_at)
-				VALUES (?, ?, ?, 'post', ?, ?, ?, ?, ?, ?, ?, ?)
-			`).run(id, user.id, clubId, content, image, visibility, isRichHtml, studySetId, scheduledAt, publishStatus, createdAt);
+				INSERT INTO posts(id, user_id, club_id, type, content, image, music_url, music_title, visibility, is_rich_html, study_set_id, scheduled_at, publish_status, created_at)
+				VALUES (?, ?, ?, 'post', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`).run(id, user.id, clubId, content, image, musicUrl, musicTitle, visibility, isRichHtml, studySetId, scheduledAt, publishStatus, createdAt);
 			syncDb(db);
 		}
 		sendJson(response, 201, { post: postForViewer(db, db.prepare("SELECT * FROM posts WHERE id = ?").get(id), user.id) });

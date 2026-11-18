@@ -4,46 +4,35 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta name="theme-color" content="#1769aa">
-	<link rel="stylesheet" href="./style.css?v=11">
-	<link rel="icon" type="image/png" href="./DIEU.avif?v=1">
+	<link rel="stylesheet" href="./style.css?v=3">
+	<link rel="icon" type="image/png" href="./DIEU.png?v=1">
 	<title>DIEUNW - Phòng Tự Học</title>
 </head>
 <body id="study-page-body">
 	<header class="navbar nav-scroll">
-		<div class="nav-corner-dock">
-			<button class="nav-brand-toggle" type="button" aria-expanded="false" aria-controls="main-nav-menu" aria-label="Mở menu điều hướng">
-				<picture>
-					<source srcset="./DIEU.avif" type="image/avif">
-					<source srcset="./DIEU.webp" type="image/webp">
-					<img src="./DIEU.avif" alt="DIEUNW" class="nav-brand-badge">
-				</picture>
-			</button>
-			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
-				<img class="nav-user-avatar" src="./DIEU.avif" alt="">
-				<span class="nav-status-dot" aria-hidden="true"></span>
+		<div class="nav-left">
+			<a href="./index.html" class="brand-logo-link">
+				<img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo">
 			</a>
-			<button id="nav-theme-toggle" class="nav-theme-toggle" type="button" aria-label="Chuyển chế độ sáng tối" title="Chuyển chế độ sáng / tối">⏾</button>
 		</div>
-		<nav id="main-nav-menu" class="nav-menu nav-dropdown-panel" aria-label="Điều hướng chính" hidden>
+		<nav class="nav-menu" aria-label="Điều hướng chính">
 			<a href="./index.html" class="nav-item">Trang chủ</a>
+			<a href="./videos.html" class="nav-item">Video</a>
+			<a href="./music.html" class="nav-item">Kho nhạc</a>
 			<a href="./tu-hoc.html" class="nav-item active" aria-current="page">Phòng tự học</a>
 			<a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
-			<a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
 			<a href="./friends.html" class="nav-item">Bạn bè</a>
 			<a href="./messages.html" class="nav-item">Tin nhắn</a>
+			<a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
 			<a href="./clubs.html" class="nav-item">CLB</a>
 			<a href="./announcements.html" class="nav-item">Thông báo</a>
 		</nav>
+		<div class="nav-right">
+			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
+				<img class="nav-user-avatar" src="./DIEU.png" alt="">
+			</a>
+		</div>
 	</header>
-
-	<section id="hero-banner" class="hero-banner" aria-label="DIEUNW Banner">
-		<picture>
-			<source srcset="./DIEUNW.avif" type="image/avif">
-			<source srcset="./DIEUNW.webp" type="image/webp">
-			<img src="./DIEUNW.png" alt="DIEUNW" class="hero-banner-img" loading="eager">
-		</picture>
-		<div class="hero-banner-fade" aria-hidden="true"></div>
-	</section>
 
 	<main class="study-container page-enter">
 		<!-- Cột trái: Đồng hồ Pomodoro & Không gian âm nhạc -->
@@ -102,8 +91,17 @@
 
 					<div class="audio-info-col">
 						<div class="audio-info-head">
-							<label for="custom-audio-upload" class="audio-upload-btn">+ Thêm nhạc / Playlist</label>
+							<label for="custom-audio-upload" class="audio-upload-btn dieunw-file-btn">+ Nhạc từ máy</label>
 							<input type="file" id="custom-audio-upload" accept="audio/*" multiple hidden>
+						</div>
+
+						<!-- Chọn nhạc từ Kho nhạc online DIEUNW -->
+						<div class="pomodoro-library-bar">
+							<select id="pomodoro-library-select" aria-label="Chọn bài hát từ Kho nhạc DIEUNW">
+								<option value="">-- Kho nhạc DIEUNW (tùy chọn) --</option>
+							</select>
+							<button type="button" id="btn-add-library-track" class="audio-speed-btn" title="Thêm bài đã chọn vào playlist">+ Thêm bài</button>
+							<button type="button" id="btn-load-all-library" class="audio-speed-btn" title="Nạp tất cả nhạc từ Kho nhạc">Nạp kho nhạc</button>
 						</div>
 
 						<p id="audio-file-name">Chưa có bài hát nào trong playlist</p>
@@ -125,7 +123,7 @@
 							</div>
 							<label class="audio-volume-wrap" title="Âm lượng">
 								<span aria-hidden="true"><b>Âm lượng</b></span>
-								<input type="range" id="audio-volume" min="0" max="1" step="0.05" value="0.5" aria-label="Âm lượng">
+								<input type="range" id="audio-volume" class="dieunw-slider" min="0" max="1" step="0.05" value="0.5" aria-label="Âm lượng">
 							</label>
 						</div>
 					</div>

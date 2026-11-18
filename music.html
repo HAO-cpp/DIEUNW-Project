@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="theme-color" content="#1769aa">
+	<link rel="stylesheet" href="./style.css?v=3">
+	<link rel="icon" type="image/png" href="./DIEU.png?v=3">
+	<title>Kho nhạc trực tuyến - DIEUNW</title>
+	<style>
+		.music-hub-main {
+			width: min(1080px, calc(100% - 32px));
+			margin: 0 auto;
+			padding: 28px 0 110px;
+		}
+		.music-hub-hero {
+			display: flex;
+			align-items: flex-end;
+			justify-content: space-between;
+			gap: 16px;
+			flex-wrap: wrap;
+			padding: 22px 24px;
+			border-radius: 16px;
+			background: linear-gradient(135deg, rgba(23, 105, 170, 0.94), rgba(22, 116, 90, 0.92));
+			color: #ffffff;
+			box-shadow: 0 12px 30px rgba(17, 52, 82, 0.16);
+			margin-bottom: 20px;
+		}
+		.music-hub-eyebrow {
+			font-size: 11px;
+			font-weight: 800;
+			letter-spacing: 0.08em;
+			opacity: 0.88;
+			margin-bottom: 6px;
+		}
+		.music-hub-hero h1 {
+			font-size: 28px;
+			line-height: 1.2;
+			margin: 0 0 6px;
+		}
+		.music-hub-hero p {
+			margin: 0;
+			opacity: 0.92;
+			font-size: 14px;
+		}
+		.music-hero-actions {
+			display: flex;
+			gap: 10px;
+			align-items: center;
+			flex-wrap: wrap;
+		}
+		.music-upload-toggle-btn {
+			padding: 10px 18px;
+			border-radius: 10px;
+			border: 0;
+			background: #ffffff;
+			color: #124d7d;
+			font: inherit;
+			font-size: 14px;
+			font-weight: 800;
+			cursor: pointer;
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
+			transition: transform 0.16s ease, box-shadow 0.16s ease;
+		}
+		.music-upload-toggle-btn:hover {
+			transform: translateY(-1px);
+			box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+		}
+		.music-upload-panel {
+			background: rgba(255, 255, 255, 0.95);
+			border: 1px solid #d5e2ec;
+			border-radius: 14px;
+			padding: 20px;
+			margin-bottom: 20px;
+			box-shadow: 0 8px 24px rgba(15, 35, 55, 0.08);
+		}
+		.music-upload-panel h2 {
+			margin: 0 0 14px;
+			font-size: 18px;
+			color: #173853;
+		}
+		.music-upload-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+			gap: 12px;
+			margin-bottom: 12px;
+		}
+		.music-field {
+			display: grid;
+			gap: 6px;
+		}
+		.music-field label {
+			font-size: 12.5px;
+			font-weight: 700;
+			color: #365066;
+		}
+		.music-field input[type="text"],
+		.music-field select {
+			width: 100%;
+			padding: 10px 12px;
+			border-radius: 9px;
+			border: 1px solid #cbd9e6;
+			font: inherit;
+			font-size: 14px;
+			background: #fff;
+			color: #173853;
+			box-sizing: border-box;
+		}
+		.music-file-row {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 14px;
+			align-items: center;
+			margin: 12px 0;
+		}
+		.music-cover-preview {
+			width: 56px;
+			height: 56px;
+			border-radius: 10px;
+			object-fit: cover;
+			border: 1px solid #d5e2ec;
+		}
+		.music-toolbar {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 10px;
+			align-items: center;
+			justify-content: space-between;
+			margin-bottom: 16px;
+			background: rgba(255, 255, 255, 0.88);
+			padding: 12px 14px;
+			border-radius: 12px;
+			border: 1px solid #dbe5ee;
+		}
+		.music-search-box {
+			flex: 1;
+			min-width: 220px;
+		}
+		.music-search-box input {
+			width: 100%;
+			padding: 9px 13px;
+			border-radius: 9px;
+			border: 1px solid #cbd9e6;
+			font: inherit;
+			font-size: 14px;
+			box-sizing: border-box;
+		}
+		.music-genre-tabs {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 6px;
+		}
+		.music-genre-chip {
+			padding: 6px 12px;
+			border-radius: 8px;
+			border: 1px solid #d2dfe9;
+			background: #f5f9fc;
+			color: #365066;
+			font-size: 12.5px;
+			font-weight: 700;
+			cursor: pointer;
+			transition: all 0.15s ease;
+		}
+		.music-genre-chip.active {
+			background: #1769aa;
+			border-color: #1769aa;
+			color: #ffffff;
+		}
+		.music-track-list {
+			display: grid;
+			gap: 14px;
+		}
+		.music-track-card {
+			display: flex;
+			gap: 16px;
+			align-items: stretch;
+			padding: 16px;
+			border-radius: 14px;
+			background: rgba(255, 255, 255, 0.94);
+			border: 1px solid #dbe5ee;
+			box-shadow: 0 4px 16px rgba(15, 35, 55, 0.06);
+			transition: border-color 0.2s ease, transform 0.18s ease;
+		}
+		.music-track-card.is-active {
+			border-color: #1769aa;
+			box-shadow: 0 8px 24px rgba(23, 105, 170, 0.14);
+		}
+		.music-cover-btn {
+			position: relative;
+			width: 104px;
+			height: 104px;
+			flex-shrink: 0;
+			border-radius: 12px;
+			border: 0;
+			padding: 0;
+			overflow: hidden;
+			cursor: pointer;
+			background: linear-gradient(135deg, #1769aa, #2aa889);
+		}
+		.music-cover-btn img {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+			display: block;
+		}
+		.music-cover-overlay {
+			position: absolute;
+			inset: 0;
+			display: grid;
+			place-items: center;
+			background: rgba(15, 23, 42, 0.34);
+			color: #ffffff;
+			font-size: 24px;
+			transition: background 0.15s ease;
+		}
+		.music-cover-btn:hover .music-cover-overlay,
+		.music-track-card.is-active .music-cover-overlay {
+			background: rgba(23, 105, 170, 0.56);
+		}
+		.music-track-body {
+			flex: 1;
+			min-width: 0;
+			display: flex;
+			flex-direction: column;
+			justify-content: space-between;
+			gap: 8px;
+		}
+		.music-track-top {
+			display: flex;
+			justify-content: space-between;
+			align-items: flex-start;
+			gap: 10px;
+			flex-wrap: wrap;
+		}
+		.music-track-title {
+			margin: 0;
+			font-size: 16.5px;
+			color: #173853;
+			font-weight: 800;
+			overflow-wrap: anywhere;
+		}
+		.music-track-artist {
+			margin: 2px 0 0;
+			font-size: 13px;
+			color: #526a7f;
+		}
+		.music-genre-tag {
+			padding: 3px 9px;
+			border-radius: 6px;
+			background: #e9f3fc;
+			color: #125c96;
+			font-size: 11px;
+			font-weight: 800;
+			white-space: nowrap;
+		}
+		.music-progress-row {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+		}
+		.music-time-label {
+			font-size: 12px;
+			font-variant-numeric: tabular-nums;
+			color: #526a7f;
+			min-width: 40px;
+		}
+		.music-track-actions {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: 8px;
+		}
+		.music-action-btn {
+			padding: 6px 11px;
+			border-radius: 8px;
+			border: 1px solid #d2dfe9;
+			background: #f8fbfe;
+			color: #244058;
+			font: inherit;
+			font-size: 12.5px;
+			font-weight: 700;
+			cursor: pointer;
+			transition: all 0.15s ease;
+		}
+		.music-action-btn:hover {
+			background: #eaf3fb;
+			border-color: #9ec5e6;
+		}
+		.music-action-btn.liked {
+			background: #fdecef;
+			border-color: #f3a6b4;
+			color: #c62845;
+		}
+		.music-action-btn.delete {
+			margin-left: auto;
+			color: #b42318;
+			border-color: #f1c6c2;
+			background: #fff7f7;
+		}
+		.music-deck-bar {
+			position: fixed;
+			left: 16px;
+			right: 16px;
+			bottom: 14px;
+			max-width: 1048px;
+			margin: 0 auto;
+			padding: 12px 18px;
+			border-radius: 14px;
+			background: rgba(19, 36, 54, 0.94);
+			backdrop-filter: blur(12px);
+			color: #ffffff;
+			display: flex;
+			align-items: center;
+			gap: 14px;
+			flex-wrap: wrap;
+			box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+			z-index: 950;
+		}
+		.music-deck-bar[hidden] { display: none; }
+		.music-deck-info {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			min-width: 180px;
+			max-width: 260px;
+		}
+		.music-deck-cover {
+			width: 42px;
+			height: 42px;
+			border-radius: 8px;
+			object-fit: cover;
+			flex-shrink: 0;
+		}
+		.music-deck-title {
+			font-size: 13.5px;
+			font-weight: 700;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+		.music-deck-artist {
+			font-size: 11.5px;
+			opacity: 0.78;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+		.music-deck-controls {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+		}
+		.music-deck-btn {
+			width: 34px;
+			height: 34px;
+			border-radius: 50%;
+			border: 1px solid rgba(255, 255, 255, 0.24);
+			background: rgba(255, 255, 255, 0.12);
+			color: #ffffff;
+			cursor: pointer;
+			display: grid;
+			place-items: center;
+			font-size: 14px;
+		}
+		.music-deck-btn.main {
+			width: 40px;
+			height: 40px;
+			background: #2aa889;
+			border-color: #2aa889;
+		}
+		.music-deck-seek {
+			flex: 1;
+			min-width: 170px;
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			font-size: 12px;
+			font-variant-numeric: tabular-nums;
+		}
+		.music-deck-global-btn {
+			padding: 7px 12px;
+			border-radius: 8px;
+			border: 1px solid rgba(255, 255, 255, 0.28);
+			background: rgba(255, 255, 255, 0.14);
+			color: #ffffff;
+			font: inherit;
+			font-size: 12px;
+			font-weight: 700;
+			cursor: pointer;
+			white-space: nowrap;
+		}
+		@media (max-width: 680px) {
+			.music-track-card { flex-direction: column; }
+			.music-cover-btn { width: 100%; height: 150px; }
+			.music-deck-bar { padding: 10px 12px; gap: 8px; }
+		}
+	</style>
+</head>
+<body>
+	<header class="navbar nav-scroll">
+		<div class="nav-left">
+			<a href="./index.html" class="brand-logo-link">
+				<img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo">
+			</a>
+		</div>
+		<nav class="nav-menu" aria-label="Điều hướng chính">
+			<a href="./index.html" class="nav-item">Trang chủ</a>
+			<a href="./videos.html" class="nav-item">Video</a>
+			<a href="./music.html" class="nav-item active" aria-current="page">Kho nhạc</a>
+			<a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
+			<a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
+			<a href="./friends.html" class="nav-item">Bạn bè</a>
+			<a href="./messages.html" class="nav-item">Tin nhắn</a>
+			<a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
+			<a href="./clubs.html" class="nav-item">CLB</a>
+			<a href="./announcements.html" class="nav-item">Thông báo</a>
+		</nav>
+		<div class="nav-right">
+			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
+				<img class="nav-user-avatar" src="./DIEU.png" alt="">
+			</a>
+		</div>
+	</header>
+
+	<main class="music-hub-main page-enter">
+		<section class="music-hub-hero">
+			<div>
+				<p class="music-hub-eyebrow">DIEUNW SOUND HUB</p>
+				<h1>Kho nhạc trực tuyến</h1>
+				<p>Đăng bài nhạc yêu thích, lắng nghe cùng bạn học hoặc đính kèm vào Story, Bài viết và Phòng tự học.</p>
+			</div>
+			<div class="music-hero-actions">
+				<button type="button" id="btn-toggle-music-upload" class="music-upload-toggle-btn" hidden>+ Đăng nhạc lên kho</button>
+			</div>
+		</section>
+
+		<section id="music-upload-panel" class="music-upload-panel" hidden>
+			<h2>Đăng bài hát mới lên Kho nhạc</h2>
+			<form id="music-upload-form">
+				<div class="music-upload-grid">
+					<div class="music-field">
+						<label for="music-title-input">Tên bài hát *</label>
+						<input type="text" id="music-title-input" maxlength="120" placeholder="VD: Rainy Lofi Study" required>
+					</div>
+					<div class="music-field">
+						<label for="music-artist-input">Nghệ sĩ / Tác giả</label>
+						<input type="text" id="music-artist-input" maxlength="100" placeholder="VD: Chillhop hoặc tên bạn">
+					</div>
+					<div class="music-field">
+						<label for="music-genre-select">Thể loại</label>
+						<select id="music-genre-select">
+							<option value="Lo-fi / Chill">Lo-fi / Chill</option>
+							<option value="Nhạc trẻ">Nhạc trẻ</option>
+							<option value="Acoustic / Indie">Acoustic / Indie</option>
+							<option value="Không lời / Piano">Không lời / Piano</option>
+							<option value="Anime / OST">Anime / OST</option>
+							<option value="US-UK">US-UK</option>
+							<option value="Khác">Khác</option>
+						</select>
+					</div>
+				</div>
+
+				<div class="music-file-row">
+					<label class="dieunw-file-btn" for="music-audio-file">Chọn tệp âm thanh (MP3/WAV/M4A/OGG) *</label>
+					<input type="file" id="music-audio-file" accept="audio/*" hidden>
+					<span id="music-audio-filename" class="image-upload-filename">Chưa chọn tệp âm thanh</span>
+				</div>
+
+				<div class="music-file-row">
+					<label class="dieunw-file-btn" for="music-cover-file">Ảnh bìa bài hát (tùy chọn)</label>
+					<input type="file" id="music-cover-file" accept="image/*" hidden>
+					<span id="music-cover-filename" class="image-upload-filename">Mặc định logo DIEUNW</span>
+					<img id="music-cover-preview" class="music-cover-preview" alt="Xem trước bìa" hidden>
+					<button type="button" id="music-cover-clear" class="btn-clear-upload" hidden>Xóa bìa</button>
+				</div>
+
+				<div id="music-upload-progress"></div>
+
+				<div style="display:flex; gap:10px; justify-content:flex-end; margin-top:12px;">
+					<button type="button" id="btn-cancel-music-upload" class="btn-timer outline" style="padding:8px 16px;">Đóng</button>
+					<button type="submit" id="btn-submit-music" class="btn-auth" style="width:auto; padding:9px 22px;">Tải lên Kho nhạc</button>
+				</div>
+			</form>
+		</section>
+
+		<section class="music-toolbar">
+			<div class="music-search-box">
+				<input type="search" id="music-search-input" placeholder="Tìm theo tên bài hát, nghệ sĩ, người đăng...">
+			</div>
+			<div class="music-genre-tabs" id="music-genre-tabs">
+				<button type="button" class="music-genre-chip active" data-genre="">Tất cả</button>
+				<button type="button" class="music-genre-chip" data-genre="Lo-fi / Chill">Lo-fi / Chill</button>
+				<button type="button" class="music-genre-chip" data-genre="Nhạc trẻ">Nhạc trẻ</button>
+				<button type="button" class="music-genre-chip" data-genre="Acoustic / Indie">Acoustic</button>
+				<button type="button" class="music-genre-chip" data-genre="Không lời / Piano">Không lời</button>
+				<button type="button" class="music-genre-chip" data-genre="Anime / OST">Anime / OST</button>
+				<button type="button" class="music-genre-chip" data-genre="US-UK">US-UK</button>
+			</div>
+		</section>
+
+		<section id="music-track-list" class="music-track-list" aria-live="polite">
+			<p class="loading-text">Đang tải danh sách nhạc...</p>
+		</section>
+	</main>
+
+	<!-- Thanh phát nhạc cố định cuối trang -->
+	<div id="music-deck-bar" class="music-deck-bar" hidden>
+		<div class="music-deck-info">
+			<img id="deck-cover" class="music-deck-cover" src="./DIEU.png" alt="">
+			<div style="min-width:0;">
+				<div id="deck-title" class="music-deck-title">Chưa phát bài hát</div>
+				<div id="deck-artist" class="music-deck-artist">--</div>
+			</div>
+		</div>
+		<div class="music-deck-controls">
+			<button type="button" id="deck-prev-btn" class="music-deck-btn" title="Bài trước">⏮</button>
+			<button type="button" id="deck-play-btn" class="music-deck-btn main" title="Phát / Tạm dừng">▶</button>
+			<button type="button" id="deck-next-btn" class="music-deck-btn" title="Bài tiếp theo">⏭</button>
+		</div>
+		<div class="music-deck-seek">
+			<span id="deck-current-time">0:00</span>
+			<input type="range" id="deck-seek-slider" class="dieunw-slider" min="0" max="100" value="0" step="0.5" style="flex:1;" aria-label="Tua nhạc">
+			<span id="deck-duration-time">0:00</span>
+		</div>
+		<button type="button" id="deck-send-global-btn" class="music-deck-global-btn" title="Phát ở đĩa quay trên thanh menu để nghe khi chuyển trang">Nghe xuyên trang</button>
+	</div>
+
+	<audio id="music-hub-audio"></audio>
+
+	<script src="./nav-profile.js?v=3" defer></script>
+	<script src="./music.js?v=3" defer></script>
+</body>
+</html>

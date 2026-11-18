@@ -3,69 +3,61 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<link rel="stylesheet" href="./style.css?v=11">
+	<link rel="stylesheet" href="./style.css?v=3">
 	<link rel="prefetch" href="./profile.html">
-	<link rel="icon" type="image/png" href="./DIEU.avif?v=3">
+	<link rel="icon" type="image/png" href="./DIEU.png?v=3">
 	<title>DIEUNW - Trang Chủ</title>
 </head>
 <body>
 	<header class="navbar nav-scroll">
-		<div class="nav-corner-dock">
-			<button type="button" class="nav-brand-toggle" aria-expanded="false" aria-controls="main-nav-menu" aria-label="Mở menu điều hướng DIEUNW">
-				<picture>
-					<source srcset="./DIEU.avif" type="image/avif">
-					<source srcset="./DIEU.webp" type="image/webp">
-					<img src="./DIEU.avif" alt="DIEUNW" class="nav-brand-icon">
-				</picture>
-				<span class="nav-brand-caret">▾</span>
-			</button>
-			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
-				<img class="nav-user-avatar" src="./DIEU.avif" alt="Trang cá nhân">
-				<span class="nav-status-dot" data-status="offline" aria-hidden="true"></span>
+		<div class="nav-left">
+			<a href="./index.html" class="brand-logo-link">
+				<img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo">
 			</a>
-			<button type="button" class="nav-theme-toggle" id="nav-theme-toggle" aria-label="Bật/tắt chế độ tối" title="Chế độ Sáng / Tối">⏾</button>
 		</div>
-		<nav id="main-nav-menu" class="nav-menu nav-dropdown-panel" aria-label="Điều hướng chính" hidden>
+		<nav class="nav-menu" aria-label="Điều hướng chính">
 			<a href="./index.html" class="nav-item active" aria-current="page">Trang chủ</a>
+			<a href="./videos.html" class="nav-item">Video</a>
+			<a href="./music.html" class="nav-item">Kho nhạc</a>
 			<a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
 			<a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
-			<a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
 			<a href="./friends.html" class="nav-item">Bạn bè</a>
 			<a href="./messages.html" class="nav-item">Tin nhắn</a>
+			<a href="./tro-chuyen.html" class="nav-item">Phòng trò chuyện</a>
 			<a href="./clubs.html" class="nav-item">CLB</a>
 			<a href="./announcements.html" class="nav-item">Thông báo</a>
 		</nav>
+		<div class="nav-right">
+			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
+				<img class="nav-user-avatar" src="./DIEU.png" alt="">
+			</a>
+		</div>
 	</header>
 
 	<div id="hero-banner">
-		<picture>
-			<source srcset="./DIEUNW.avif" type="image/avif">
-			<source srcset="./DIEUNW.webp" type="image/webp">
-			<img src="./DIEUNW.png" alt="DIEUNW Banner">
-		</picture>
+		<img src="./DIEUNW.png" alt="DIEUNW Banner">
 	</div>
 
 	<main class="main-content page-enter">
 		<section class="home-auth-gate" id="feed-auth-gate">
 			<p class="home-auth-eyebrow">BẢNG TIN DIEUNW</p>
 			<h1>Đăng nhập để kết nối cùng bạn học</h1>
-			<p>Đăng nhập hoặc đăng ký để xem bài viết, Stories và chia sẻ nội dung học tập của bạn.</p>
+			<p>Đăng nhập hoặc đăng ký để xem bài viết và chia sẻ nội dung của bạn.</p>
 			<div class="home-auth-actions">
 				<button class="btn-auth" id="feed-login-button" type="button">Đăng nhập</button>
 				<button class="btn-auth btn-register-outline" id="feed-register-button" type="button">Đăng ký</button>
 			</div>
 		</section>
 
-		<!-- Thanh Stories 24h / 48h -->
-		<section class="story-bar" id="story-bar" aria-label="Tin 24h bạn học" hidden></section>
-
 		<div class="feed-trigger-box" id="feed-trigger-box" hidden>
-			<img src="./DIEU.avif" alt="Avatar" class="user-avatar-mini" id="feed-trigger-avatar">
+			<img id="trigger-user-avatar" src="./DIEU.png" alt="Avatar" class="user-avatar-mini">
 			<div id="trigger-modal-input">Dieuer ơi, bạn đang nghĩ gì thế?</div>
 			<button id="btn-trigger-open" type="button">Đăng bài</button>
 		</div>
 
-		<div id="newsfeed-container" hidden></div>
+		<div id="newsfeed-container" hidden>
+			<p class="loading-text">Đang tải bài viết...</p>
+		</div>
 
 		<!-- Khung đăng nhập / đăng ký nhanh khi chưa đăng nhập -->
 		<div id="auth-container" class="auth-box" style="display: none;">
@@ -88,7 +80,7 @@
 				</div>
 				<button id="btn-login" class="btn-auth" type="button">Đăng nhập</button>
 				<div style="margin-top: 15px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px;">
-					<a href="#" id="link-to-forgot" style="color: var(--text-muted); text-decoration: none;">Quên mật khẩu?</a>
+					<a href="#" id="link-to-forgot" style="color: #65676b; text-decoration: none;">Quên mật khẩu?</a>
 					<p>Chưa có tài khoản? <a href="#" id="link-to-register" style="color: #0078ff; font-weight: 600; text-decoration: none;">Đăng ký</a></p>
 				</div>
 			</div>
@@ -132,7 +124,7 @@
 		</div>
 	</main>
 
-	<!-- Modal tạo bài viết (Rich Text + @tag + Upload ảnh + Nhúng Bộ ôn tập) -->
+	<!-- Modal tạo bài viết (Rich Text + @tag email + Upload ảnh nén WebP + Nhạc nền + Thanh loading %) -->
 	<div id="post-modal-overlay" class="modal-overlay" hidden>
 		<div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="post-modal-title">
 			<div class="modal-header">
@@ -140,7 +132,7 @@
 				<button id="btn-modal-close" class="close-badge" type="button" aria-label="Đóng">&times;</button>
 			</div>
 			<div class="modal-user-info">
-				<img id="post-author-avatar" src="./DIEU.avif" alt="" class="user-avatar-mini">
+				<img id="post-author-avatar" src="./DIEU.png" alt="" class="user-avatar-mini">
 				<div>
 					<h4 id="post-author-name">Tên người đăng</h4>
 					<span class="privacy-badge" id="post-privacy-label">Công khai</span>
@@ -163,7 +155,7 @@
 							<span>Màu chữ</span>
 							<input type="color" id="post-color-picker" value="#173853">
 						</label>
-						<button type="button" class="rte-btn" id="post-mention-trigger" title="Gắn thẻ bạn học (@)">@Tag</button>
+						<button type="button" class="rte-btn" id="post-mention-trigger" title="Gắn thẻ bạn học (@email)">@Tag</button>
 					</div>
 					<div id="post-rich-editor" class="rte-editor" contenteditable="true" data-placeholder="Bạn đang nghĩ gì thế? Gõ @ để gắn thẻ bạn học..."></div>
 					<div id="post-mention-dropdown" class="mention-dropdown" hidden></div>
@@ -171,7 +163,7 @@
 
 				<div class="image-upload-box">
 					<div class="image-upload-row">
-						<label class="image-upload-label" for="post-image-file">Chọn ảnh từ máy</label>
+						<label class="image-upload-label dieunw-file-btn" for="post-image-file">Chọn ảnh từ máy</label>
 						<input id="post-image-file" type="file" accept="image/*" hidden>
 						<span id="post-image-filename" class="image-upload-filename">Chưa chọn ảnh</span>
 						<button type="button" id="post-image-clear" class="btn-clear-upload" hidden>Xóa ảnh</button>
@@ -181,85 +173,22 @@
 					</div>
 				</div>
 
-				<div class="input-group" style="margin:0;">
-					<label class="input-group-label" for="post-studyset-select">Đính kèm Bộ thẻ Flashcard / Quiz tương tác (tùy chọn)</label>
-					<select id="post-studyset-select" style="margin-bottom:0;">
-						<option value="">Không đính kèm bộ ôn tập</option>
-					</select>
-				</div>
+				<!-- Gắn nhạc từ Kho nhạc online hoặc tệp từ máy -->
+				<div id="post-music-picker"></div>
 
 				<fieldset class="post-visibility-fieldset">
 					<legend>Ai có thể xem bài viết?</legend>
 					<label><input type="radio" name="post-visibility" value="public" checked> Công khai</label>
 					<label><input type="radio" name="post-visibility" value="private"> Riêng tư</label>
 				</fieldset>
+
+				<!-- Thanh loading % khi đăng bài -->
+				<div id="post-upload-progress"></div>
 			</div>
 			<div class="modal-footer">
 				<button id="btn-submit-post" type="button">Đăng</button>
 			</div>
 		</div>
-	</div>
-
-	<!-- Modal Đăng Story 24h/48h nhanh từ Trang chủ -->
-	<div id="home-story-modal-overlay" class="report-modal-overlay" hidden>
-		<section class="report-modal-box" role="dialog" aria-modal="true" aria-labelledby="home-story-modal-title">
-			<div class="report-modal-header">
-				<h3 id="home-story-modal-title">Đăng Story Ảnh / Video</h3>
-				<button type="button" class="close-badge" id="home-story-close">&times;</button>
-			</div>
-			<form id="home-story-form" class="profile-extra-form">
-				<label for="home-story-file">Chọn ảnh hoặc video (.mp4 / .webm)</label>
-				<input type="file" id="home-story-file" accept="image/*,video/mp4,video/webm" required>
-				<label for="home-story-caption">Chú thích</label>
-				<input type="text" id="home-story-caption" maxlength="160" placeholder="Chia sẻ khoảnh khắc cùng bạn bè...">
-				<label for="home-story-duration">Thời gian tồn tại</label>
-				<select id="home-story-duration">
-					<option value="24">24 giờ</option>
-					<option value="48">48 giờ</option>
-				</select>
-				<p id="home-story-status" class="profile-extra-status"></p>
-				<button type="submit" class="btn-auth">Đăng Story ngay</button>
-			</form>
-		</section>
-	</div>
-
-	<!-- Modal Trình xem Story -->
-	<div id="home-story-viewer-overlay" class="story-viewer-overlay" hidden>
-		<div class="story-viewer-box" role="dialog" aria-modal="true">
-			<div id="home-story-progress-track" class="story-progress-track"></div>
-			<div class="story-viewer-header">
-				<div class="story-viewer-author">
-					<img id="home-story-viewer-avatar" src="./DIEU.avif" alt="">
-					<div>
-						<strong id="home-story-viewer-name" style="font-size:13.5px;"></strong>
-						<p id="home-story-viewer-time" style="font-size:11px; color:#9eb7cc;"></p>
-					</div>
-				</div>
-				<button type="button" class="close-badge" id="home-story-viewer-close">&times;</button>
-			</div>
-			<div class="story-media-stage" id="home-story-media-stage">
-				<button type="button" id="home-story-prev" class="story-nav-btn prev">‹</button>
-				<button type="button" id="home-story-next" class="story-nav-btn next">›</button>
-			</div>
-			<div class="story-viewer-footer">
-				<p id="home-story-viewer-caption" class="story-caption-text"></p>
-				<div class="story-meta-row">
-					<span id="home-story-viewer-views">0 lượt xem</span>
-					<span id="home-story-viewer-expiry"></span>
-				</div>
-			</div>
-		</div>
-	</div>
-
-	<!-- Modal Học Bộ thẻ / Quiz trực tiếp từ Bảng tin -->
-	<div id="home-studyset-player-overlay" class="report-modal-overlay" hidden>
-		<section class="report-modal-box" style="width:min(620px, 100%);" role="dialog" aria-modal="true">
-			<div class="report-modal-header">
-				<h3 id="home-studyset-player-title">Ôn tập</h3>
-				<button type="button" class="close-badge" id="home-studyset-player-close">&times;</button>
-			</div>
-			<div id="home-studyset-player-body" style="display:grid; gap:12px;"></div>
-		</section>
 	</div>
 
 	<!-- Modal Báo cáo bài viết -->
@@ -269,7 +198,7 @@
 				<h3 id="report-modal-title">Báo cáo vi phạm</h3>
 				<button type="button" id="report-modal-close" class="close-badge" aria-label="Đóng">&times;</button>
 			</div>
-			<p id="report-target-label" style="font-size:13px; color:var(--text-muted);"></p>
+			<p id="report-target-label" style="font-size:13px; color:#5e7488; margin-bottom:10px;"></p>
 			<div class="report-reason-chips">
 				<button type="button" class="report-chip" data-reason="Nội dung không phù hợp">Nội dung không phù hợp</button>
 				<button type="button" class="report-chip" data-reason="Ngôn từ thù ghét hoặc xúc phạm">Xúc phạm / Thù ghét</button>
@@ -278,7 +207,7 @@
 			</div>
 			<textarea id="report-reason-input" rows="3" maxlength="500" placeholder="Nhập lý do chi tiết (tùy chọn)..."></textarea>
 			<p id="report-modal-status" class="form-message" role="status"></p>
-			<div style="display:flex; justify-content:flex-end; gap:10px;">
+			<div style="display:flex; justify-content:flex-end; gap:10px; margin-top:12px;">
 				<button type="button" id="report-modal-cancel" class="btn-timer outline" style="padding:8px 16px;">Hủy</button>
 				<button type="button" id="report-modal-submit" class="btn-auth" style="width:auto; padding:8px 18px; background:#b42318;">Gửi báo cáo</button>
 			</div>
