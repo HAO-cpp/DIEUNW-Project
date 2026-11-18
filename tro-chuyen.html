@@ -4,18 +4,27 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta name="theme-color" content="#1769aa">
-	<link rel="stylesheet" href="./style.css">
+	<link rel="stylesheet" href="./style.css?v=11">
 	<link rel="icon" type="image/png" href="./DIEU.png?v=1">
 	<title>Phòng Trò Chuyện - DIEUNW</title>
 </head>
 <body class="chat-page">
-	<header class="navbar">
-		<div class="nav-left">
-			<a href="./index.html" class="brand-logo-link">
-				<img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo">
+	<header class="navbar nav-scroll">
+		<div class="nav-corner-dock">
+			<button class="nav-brand-toggle" type="button" aria-expanded="false" aria-controls="main-nav-menu" aria-label="Mở menu điều hướng">
+				<picture>
+					<source srcset="./DIEU.avif" type="image/avif">
+					<source srcset="./DIEU.webp" type="image/webp">
+					<img src="./DIEU.png" alt="DIEUNW" class="nav-brand-badge">
+				</picture>
+			</button>
+			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
+				<img class="nav-user-avatar" src="./DIEU.png" alt="">
+				<span class="nav-status-dot" aria-hidden="true"></span>
 			</a>
+			<button id="nav-theme-toggle" class="nav-theme-toggle" type="button" aria-label="Chuyển chế độ sáng tối" title="Chuyển chế độ sáng / tối">🌙</button>
 		</div>
-		<nav class="nav-menu" aria-label="Điều hướng chính">
+		<nav id="main-nav-menu" class="nav-menu nav-dropdown-panel" aria-label="Điều hướng chính" hidden>
 			<a href="./index.html" class="nav-item">Trang chủ</a>
 			<a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
 			<a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
@@ -25,24 +34,31 @@
 			<a href="./clubs.html" class="nav-item">CLB</a>
 			<a href="./announcements.html" class="nav-item">Thông báo</a>
 		</nav>
-		<div class="nav-right">
-			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
-				<img class="nav-user-avatar" src="./DIEU.png" alt="">
-			</a>
-		</div>
 	</header>
-	<div id="hero-banner" aria-hidden="true">
-		<img src="./DIEUNW.png" alt="">
-	</div>
 
-	<main class="chat-main">
+	<section id="hero-banner" class="hero-banner" aria-label="DIEUNW Banner">
+		<picture>
+			<source srcset="./DIEUNW.avif" type="image/avif">
+			<source srcset="./DIEUNW.webp" type="image/webp">
+			<img src="./DIEUNW.png" alt="DIEUNW" class="hero-banner-img" loading="eager">
+		</picture>
+		<div class="hero-banner-fade" aria-hidden="true"></div>
+	</section>
+
+	<main class="chat-main page-enter">
 		<header class="chat-page-heading">
 			<div>
 				<p class="chat-eyebrow"><span class="live-indicator"></span> CÁC DIEUER ĐANG TRÒ CHUYỆN</p>
 				<h1>Phòng trò chuyện</h1>
 				<p class="chat-page-subtitle">Gặp gỡ mọi người, cùng tham gia một cuộc trò chuyện công khai.</p>
 			</div>
-			<div class="chat-heading-mark" aria-hidden="true"><img src="./DIEU.png" alt=""></div>
+			<div class="chat-heading-mark" aria-hidden="true">
+				<picture>
+					<source srcset="./DIEU.avif" type="image/avif">
+					<source srcset="./DIEU.webp" type="image/webp">
+					<img src="./DIEU.png" alt="">
+				</picture>
+			</div>
 		</header>
 
 		<div class="live-workspace">
@@ -106,9 +122,10 @@
 					<div class="message-list" id="message-list" aria-live="polite" aria-relevant="additions">
 						<p class="message-list-state">Đang tải tin nhắn...</p>
 					</div>
-					<form class="message-composer" id="message-form">
+					<form class="message-composer" id="message-form" style="grid-template-columns: auto minmax(0, 1fr) 40px;">
+						<button type="button" id="chat-sticker-btn" class="sticker-trigger-btn" title="Chọn nhãn dán" aria-label="Chọn nhãn dán">😊</button>
 						<label class="sr-only" for="message-input">Tin nhắn</label>
-						<textarea id="message-input" maxlength="1000" rows="1" placeholder="Viết tin nhắn..." required></textarea>
+						<textarea id="message-input" maxlength="1000" rows="1" placeholder="Viết tin nhắn..."></textarea>
 						<span class="message-hint">Enter để gửi · Shift + Enter xuống dòng</span>
 						<button class="send-message-button" id="send-message-button" type="submit" aria-label="Gửi tin nhắn" title="Gửi tin nhắn"><span aria-hidden="true">➤</span></button>
 					</form>
@@ -117,7 +134,7 @@
 		</div>
 	</main>
 
-	<script src="./tro-chuyen.js" defer></script>
-	<script src="./nav-profile.js" defer></script>
+	<script src="./nav-profile.js?v=3" defer></script>
+	<script src="./tro-chuyen.js?v=3" defer></script>
 </body>
 </html>

@@ -4,18 +4,27 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta name="theme-color" content="#1769aa">
-	<link rel="stylesheet" href="./style.css?v=10">
+	<link rel="stylesheet" href="./style.css?v=11">
 	<link rel="icon" type="image/png" href="./DIEU.png?v=1">
 	<title>Học Nhóm - DIEUNW</title>
 </head>
 <body class="group-page">
 	<header class="navbar nav-scroll">
-		<div class="nav-left">
-			<a href="./index.html" class="brand-logo-link">
-				<img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo">
+		<div class="nav-corner-dock">
+			<button class="nav-brand-toggle" type="button" aria-expanded="false" aria-controls="main-nav-menu" aria-label="Mở menu điều hướng">
+				<picture>
+					<source srcset="./DIEU.avif" type="image/avif">
+					<source srcset="./DIEU.webp" type="image/webp">
+					<img src="./DIEU.png" alt="DIEUNW" class="nav-brand-badge">
+				</picture>
+			</button>
+			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
+				<img class="nav-user-avatar" src="./DIEU.png" alt="">
+				<span class="nav-status-dot" aria-hidden="true"></span>
 			</a>
+			<button id="nav-theme-toggle" class="nav-theme-toggle" type="button" aria-label="Chuyển chế độ sáng tối" title="Chuyển chế độ sáng / tối">🌙</button>
 		</div>
-		<nav class="nav-menu" aria-label="Điều hướng chính">
+		<nav id="main-nav-menu" class="nav-menu nav-dropdown-panel" aria-label="Điều hướng chính" hidden>
 			<a href="./index.html" class="nav-item">Trang chủ</a>
 			<a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
 			<a href="./hoc-nhom.html" class="nav-item active" aria-current="page">Học nhóm</a>
@@ -25,16 +34,16 @@
 			<a href="./clubs.html" class="nav-item">CLB</a>
 			<a href="./announcements.html" class="nav-item">Thông báo</a>
 		</nav>
-		<div class="nav-right">
-			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
-				<img class="nav-user-avatar" src="./DIEU.png" alt="">
-			</a>
-		</div>
 	</header>
 
-	<div id="hero-banner" aria-hidden="true">
-		<img src="./DIEUNW.png" alt="">
-	</div>
+	<section id="hero-banner" class="hero-banner" aria-label="DIEUNW Banner">
+		<picture>
+			<source srcset="./DIEUNW.avif" type="image/avif">
+			<source srcset="./DIEUNW.webp" type="image/webp">
+			<img src="./DIEUNW.png" alt="DIEUNW" class="hero-banner-img" loading="eager">
+		</picture>
+		<div class="hero-banner-fade" aria-hidden="true"></div>
+	</section>
 
 	<main class="group-main page-enter">
 		<section class="group-intro">
@@ -80,7 +89,7 @@
 					<input class="group-input" id="resource-link" name="link" type="text" placeholder="https://... (có thể bỏ trống nếu đã chọn tệp)">
 
 					<label class="form-label" for="resource-file">Tệp tài liệu (PDF, Word, ảnh... — tùy chọn nếu đã có liên kết)</label>
-					<input class="group-input" id="resource-file" name="resource_file" type="file" accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg,.zip">
+					<input class="group-input" id="resource-file" name="resource_file" type="file" accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.avif,.zip">
 
 					<label class="form-label" for="resource-cover-color">Màu bìa sách</label>
 					<div class="cover-color-row">
@@ -194,7 +203,7 @@
 		</section>
 	</div>
 
-	<script src="./nav-profile.js?v=2" defer></script>
-	<script src="./hoc-nhom.js?v=2" defer></script>
+	<script src="./nav-profile.js?v=3" defer></script>
+	<script src="./hoc-nhom.js?v=3" defer></script>
 </body>
 </html>

@@ -2,6 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	const POSTS_API = "https://6af30641d2377d6c370469d7.mockapi.io/posts";
 	const POLL_INTERVAL = 5000;
 	const PRESENCE_WINDOW = 25000;
+
 	const roomList = document.getElementById("public-room-list");
 	const roomSearch = document.getElementById("room-search");
 	const roomCount = document.getElementById("room-count");
@@ -14,17 +15,31 @@ document.addEventListener("DOMContentLoaded", () => {
 	const messageList = document.getElementById("message-list");
 	const messageForm = document.getElementById("message-form");
 	const messageInput = document.getElementById("message-input");
+	const stickerButton = document.getElementById("chat-sticker-btn");
 	const sendMessageButton = document.getElementById("send-message-button");
+
 	let rooms = [];
 	let activeRoom = null;
 	let activeTopic = "Tất cả";
 	let lastRenderedMessages = null;
 	let polling = false;
 
+	function buildSkeletonMarkup(count = 3) {
+		if (window.DIEUNW && typeof window.DIEUNW.createSkeletonCardsHtml === "function") {
+			return window.DIEUNW.createSkeletonCardsHtml(count);
+		}
+		return Array.from({ length: count }, () => `
+			<div class="skeleton-card" aria-hidden="true">
+				<div class="skeleton-line short"></div>
+				<div class="skeleton-line"></div>
+			</div>
+		`).join("");
+	}
+
 	function readCurrentUser() {
 		try {
 			return JSON.parse(localStorage.getItem("dieuNwUser") || "null");
-		} catch (error) {
+		} catch {
 			return null;
 		}
 	}
@@ -129,6 +144,9 @@ document.addEventListener("DOMContentLoaded", () => {
 	}
 
 	async function loadRooms() {
+		if (!rooms.length) {
+			roomList.innerHTML = buildSkeletonMarkup(3);
+		}
 		try {
 			const posts = await getPosts();
 			rooms = posts
@@ -143,7 +161,7 @@ document.addEventListener("DOMContentLoaded", () => {
 			}
 			renderRooms();
 			if (!rooms.length) roomCount.textContent = "0 phòng đang mở";
-		} catch (error) {
+		} catch {
 			if (!rooms.length) {
 				roomList.innerHTML = "<p class=\"room-list-state room-error-state\">Không kết nối được danh sách phòng. Thử tải lại trang.</p>";
 				roomCount.textContent = "Ngoại tuyến";
@@ -166,7 +184,7 @@ document.addEventListener("DOMContentLoaded", () => {
 			});
 			activeRoom = updatedRoom;
 			updateConversationHeader();
-		} catch (error) {
+		} catch {
 			updateConversationHeader();
 		}
 	}
@@ -185,7 +203,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		chatEmptyState.hidden = true;
 		activeConversation.hidden = false;
 		document.body.classList.add("room-open");
-		messageList.innerHTML = "<p class=\"message-list-state\">Đang tải tin nhắn...</p>";
+		messageList.innerHTML = buildSkeletonMarkup(3);
 		updateConversationHeader();
 		renderRooms();
 		await updateConversationPresence();
@@ -216,7 +234,7 @@ document.addEventListener("DOMContentLoaded", () => {
 			}
 			lastRenderedMessages = signature;
 			if (nearBottom || signature.split("|").length <= 1) messageList.scrollTop = messageList.scrollHeight;
-		} catch (error) {
+		} catch {
 			if (!lastRenderedMessages) {
 				messageList.innerHTML = "<p class=\"message-list-state room-error-state\">Không tải được tin nhắn. Hãy thử lại.</p>";
 			}
@@ -233,6 +251,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		const avatar = document.createElement("span");
 		avatar.className = "message-avatar";
 		avatar.textContent = (message.senderName || "K").trim().charAt(0).toLocaleUpperCase("vi");
+
 		const bubbleWrap = document.createElement("div");
 		bubbleWrap.className = "message-bubble-wrap";
 		const meta = document.createElement("div");
@@ -241,15 +260,75 @@ document.addEventListener("DOMContentLoaded", () => {
 		author.textContent = mine ? "Bạn" : message.senderName || "Khách NQD";
 		const time = document.createElement("time");
 		time.textContent = formatTime(message.createdAt);
-		bubbleWrap.appendChild(meta);
 		meta.append(author, time);
-		const text = document.createElement("p");
-		text.className = "message-bubble";
-		text.textContent = message.messageText || "";
-		bubbleWrap.appendChild(text);
+		bubbleWrap.appendChild(meta);
+
+		const bubbleBox = document.createElement("div");
+		bubbleBox.className = "message-bubble";
+		if (message.stickerUrl) {
+			const stickerImg = document.createElement("img");
+			stickerImg.src = message.stickerUrl;
+			stickerImg.alt = "Nhãn dán";
+			stickerImg.className = "chat-sticker-img";
+			bubbleBox.appendChild(stickerImg);
+		}
+		if (message.messageText) {
+			const textEl = document.createElement("p");
+			textEl.textContent = message.messageText;
+			textEl.style.margin = "0";
+			bubbleBox.appendChild(textEl);
+		}
+		bubbleWrap.appendChild(bubbleBox);
+
 		if (mine) wrapper.append(bubbleWrap, avatar);
 		else wrapper.append(avatar, bubbleWrap);
 		return wrapper;
+	}
+
+	async function postChatMessage({ messageText = "", stickerUrl = "" }) {
+		if (!activeRoom || (!messageText && !stickerUrl)) return;
+		sendMessageButton.disabled = true;
+		try {
+			const response = await fetch(POSTS_API, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					type: "public-chat-message",
+					roomId: String(activeRoom.id),
+					senderId: visitorId,
+					senderName: currentName,
+					messageText,
+					stickerUrl,
+					createdAt: new Date().toISOString()
+				})
+			});
+			if (!response.ok) throw new Error("Không thể gửi tin nhắn.");
+			if (messageText) messageInput.value = "";
+			await loadMessages();
+			messageList.scrollTop = messageList.scrollHeight;
+			updateConversationPresence();
+		} catch {
+			const notice = document.createElement("p");
+			notice.className = "message-send-error";
+			notice.textContent = "Gửi chưa thành công. Hãy thử lại.";
+			messageForm.appendChild(notice);
+			window.setTimeout(() => notice.remove(), 3500);
+		} finally {
+			sendMessageButton.disabled = false;
+			messageInput.focus();
+		}
+	}
+
+	if (stickerButton) {
+		if (window.DIEUNW && typeof window.DIEUNW.attachStickerPicker === "function") {
+			window.DIEUNW.attachStickerPicker(stickerButton, stickerUrl => {
+				postChatMessage({ stickerUrl });
+			});
+		} else {
+			stickerButton.addEventListener("click", () => {
+				postChatMessage({ messageText: "👋✨" });
+			});
+		}
 	}
 
 	createRoomToggle.addEventListener("click", () => {
@@ -287,7 +366,7 @@ document.addEventListener("DOMContentLoaded", () => {
 			createRoomForm.hidden = true;
 			await loadRooms();
 			await joinRoom(room);
-		} catch (error) {
+		} catch {
 			createRoomMessage.textContent = "Chưa tạo được phòng. Hãy kiểm tra kết nối rồi thử lại.";
 		} finally {
 			submit.disabled = false;
@@ -311,36 +390,8 @@ document.addEventListener("DOMContentLoaded", () => {
 	messageForm.addEventListener("submit", async event => {
 		event.preventDefault();
 		const messageText = messageInput.value.trim();
-		if (!activeRoom || !messageText) return;
-		sendMessageButton.disabled = true;
-		try {
-			const response = await fetch(POSTS_API, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					type: "public-chat-message",
-					roomId: String(activeRoom.id),
-					senderId: visitorId,
-					senderName: currentName,
-					messageText,
-					createdAt: new Date().toISOString()
-				})
-			});
-			if (!response.ok) throw new Error("Không thể gửi tin nhắn.");
-			messageInput.value = "";
-			await loadMessages();
-			messageList.scrollTop = messageList.scrollHeight;
-			updateConversationPresence();
-		} catch (error) {
-			const notice = document.createElement("p");
-			notice.className = "message-send-error";
-			notice.textContent = "Gửi chưa thành công. Hãy thử lại.";
-			messageForm.appendChild(notice);
-			window.setTimeout(() => notice.remove(), 3500);
-		} finally {
-			sendMessageButton.disabled = false;
-			messageInput.focus();
-		}
+		if (!messageText) return;
+		await postChatMessage({ messageText });
 	});
 
 	messageInput.addEventListener("keydown", event => {
@@ -356,6 +407,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 	loadRooms();
 	window.setInterval(() => {
+		if (document.hidden) return;
 		loadRooms();
 		if (activeRoom) loadMessages();
 	}, POLL_INTERVAL);

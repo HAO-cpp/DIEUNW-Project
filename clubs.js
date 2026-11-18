@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+	const API_BASE = "https://dieunw.onrender.com";
 	const clubsList = document.getElementById("clubs-list");
 	const requestForm = document.getElementById("club-request-form");
 	const requestStatus = document.getElementById("club-request-status");
@@ -6,24 +7,35 @@ document.addEventListener("DOMContentLoaded", () => {
 	const reviewList = document.getElementById("club-review-list");
 	let currentUser = null;
 
-	// Biến quản lý danh sách nhiều email quản lý CLB
 	let managerEmails = [];
 	const managerInput = document.getElementById("club-manager-input");
 	const managersListEl = document.getElementById("club-managers-list");
 	const btnAddManager = document.getElementById("btn-add-manager");
 
+	function buildSkeletonMarkup(count = 3) {
+		if (window.DIEUNW && typeof window.DIEUNW.createSkeletonCardsHtml === "function") {
+			return window.DIEUNW.createSkeletonCardsHtml(count);
+		}
+		return Array.from({ length: count }, () => `
+			<div class="skeleton-card" aria-hidden="true">
+				<div class="skeleton-line short"></div>
+				<div class="skeleton-line"></div>
+			</div>
+		`).join("");
+	}
+
 	async function api(url, options = {}) {
-		const token = localStorage.getItem("session_token");
+		const token = localStorage.getItem("session_token") || localStorage.getItem("dieuNwToken") || "";
 		const headers = {
 			...(token ? { Authorization: `Bearer ${token}` } : {}),
 			...(options.headers || {})
 		};
-		const response = await fetch(`https://dieunw.onrender.com${url}`, {
+		const response = await fetch(`${API_BASE}${url}`, {
 			credentials: "include",
 			...options,
 			headers
 		});
-		const data = await response.json();
+		const data = await response.json().catch(() => ({}));
 		if (!response.ok) throw new Error(data.error || "Không thể hoàn tất yêu cầu.");
 		return data;
 	}
@@ -82,6 +94,26 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 	});
 
+	async function toggleJoinClub(club, button) {
+		if (!currentUser) {
+			window.location.href = "./profile.html";
+			return;
+		}
+		const isMember = Boolean(club.isMember);
+		button.disabled = true;
+		try {
+			await api(`/api/clubs/${encodeURIComponent(club.id)}/join`, {
+				method: isMember ? "DELETE" : "POST",
+				headers: { "Content-Type": "application/json" },
+				body: isMember ? undefined : "{}"
+			});
+			await loadClubs();
+		} catch (error) {
+			document.getElementById("clubs-status").textContent = error.message;
+			button.disabled = false;
+		}
+	}
+
 	function renderClub(club) {
 		const card = element("article", "club-card");
 		card.style.cursor = "pointer";
@@ -94,32 +126,52 @@ document.addEventListener("DOMContentLoaded", () => {
 			const logo = element("img", "club-card-logo");
 			logo.src = club.logo;
 			logo.alt = `Logo ${club.name}`;
+			logo.loading = "lazy";
 			brand.append(logo);
 		} else {
 			brand.append(element("span", "club-card-monogram", club.name.slice(0, 1).toUpperCase()));
 		}
 
-		const managersText = Array.isArray(club.managerEmails)
+		const managersText = Array.isArray(club.managerEmails) && club.managerEmails.length
 			? club.managerEmails.join(", ")
-			: (club.manager?.name || club.managerEmail);
+			: (club.manager?.name || club.managerEmail || "Ban chủ nhiệm");
 
 		const identity = element("div", "club-card-identity");
 		identity.append(element("h3", "", club.name), element("p", "", managersText));
 		brand.append(identity);
 		card.append(brand);
 
+		const footer = element("div", "club-card-footer");
+		footer.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px;";
+
 		const managerTag = element("span", "club-manager-tag", `Quản lý · ${managersText}`);
-		managerTag.style.setProperty("--club-color", club.tagColor);
-		card.append(managerTag);
+		managerTag.style.marginTop = "0";
+		managerTag.style.setProperty("--club-color", club.tagColor || "#1769aa");
+
+		const joinBtn = element(
+			"button",
+			club.isMember ? "club-join-btn joined" : "club-join-btn",
+			club.isMember
+				? `✓ Đã tham gia${club.membersCount ? ` (${club.membersCount})` : ""}`
+				: `+ Tham gia CLB${club.membersCount ? ` (${club.membersCount})` : ""}`
+		);
+		joinBtn.type = "button";
+		joinBtn.addEventListener("click", event => {
+			event.stopPropagation();
+			toggleJoinClub(club, joinBtn);
+		});
+
+		footer.append(managerTag, joinBtn);
+		card.append(footer);
 		return card;
 	}
 
 	function renderReview(club) {
 		const item = element("article", "club-review-item");
 		const details = element("div", "club-review-details");
-		const managersText = Array.isArray(club.managerEmails)
+		const managersText = Array.isArray(club.managerEmails) && club.managerEmails.length
 			? club.managerEmails.join(", ")
-			: (club.manager?.name || club.managerEmail);
+			: (club.manager?.name || club.managerEmail || "");
 
 		details.append(element("h3", "", club.name), element("p", "", `Quản lý: ${managersText}`));
 		if (club.logo) {
@@ -216,12 +268,14 @@ document.addEventListener("DOMContentLoaded", () => {
 		try {
 			let logo = "";
 			const file = logoInput.files?.[0];
-			if (file) logo = await new Promise((resolve, reject) => {
-				const reader = new FileReader();
-				reader.onload = () => resolve(reader.result);
-				reader.onerror = () => reject(new Error("Không đọc được ảnh logo."));
-				reader.readAsDataURL(file);
-			});
+			if (file) {
+				logo = await new Promise((resolve, reject) => {
+					const reader = new FileReader();
+					reader.onload = () => resolve(reader.result);
+					reader.onerror = () => reject(new Error("Không đọc được ảnh logo."));
+					reader.readAsDataURL(file);
+				});
+			}
 			const data = await api("/api/clubs", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -247,9 +301,10 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 	});
 
-	Promise.all([api("/api/auth/me"), api("/api/clubs")])
+	clubsList.innerHTML = buildSkeletonMarkup(3);
+	Promise.all([api("/api/auth/me").catch(() => ({ user: null })), api("/api/clubs")])
 		.then(([auth]) => {
-			currentUser = auth.user;
+			currentUser = auth?.user || null;
 			if (currentUser) {
 				requestForm.hidden = false;
 				if (!managerEmails.includes(currentUser.email)) {
@@ -262,6 +317,7 @@ document.addEventListener("DOMContentLoaded", () => {
 			return loadClubs();
 		})
 		.catch(error => {
+			clubsList.replaceChildren();
 			document.getElementById("clubs-status").textContent = error.message;
 		});
 });

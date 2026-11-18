@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+	const API_BASE = "https://dieunw.onrender.com";
 	const loadingState = document.getElementById("messages-loading");
 	const authGate = document.getElementById("messages-auth-gate");
 	const app = document.getElementById("messages-app");
@@ -9,8 +10,10 @@ document.addEventListener("DOMContentLoaded", () => {
 	const activeChat = document.getElementById("messages-active-chat");
 	const messageStatus = document.getElementById("messages-status");
 	const messageLog = document.getElementById("messages-log");
+	const typingIndicator = document.getElementById("messages-typing-indicator");
 	const composer = document.getElementById("messages-composer");
 	const messageInput = document.getElementById("messages-input");
+	const stickerBtn = document.getElementById("messages-sticker-btn");
 	const groupModal = document.getElementById("messages-group-modal");
 	const groupFriendList = document.getElementById("messages-group-friend-list");
 	const groupForm = document.getElementById("messages-group-form");
@@ -18,13 +21,47 @@ document.addEventListener("DOMContentLoaded", () => {
 	const groupError = document.getElementById("messages-group-error");
 	const meeting = document.getElementById("messages-meeting");
 	const meetingFrame = document.getElementById("messages-meeting-frame");
-	const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 	let users = [];
 	let friends = [];
 	let currentUser = null;
 	let conversations = [];
 	let activeConversationId = "";
 	let lastGroupTrigger = null;
+	let pollTimer = null;
+	let lastTypingPing = 0;
+	let lastMessageSignature = "";
+
+	function getAuthHeaders(extra = {}) {
+		const token = localStorage.getItem("session_token") || localStorage.getItem("dieuNwToken") || "";
+		return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra };
+	}
+
+	function buildSkeletonMarkup(count = 4) {
+		if (window.DIEUNW && typeof window.DIEUNW.createSkeletonCardsHtml === "function") {
+			return window.DIEUNW.createSkeletonCardsHtml(count);
+		}
+		return Array.from({ length: count }, () => `
+			<div class="skeleton-card" aria-hidden="true">
+				<div class="skeleton-line short"></div>
+				<div class="skeleton-line"></div>
+			</div>
+		`).join("");
+	}
+
+	function resolveStatusDotClass(obj) {
+		if (window.DIEUNW && typeof window.DIEUNW.getStatusDotClass === "function") {
+			return window.DIEUNW.getStatusDotClass(obj);
+		}
+		const st = String(obj?.presenceStatus || obj?.status || "").toLowerCase();
+		if (st === "studying") return "studying";
+		if (st === "online" || obj?.isOnline) return "online";
+		return "offline";
+	}
+
+	function getUser(userId) {
+		return users.find(u => String(u.id) === String(userId)) || null;
+	}
 
 	function formatTime(value) {
 		const date = new Date(value);
@@ -48,6 +85,10 @@ document.addEventListener("DOMContentLoaded", () => {
 		return String(name || "B").trim().split(/[\s@._-]+/).filter(Boolean).slice(0, 2).map(part => part[0]).join("").toUpperCase();
 	}
 
+	function isGhostModeEnabled() {
+		return Boolean(currentUser?.privacyGhostMode || currentUser?.ghostMode);
+	}
+
 	function makeConversationButton(conversation) {
 		const button = document.createElement("button");
 		button.type = "button";
@@ -57,13 +98,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
 		const avatar = document.createElement("span");
 		avatar.className = "messages-list-avatar";
+		avatar.style.position = "relative";
+		avatar.style.overflow = "visible";
+
 		if (conversation.type === "direct" && conversation.avatar) {
 			const image = document.createElement("img");
 			image.src = conversation.avatar;
 			image.alt = "";
+			image.style.borderRadius = "50%";
 			avatar.append(image);
 		} else {
 			avatar.textContent = initials(conversation.title);
+		}
+
+		if (conversation.type === "direct") {
+			const otherId = (conversation.memberIds || []).find(id => String(id) !== String(currentUser?.id || ""));
+			const otherUser = otherId ? getUser(otherId) : null;
+			const dot = document.createElement("span");
+			dot.className = `nav-status-dot ${resolveStatusDotClass(otherUser || conversation)}`;
+			dot.setAttribute("aria-hidden", "true");
+			avatar.append(dot);
 		}
 
 		const detail = document.createElement("span");
@@ -71,12 +125,17 @@ document.addEventListener("DOMContentLoaded", () => {
 		const title = document.createElement("strong");
 		title.textContent = conversation.title;
 		const preview = document.createElement("span");
-		preview.textContent = conversation.lastMessage?.text || conversation.subtitle;
+		if (conversation.lastMessage?.stickerUrl && !conversation.lastMessage?.text) {
+			preview.textContent = "[Nhãn dán]";
+		} else {
+			preview.textContent = conversation.lastMessage?.text || conversation.subtitle;
+		}
 		detail.append(title, preview);
 
 		const time = document.createElement("time");
 		time.textContent = conversation.lastMessage ? formatTime(conversation.lastMessage.createdAt) : "";
 		button.append(avatar, detail, time);
+
 		if (conversation.type !== "group" || String(conversation.createdBy) !== String(currentUser.id)) return button;
 
 		const row = document.createElement("div");
@@ -90,9 +149,10 @@ document.addEventListener("DOMContentLoaded", () => {
 			if (!window.confirm(`Xóa nhóm “${conversation.title}” và toàn bộ tin nhắn trong nhóm này?`)) return;
 			deleteButton.disabled = true;
 			try {
-				const response = await fetch(`https://dieunw.onrender.com/api/conversations/${encodeURIComponent(conversation.id)}`, {
+				const response = await fetch(`${API_BASE}/api/conversations/${encodeURIComponent(conversation.id)}`, {
 					method: "DELETE",
-					credentials: "include"
+					credentials: "include",
+					headers: getAuthHeaders()
 				});
 				const data = await response.json();
 				if (!response.ok) throw new Error(data.error || "Không thể xóa nhóm.");
@@ -129,7 +189,14 @@ document.addEventListener("DOMContentLoaded", () => {
 		visible.forEach(conversation => conversationList.append(makeConversationButton(conversation)));
 	}
 
-	function renderMessages(conversation) {
+	function renderMessages(conversation, forceScroll = false) {
+		const prevBottomGap = messageLog.scrollHeight - messageLog.scrollTop - messageLog.clientHeight;
+		const signature = (conversation.messages || []).map(m => `${m.id}:${m.readBy?.length || m.seenBy?.length || 0}`).join("|");
+		if (!forceScroll && signature === lastMessageSignature && conversation.messages.length > 0) {
+			return;
+		}
+		lastMessageSignature = signature;
+
 		messageLog.replaceChildren();
 		if (!conversation.messages.length) {
 			const message = document.createElement("p");
@@ -139,52 +206,170 @@ document.addEventListener("DOMContentLoaded", () => {
 			return;
 		}
 
-		conversation.messages.forEach(message => {
+		const msgs = conversation.messages;
+		msgs.forEach((message, idx) => {
+			const isOwn = String(message.fromId) === String(currentUser.id);
 			const bubble = document.createElement("article");
-			bubble.className = `messages-bubble${String(message.fromId) === String(currentUser.id) ? " own" : ""}`;
-			if (conversation.type === "group" && String(message.fromId) !== String(currentUser.id)) {
+			bubble.className = `messages-bubble${isOwn ? " own" : ""}`;
+
+			if (conversation.type === "group" && !isOwn) {
 				const sender = document.createElement("strong");
 				sender.className = "messages-sender-name";
 				sender.textContent = message.name || getUser(message.fromId)?.name || "Thành viên";
 				bubble.append(sender);
 			}
-			const text = document.createElement("p");
-			text.textContent = message.text;
+
+			if (message.stickerUrl) {
+				const stickerImg = document.createElement("img");
+				stickerImg.src = message.stickerUrl;
+				stickerImg.alt = "Nhãn dán";
+				stickerImg.className = "chat-sticker-img";
+				bubble.append(stickerImg);
+			}
+
+			if (message.text) {
+				const text = document.createElement("p");
+				text.textContent = message.text;
+				bubble.append(text);
+			}
+
+			const metaRow = document.createElement("div");
+			metaRow.className = "messages-meta-row";
 			const time = document.createElement("time");
 			time.textContent = formatTime(message.createdAt);
-			bubble.append(text, time);
+			metaRow.append(time);
+
+			const isLastMsg = idx === msgs.length - 1;
+			if (isOwn && isLastMsg && !isGhostModeEnabled()) {
+				const readers = Array.isArray(message.readBy)
+					? message.readBy.filter(id => String(id) !== String(currentUser.id))
+					: Array.isArray(message.seenBy)
+						? message.seenBy.filter(id => String(id) !== String(currentUser.id))
+						: (message.isRead ? ["reader"] : []);
+				if (readers.length > 0) {
+					const seen = document.createElement("span");
+					seen.className = "messages-seen-tag";
+					seen.textContent = " · Đã xem";
+					metaRow.append(seen);
+				}
+			}
+
+			bubble.append(metaRow);
 			messageLog.append(bubble);
 		});
-		messageLog.scrollTop = messageLog.scrollHeight;
+
+		if (forceScroll || prevBottomGap < 90) {
+			messageLog.scrollTop = messageLog.scrollHeight;
+		}
+	}
+
+	function renderTyping(typingUsers) {
+		if (!typingIndicator) return;
+		const others = Array.isArray(typingUsers)
+			? typingUsers.filter(u => String(u.id || u.userId || u) !== String(currentUser?.id || ""))
+			: [];
+		if (!others.length) {
+			typingIndicator.hidden = true;
+			typingIndicator.textContent = "";
+			return;
+		}
+		const names = others.map(u => u.name || getUser(u.id || u.userId || u)?.name || "Bạn ấy").slice(0, 2);
+		typingIndicator.textContent = `${names.join(", ")} đang nhập...`;
+		typingIndicator.hidden = false;
+	}
+
+	async function markConversationRead(conversationId) {
+		if (!conversationId || isGhostModeEnabled()) return;
+		try {
+			await fetch(`${API_BASE}/api/conversations/${encodeURIComponent(conversationId)}/read`, {
+				method: "POST",
+				credentials: "include",
+				headers: getAuthHeaders({ "Content-Type": "application/json" }),
+				body: "{}"
+			});
+		} catch {
+			// Bỏ qua lỗi mạng nhẹ khi đánh dấu đã xem
+		}
+	}
+
+	async function pingTyping(conversationId) {
+		if (!conversationId) return;
+		const now = Date.now();
+		if (now - lastTypingPing < 2200) return;
+		lastTypingPing = now;
+		try {
+			await fetch(`${API_BASE}/api/conversations/${encodeURIComponent(conversationId)}/typing`, {
+				method: "POST",
+				credentials: "include",
+				headers: getAuthHeaders({ "Content-Type": "application/json" }),
+				body: JSON.stringify({ isTyping: true })
+			});
+		} catch {
+			// Bỏ qua lỗi ping typing
+		}
+	}
+
+	async function refreshActiveConversation(forceScroll = false) {
+		const conversation = conversations.find(item => item.id === activeConversationId);
+		if (!conversation) return;
+		try {
+			const response = await fetch(`${API_BASE}/api/conversations/${encodeURIComponent(conversation.id)}/messages`, {
+				credentials: "include",
+				headers: getAuthHeaders()
+			});
+			const data = await response.json();
+			if (!response.ok) throw new Error(data.error || "Không thể tải cuộc trò chuyện.");
+			conversation.messages = Array.isArray(data.messages) ? data.messages : [];
+			renderMessages(conversation, forceScroll);
+			renderTyping(data.typingUsers || []);
+			markConversationRead(conversation.id);
+		} catch (error) {
+			if (forceScroll) setMessageStatus(error.message || "Không thể tải tin nhắn.", true);
+		}
 	}
 
 	async function selectConversation(conversationId) {
 		const conversation = conversations.find(item => item.id === conversationId);
 		if (!conversation) return;
 		activeConversationId = conversationId;
+		lastMessageSignature = "";
 		emptyState.hidden = true;
 		activeChat.hidden = false;
 		meeting.hidden = true;
 		meetingFrame.hidden = true;
-		document.getElementById("messages-chat-avatar").textContent = initials(conversation.title);
+
+		const chatAvatar = document.getElementById("messages-chat-avatar");
+		chatAvatar.replaceChildren();
+		chatAvatar.style.position = "relative";
+		if (conversation.type === "direct" && conversation.avatar) {
+			const img = document.createElement("img");
+			img.src = conversation.avatar;
+			img.alt = "";
+			img.style.width = "100%";
+			img.style.height = "100%";
+			img.style.borderRadius = "50%";
+			img.style.objectFit = "cover";
+			chatAvatar.append(img);
+		} else {
+			chatAvatar.textContent = initials(conversation.title);
+		}
+		if (conversation.type === "direct") {
+			const otherId = (conversation.memberIds || []).find(id => String(id) !== String(currentUser?.id || ""));
+			const otherUser = otherId ? getUser(otherId) : null;
+			const dot = document.createElement("span");
+			dot.className = `nav-status-dot ${resolveStatusDotClass(otherUser || conversation)}`;
+			dot.setAttribute("aria-hidden", "true");
+			chatAvatar.append(dot);
+		}
+
 		document.getElementById("messages-chat-name").textContent = conversation.title;
 		document.getElementById("messages-chat-subtitle").textContent = conversation.subtitle;
 		renderConversationList();
-		messageLog.replaceChildren();
-		const loading = document.createElement("p");
-		loading.className = "messages-list-state";
-		loading.textContent = "Đang tải tin nhắn...";
-		messageLog.append(loading);
-		try {
-			const response = await fetch(`https://dieunw.onrender.com/api/conversations/${encodeURIComponent(conversation.id)}/messages`, { credentials: "include" });
-			const data = await response.json();
-			if (!response.ok) throw new Error(data.error || "Không thể tải cuộc trò chuyện.");
-			conversation.messages = data.messages;
-			renderMessages(conversation);
-			messageInput.focus();
-		} catch (error) {
-			setMessageStatus(error.message || "Không thể tải tin nhắn.", true);
-		}
+		renderTyping([]);
+		messageLog.innerHTML = buildSkeletonMarkup(3);
+
+		await refreshActiveConversation(true);
+		messageInput.focus();
 	}
 
 	function renderGroupFriends() {
@@ -224,11 +409,59 @@ document.addEventListener("DOMContentLoaded", () => {
 		lastGroupTrigger = null;
 	}
 
+	async function sendMessagePayload({ content = "", stickerUrl = "" }) {
+		const conversation = conversations.find(item => item.id === activeConversationId);
+		if (!conversation || (!content && !stickerUrl)) return;
+		const submit = composer.querySelector("button[type='submit']");
+		submit.disabled = true;
+		try {
+			const response = await fetch(`${API_BASE}/api/conversations/${encodeURIComponent(conversation.id)}/messages`, {
+				method: "POST",
+				credentials: "include",
+				headers: getAuthHeaders({ "Content-Type": "application/json" }),
+				body: JSON.stringify({ content, stickerUrl })
+			});
+			const data = await response.json();
+			if (!response.ok) throw new Error(data.error || "Không thể gửi tin nhắn.");
+			if (content) messageInput.value = "";
+			setMessageStatus("");
+			await refreshActiveConversation(true);
+			await loadConversationsOnly();
+		} catch (error) {
+			setMessageStatus(error.message || "Không thể gửi tin nhắn.", true);
+		} finally {
+			submit.disabled = false;
+			messageInput.focus();
+		}
+	}
+
+	async function loadConversationsOnly() {
+		try {
+			const res = await fetch(`${API_BASE}/api/conversations`, {
+				credentials: "include",
+				headers: getAuthHeaders()
+			});
+			if (!res.ok) return;
+			const data = await res.json();
+			conversations = (data.conversations || []).map(conversation => {
+				const existing = conversations.find(c => c.id === conversation.id);
+				return { ...conversation, title: conversation.name, messages: existing?.messages || [] };
+			});
+			renderConversationList();
+		} catch {
+			// Bỏ qua nếu polling nền lỗi tạm thời
+		}
+	}
+
 	async function loadUsers() {
 		loadingState.hidden = false;
 		authGate.hidden = true;
 		app.hidden = true;
-		const sessionResponse = await fetch("https://dieunw.onrender.com/api/auth/me", { credentials: "include" });
+
+		const sessionResponse = await fetch(`${API_BASE}/api/auth/me`, {
+			credentials: "include",
+			headers: getAuthHeaders()
+		});
 		const sessionData = await sessionResponse.json();
 		currentUser = sessionData.user || null;
 
@@ -240,37 +473,74 @@ document.addEventListener("DOMContentLoaded", () => {
 			app.hidden = true;
 			if (hadCachedUser) {
 				authGate.querySelector("h2").textContent = "Phiên đăng nhập cần được xác nhận lại";
-				authGate.querySelector("p").textContent = "Tài khoản đang lưu trên trình duyệt chưa có session ở máy chủ. Hãy đăng nhập lại; tài khoản tạo trước khi có backend cần đăng ký lại.";
+				authGate.querySelector("p").textContent = "Tài khoản đang lưu trên trình duyệt chưa có session ở máy chủ. Hãy đăng nhập lại.";
 			}
 			return;
 		}
 
 		localStorage.setItem("dieuNwUser", JSON.stringify(currentUser));
+		conversationList.innerHTML = buildSkeletonMarkup(4);
+
 		const [conversationResponse, friendsResponse] = await Promise.all([
-			fetch("https://dieunw.onrender.com/api/conversations", { credentials: "include" }),
-			fetch("https://dieunw.onrender.com/api/friends", { credentials: "include" })
+			fetch(`${API_BASE}/api/conversations`, { credentials: "include", headers: getAuthHeaders() }),
+			fetch(`${API_BASE}/api/friends`, { credentials: "include", headers: getAuthHeaders() })
 		]);
 		const [conversationData, friendsData] = await Promise.all([conversationResponse.json(), friendsResponse.json()]);
 		if (!conversationResponse.ok || !friendsResponse.ok) throw new Error("Không thể tải danh sách tin nhắn.");
-		users = [...friendsData.friends, ...friendsData.incoming];
-		friends = friendsData.friends;
-		conversations = conversationData.conversations.map(conversation => ({ ...conversation, title: conversation.name, messages: [] }));
+
+		users = [...(friendsData.friends || []), ...(friendsData.incoming || [])];
+		friends = friendsData.friends || [];
+		conversations = (conversationData.conversations || []).map(conversation => ({ ...conversation, title: conversation.name, messages: [] }));
 		loadingState.hidden = true;
 		authGate.hidden = true;
 		app.hidden = false;
 		renderConversationList();
 
-		const requestedFriend = new URLSearchParams(location.search).get("with");
-		const requestedConversation = requestedFriend && conversations.find(item => item.type === "direct" && item.memberIds.includes(requestedFriend));
-		if (requestedConversation) selectConversation(requestedConversation.id);
-		else if (activeConversationId && conversations.some(item => item.id === activeConversationId)) selectConversation(activeConversationId);
-		else {
+		const params = new URLSearchParams(location.search);
+		const requestedFriend = params.get("with") || params.get("userId");
+		const requestedConversation = requestedFriend && conversations.find(item => item.type === "direct" && item.memberIds.map(String).includes(String(requestedFriend)));
+
+		if (requestedConversation) {
+			await selectConversation(requestedConversation.id);
+		} else if (activeConversationId && conversations.some(item => item.id === activeConversationId)) {
+			await selectConversation(activeConversationId);
+		} else {
 			activeChat.hidden = true;
 			emptyState.hidden = false;
+		}
+
+		if (!pollTimer) {
+			pollTimer = setInterval(() => {
+				if (document.hidden) return;
+				if (activeConversationId) refreshActiveConversation(false);
+				loadConversationsOnly();
+			}, 4000);
+		}
+	}
+
+	if (stickerBtn) {
+		if (window.DIEUNW && typeof window.DIEUNW.attachStickerPicker === "function") {
+			window.DIEUNW.attachStickerPicker(stickerBtn, stickerUrl => {
+				sendMessagePayload({ stickerUrl });
+			});
+		} else {
+			stickerBtn.addEventListener("click", () => {
+				sendMessagePayload({ content: "👋✨" });
+			});
 		}
 	}
 
 	searchInput.addEventListener("input", renderConversationList);
+	messageInput.addEventListener("input", () => {
+		if (activeConversationId && messageInput.value.trim()) pingTyping(activeConversationId);
+	});
+	messageInput.addEventListener("keydown", event => {
+		if (event.key === "Enter" && !event.shiftKey) {
+			event.preventDefault();
+			composer.requestSubmit();
+		}
+	});
+
 	document.getElementById("create-private-group").addEventListener("click", event => openGroupDialog(event.currentTarget));
 	document.getElementById("messages-group-close").addEventListener("click", closeGroupDialog);
 	groupModal.addEventListener("click", event => {
@@ -297,10 +567,10 @@ document.addEventListener("DOMContentLoaded", () => {
 		submit.disabled = true;
 		groupError.textContent = "Đang tạo nhóm...";
 		try {
-			const response = await fetch("https://dieunw.onrender.com/api/conversations", {
+			const response = await fetch(`${API_BASE}/api/conversations`, {
 				method: "POST",
 				credentials: "include",
-				headers: { "Content-Type": "application/json" },
+				headers: getAuthHeaders({ "Content-Type": "application/json" }),
 				body: JSON.stringify({ name, memberIds })
 			});
 			const data = await response.json();
@@ -309,7 +579,7 @@ document.addEventListener("DOMContentLoaded", () => {
 			activeConversationId = data.conversation.id;
 			groupNameInput.value = "";
 			closeGroupDialog();
-			selectConversation(activeConversationId);
+			await selectConversation(activeConversationId);
 		} catch (error) {
 			groupError.textContent = error.message || "Không thể tạo nhóm.";
 		} finally {
@@ -320,29 +590,8 @@ document.addEventListener("DOMContentLoaded", () => {
 	composer.addEventListener("submit", async event => {
 		event.preventDefault();
 		const text = messageInput.value.trim();
-		const conversation = conversations.find(item => item.id === activeConversationId);
-		if (!text || !conversation) return;
-
-		const submit = composer.querySelector("button[type='submit']");
-		submit.disabled = true;
-		try {
-			const response = await fetch(`https://dieunw.onrender.com/api/conversations/${encodeURIComponent(conversation.id)}/messages`, {
-				method: "POST",
-				credentials: "include",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ content: text })
-			});
-			const data = await response.json();
-			if (!response.ok) throw new Error(data.error || "Không thể gửi tin nhắn.");
-			messageInput.value = "";
-			setMessageStatus("");
-			await loadUsers();
-			await selectConversation(conversation.id);
-		} catch (error) {
-			setMessageStatus(error.message || "Không thể gửi tin nhắn.", true);
-		} finally {
-			submit.disabled = false;
-		}
+		if (!text || !activeConversationId) return;
+		await sendMessagePayload({ content: text });
 	});
 
 	document.getElementById("messages-call-button").addEventListener("click", () => {
@@ -360,7 +609,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		meeting.hidden = true;
 	});
 	window.addEventListener("storage", event => {
-		if (event.key === "dieuNwUser") loadUsers().catch(() => {});
+		if (event.key === "dieuNwUser" || event.key === "session_token") loadUsers().catch(() => {});
 	});
 	window.addEventListener("focus", () => loadUsers().catch(() => {}));
 

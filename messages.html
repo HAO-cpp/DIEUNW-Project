@@ -4,18 +4,27 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta name="theme-color" content="#1769aa">
-	<link rel="stylesheet" href="./style.css?v=99">
+	<link rel="stylesheet" href="./style.css?v=11">
 	<link rel="icon" type="image/png" href="./DIEU.png?v=1">
 	<title>Tin nhắn - DIEUNW</title>
 </head>
 <body class="chat-page messages-page">
-	<header class="navbar">
-		<div class="nav-left">
-			<a href="./index.html" class="brand-logo-link">
-				<img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo">
+	<header class="navbar nav-scroll">
+		<div class="nav-corner-dock">
+			<button class="nav-brand-toggle" type="button" aria-expanded="false" aria-controls="main-nav-menu" aria-label="Mở menu điều hướng">
+				<picture>
+					<source srcset="./DIEU.avif" type="image/avif">
+					<source srcset="./DIEU.webp" type="image/webp">
+					<img src="./DIEU.png" alt="DIEUNW" class="nav-brand-badge">
+				</picture>
+			</button>
+			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
+				<img class="nav-user-avatar" src="./DIEU.png" alt="">
+				<span class="nav-status-dot" aria-hidden="true"></span>
 			</a>
+			<button id="nav-theme-toggle" class="nav-theme-toggle" type="button" aria-label="Chuyển chế độ sáng tối" title="Chuyển chế độ sáng / tối">🌙</button>
 		</div>
-		<nav class="nav-menu" aria-label="Điều hướng chính">
+		<nav id="main-nav-menu" class="nav-menu nav-dropdown-panel" aria-label="Điều hướng chính" hidden>
 			<a href="./index.html" class="nav-item">Trang chủ</a>
 			<a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
 			<a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
@@ -25,17 +34,18 @@
 			<a href="./clubs.html" class="nav-item">CLB</a>
 			<a href="./announcements.html" class="nav-item">Thông báo</a>
 		</nav>
-		<div class="nav-right">
-			<a href="./profile.html" class="nav-avatar-link" aria-label="Trang cá nhân" title="Trang cá nhân">
-				<img class="nav-user-avatar" src="./DIEU.png" alt="">
-			</a>
-		</div>
 	</header>
-	<div id="hero-banner" aria-hidden="true">
-		<img src="./DIEUNW.png" alt="">
-	</div>
 
-	<main class="messages-main">
+	<section id="hero-banner" class="hero-banner" aria-label="DIEUNW Banner">
+		<picture>
+			<source srcset="./DIEUNW.avif" type="image/avif">
+			<source srcset="./DIEUNW.webp" type="image/webp">
+			<img src="./DIEUNW.png" alt="DIEUNW" class="hero-banner-img" loading="eager">
+		</picture>
+		<div class="hero-banner-fade" aria-hidden="true"></div>
+	</section>
+
+	<main class="messages-main page-enter">
 		<header class="messages-heading">
 			<div>
 				<p class="chat-eyebrow"><span class="live-indicator"></span> KHÔNG GIAN RIÊNG</p>
@@ -89,7 +99,12 @@
 								<h2 id="messages-chat-name">Tên bạn</h2>
 								<p id="messages-chat-subtitle"></p>
 							</div>
-							<button class="messages-call-button" id="messages-call-button" type="button"><img src="./call-button.png" alt=""></button>
+							<button class="messages-call-button" id="messages-call-button" type="button" aria-label="Gọi video" title="Gọi video Jitsi">
+								<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+									<polygon points="23 7 16 12 23 17 23 7"></polygon>
+									<rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+								</svg>
+							</button>
 						</header>
 						<p class="messages-status" id="messages-status" role="status" aria-live="polite"></p>
 						<div class="messages-meeting" id="messages-meeting" hidden>
@@ -102,9 +117,11 @@
 						<div class="messages-log" id="messages-log" aria-live="polite" aria-relevant="additions">
 							<p class="messages-list-state">Chưa có tin nhắn. Hãy bắt đầu cuộc trò chuyện.</p>
 						</div>
+						<p id="messages-typing-indicator" class="messages-typing-indicator" hidden></p>
 						<form class="messages-composer" id="messages-composer">
+							<button type="button" id="messages-sticker-btn" class="sticker-trigger-btn" title="Chọn nhãn dán" aria-label="Chọn nhãn dán">😊</button>
 							<label class="sr-only" for="messages-input">Tin nhắn</label>
-							<textarea id="messages-input" maxlength="1000" rows="1" placeholder="Viết tin nhắn..." required></textarea>
+							<textarea id="messages-input" maxlength="1000" rows="1" placeholder="Viết tin nhắn..."></textarea>
 							<button type="submit" aria-label="Gửi tin nhắn" title="Gửi tin nhắn"><span aria-hidden="true">➤</span></button>
 						</form>
 					</section>
@@ -120,7 +137,7 @@
 					<p class="chat-eyebrow">NHÓM RIÊNG TƯ</p>
 					<h2 id="messages-group-title">Tạo nhóm mới</h2>
 				</div>
-			<button class="messages-group-close" id="messages-group-close" type="button" aria-label="Đóng">×</button>
+				<button class="messages-group-close" id="messages-group-close" type="button" aria-label="Đóng">×</button>
 			</header>
 			<label for="messages-group-name">Tên nhóm</label>
 			<input id="messages-group-name" maxlength="60" placeholder="Ví dụ: Ôn thi cuối kỳ" required>
@@ -133,7 +150,7 @@
 		</form>
 	</div>
 
-	<script src="./messages.js" defer></script>
-	<script src="./nav-profile.js" defer></script>
+	<script src="./nav-profile.js?v=3" defer></script>
+	<script src="./messages.js?v=3" defer></script>
 </body>
 </html>

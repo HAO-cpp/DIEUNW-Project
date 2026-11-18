@@ -1,710 +1,861 @@
-document.addEventListener("DOMContentLoaded", () => {
-	const API_BASE = "https://dieunw.onrender.com";
-	const POSTS_API = `${API_BASE}/api/posts`;
+const HOME_API_BASE = "https://dieunw.onrender.com";
+const POSTS_API = `${HOME_API_BASE}/api/posts`;
 
-	const modalOverlay = document.getElementById("post-modal-overlay");
-	const triggerInput = document.getElementById("trigger-modal-input");
-	const btnTriggerOpen = document.getElementById("btn-trigger-open");
-	const btnModalClose = document.getElementById("btn-modal-close");
-	const btnSubmit = document.getElementById("btn-submit-post");
-	const richEditor = document.getElementById("post-rich-editor");
-	const headingSelect = document.getElementById("post-heading-select");
-	const colorPicker = document.getElementById("post-color-picker");
-	const mentionTrigger = document.getElementById("post-mention-trigger");
-	const mentionDropdown = document.getElementById("post-mention-dropdown");
-	const postImageFile = document.getElementById("post-image-file");
-	const postImageFilename = document.getElementById("post-image-filename");
-	const postImageClear = document.getElementById("post-image-clear");
-	const postImagePreviewWrap = document.getElementById("post-image-preview-wrap");
-	const postImagePreview = document.getElementById("post-image-preview");
-	const newsfeedContainer = document.getElementById("newsfeed-container");
-	const feedAuthGate = document.getElementById("feed-auth-gate");
-	const feedTriggerBox = document.getElementById("feed-trigger-box");
+const modalOverlay = document.getElementById("post-modal-overlay");
+const triggerInput = document.getElementById("trigger-modal-input");
+const btnTriggerOpen = document.getElementById("btn-trigger-open");
+const btnModalClose = document.getElementById("btn-modal-close");
+const btnSubmit = document.getElementById("btn-submit-post");
+const postRichEditor = document.getElementById("post-rich-editor");
+const newsfeedContainer = document.getElementById("newsfeed-container");
+const feedAuthGate = document.getElementById("feed-auth-gate");
+const feedTriggerBox = document.getElementById("feed-trigger-box");
+const storyBarEl = document.getElementById("story-bar");
 
-	// Report Modal elements
-	const reportOverlay = document.getElementById("report-modal-overlay");
-	const reportTargetLabel = document.getElementById("report-target-label");
-	const reportReasonInput = document.getElementById("report-reason-input");
-	const reportStatus = document.getElementById("report-modal-status");
-	const reportSubmitBtn = document.getElementById("report-modal-submit");
-	const reportCloseBtn = document.getElementById("report-modal-close");
-	const reportCancelBtn = document.getElementById("report-modal-cancel");
+let homeAccessEnabled = false;
+let currentHomeUser = null;
+let pendingPostImageData = "";
+let activeHomeReportTarget = null;
+let homeStoriesQueue = [];
+let homeStoryIdx = 0;
 
-	let homeAccessEnabled = false;
-	let currentHomeUser = null;
-	let selectedPostImageDataUrl = "";
-	let cachedUsers = [];
-	let savedRange = null;
-	let activeReportTarget = null;
+function getHomeHeaders(extra = {}) {
+    const token = localStorage.getItem("session_token");
+    return {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...extra
+    };
+}
 
-	function getToken() {
-		try {
-			return localStorage.getItem("session_token")
-				|| localStorage.getItem("dieuNwToken")
-				|| JSON.parse(localStorage.getItem("dieuNwUser") || "{}").token
-				|| "";
-		} catch {
-			return localStorage.getItem("session_token") || localStorage.getItem("dieuNwToken") || "";
-		}
-	}
+function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, ch => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+    })[ch]);
+}
 
-	function getAuthHeaders(extra = {}) {
-		const token = getToken();
-		return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra };
-	}
+function sanitizeRichHtml(rawHtml) {
+    const tpl = document.createElement("template");
+    tpl.innerHTML = String(rawHtml || "");
+    const allowedTags = new Set(["B", "STRONG", "I", "EM", "U", "BR", "P", "DIV", "H1", "H2", "H3", "H4", "H5", "SPAN", "FONT", "A"]);
 
-	function escapeHtml(value) {
-		return String(value ?? "").replace(/[&<>"']/g, ch => ({
-			"&": "&amp;",
-			"<": "&lt;",
-			">": "&gt;",
-			'"': "&quot;",
-			"'": "&#39;"
-		})[ch]);
-	}
+    function clean(node) {
+        if (node.nodeType === Node.TEXT_NODE) return;
+        if (node.nodeType !== Node.ELEMENT_NODE) {
+            node.remove();
+            return;
+        }
+        if (!allowedTags.has(node.tagName)) {
+            node.replaceWith(document.createTextNode(node.textContent || ""));
+            return;
+        }
+        Array.from(node.attributes).forEach(attr => {
+            const name = attr.name.toLowerCase();
+            if (name === "class" && attr.value.includes("mention-tag")) return;
+            if (name === "href" && node.tagName === "A" && /^(https?:\/\/|\.\/profile\.html\?userId=)/i.test(attr.value)) return;
+            if (name === "color" && node.tagName === "FONT") return;
+            if (name === "style") {
+                const m = attr.value.match(/color\s*:\s*([^;]+)/i);
+                if (m) {
+                    node.setAttribute("style", `color: ${m[1]}`);
+                    return;
+                }
+            }
+            node.removeAttribute(attr.name);
+        });
+        Array.from(node.childNodes).forEach(clean);
+    }
+    Array.from(tpl.content.childNodes).forEach(clean);
+    return tpl.innerHTML;
+}
 
-	function sanitizeRichHtml(rawHtml) {
-		if (!rawHtml) return "";
-		const doc = new DOMParser().parseFromString(`<div>${rawHtml}</div>`, "text/html");
-		const allowedTags = new Set(["P", "DIV", "BR", "B", "STRONG", "I", "EM", "U", "H1", "H2", "H3", "H4", "H5", "SPAN", "A", "FONT"]);
-		function cleanNode(node) {
-			if (node.nodeType === Node.TEXT_NODE) return document.createTextNode(node.textContent || "");
-			if (node.nodeType !== Node.ELEMENT_NODE) return document.createTextNode("");
-			const tag = node.tagName.toUpperCase();
-			if (tag === "SCRIPT" || tag === "STYLE") return document.createTextNode("");
-			if (!allowedTags.has(tag)) {
-				const frag = document.createDocumentFragment();
-				[...node.childNodes].forEach(c => frag.appendChild(cleanNode(c)));
-				return frag;
-			}
-			const outTag = tag === "FONT" ? "SPAN" : tag;
-			const el = document.createElement(outTag.toLowerCase());
-			if (outTag === "SPAN") {
-				const color = node.style?.color || node.getAttribute("color") || "";
-				if (/^(#[0-9a-f]{3,8}|rgb\([0-9,\s]+\))$/i.test(color.trim())) {
-					el.style.color = color.trim();
-				}
-			} else if (outTag === "A") {
-				const href = node.getAttribute("href") || "";
-				if (/^(\.\/profile\.html\?userId=|https?:\/\/)/i.test(href)) {
-					el.setAttribute("href", href);
-				} else {
-					el.setAttribute("href", "#");
-				}
-				if (node.classList.contains("mention-tag")) {
-					el.className = "mention-tag";
-				}
-			}
-			[...node.childNodes].forEach(c => el.appendChild(cleanNode(c)));
-			return el;
-		}
-		const wrapper = document.createElement("div");
-		[...doc.body.firstChild.childNodes].forEach(c => wrapper.appendChild(cleanNode(c)));
-		return wrapper.innerHTML;
-	}
+function updateHomeAccess(user = null) {
+    const isAuth = Boolean(user?.id);
+    currentHomeUser = isAuth ? user : null;
+    if (feedAuthGate) feedAuthGate.hidden = isAuth;
+    if (feedTriggerBox) feedTriggerBox.hidden = !isAuth;
+    if (storyBarEl) storyBarEl.hidden = !isAuth;
+    if (newsfeedContainer) newsfeedContainer.hidden = !isAuth;
 
-	async function compressImageFile(file, maxWidth = 1080, maxBytes = 420000) {
-		if (!file) return "";
-		if (!file.type.startsWith("image/")) throw new Error("Vui lòng chọn tệp hình ảnh hợp lệ.");
-		if (file.type === "image/gif" && file.size <= maxBytes) {
-			return new Promise((resolve, reject) => {
-				const reader = new FileReader();
-				reader.onload = () => resolve(String(reader.result || ""));
-				reader.onerror = () => reject(new Error("Không đọc được tệp ảnh."));
-				reader.readAsDataURL(file);
-			});
-		}
-		const dataUrl = await new Promise((resolve, reject) => {
-			const reader = new FileReader();
-			reader.onload = () => resolve(String(reader.result || ""));
-			reader.onerror = () => reject(new Error("Không đọc được tệp ảnh."));
-			reader.readAsDataURL(file);
-		});
-		const img = await new Promise((resolve, reject) => {
-			const image = new Image();
-			image.onload = () => resolve(image);
-			image.onerror = () => reject(new Error("Ảnh không hợp lệ."));
-			image.src = dataUrl;
-		});
+    if (isAuth) {
+        const name = user.name || user.email;
+        const authorName = document.getElementById("post-author-name");
+        const authorAvatar = document.getElementById("post-author-avatar");
+        const triggerAvatar = document.getElementById("feed-trigger-avatar");
+        const triggerText = document.getElementById("trigger-modal-input");
+        if (authorName) authorName.textContent = name;
+        if (authorAvatar) authorAvatar.src = user.avatar || "./DIEU.png";
+        if (triggerAvatar) triggerAvatar.src = user.avatar || "./DIEU.png";
+        if (triggerText) triggerText.textContent = `${name} ơi, bạn đang nghĩ gì thế?`;
+        if (!homeAccessEnabled) {
+            loadStoriesBar();
+            loadPosts();
+            populateMyStudySetsSelect();
+        }
+    } else {
+        closeModal();
+    }
+    homeAccessEnabled = isAuth;
+}
+window.updateHomeAccess = updateHomeAccess;
 
-		const canvas = document.createElement("canvas");
-		let width = img.naturalWidth || img.width;
-		let height = img.naturalHeight || img.height;
-		if (width > maxWidth) {
-			height = Math.round((height * maxWidth) / width);
-			width = maxWidth;
-		}
-		canvas.width = width;
-		canvas.height = height;
-		const ctx = canvas.getContext("2d");
-		ctx.drawImage(img, 0, 0, width, height);
+function showHomeAuth(view) {
+    const authContainer = document.getElementById("auth-container");
+    if (!authContainer) return;
+    authContainer.style.display = "block";
+    if (view === "register") {
+        document.getElementById("link-to-register")?.click();
+    } else {
+        document.getElementById("login-view").style.display = "block";
+        document.getElementById("register-view").style.display = "none";
+        document.getElementById("forgot-view").style.display = "none";
+    }
+    authContainer.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+document.getElementById("feed-login-button")?.addEventListener("click", () => showHomeAuth("login"));
+document.getElementById("feed-register-button")?.addEventListener("click", () => showHomeAuth("register"));
 
-		for (const quality of [0.82, 0.68, 0.54, 0.42]) {
-			const result = canvas.toDataURL("image/jpeg", quality);
-			if (result.length <= maxBytes * 1.37) return result;
-		}
-		return canvas.toDataURL("image/jpeg", 0.32);
-	}
+// =========================================================
+// STORIES BAR & VIEWER (24H / 48H)
+// =========================================================
+async function loadStoriesBar() {
+    if (!storyBarEl || !currentHomeUser) return;
+    try {
+        const res = await fetch(`${HOME_API_BASE}/api/stories`, {
+            credentials: "include",
+            headers: getHomeHeaders()
+        });
+        const data = await res.json();
+        const stories = data.stories || [];
+        storyBarEl.replaceChildren();
 
-	// --- RICH TEXT + @EMAIL MENTION EDITOR ---
-	function saveEditorSelection() {
-		const sel = window.getSelection();
-		if (sel && sel.rangeCount > 0 && richEditor.contains(sel.anchorNode)) {
-			savedRange = sel.getRangeAt(0).cloneRange();
-		}
-	}
+        const addBtn = document.createElement("button");
+        addBtn.type = "button";
+        addBtn.className = "story-item";
+        addBtn.innerHTML = `
+            <span class="story-ring is-add">
+                <img src="${escapeHtml(currentHomeUser.avatar || "./DIEU.png")}" alt="">
+                <span class="story-add-plus">+</span>
+            </span>
+            <span class="story-item-label">Đăng Story</span>
+        `;
+        addBtn.onclick = () => {
+            document.getElementById("home-story-modal-overlay").hidden = false;
+        };
+        storyBarEl.append(addBtn);
 
-	function restoreEditorSelection() {
-		richEditor.focus();
-		if (savedRange) {
-			const sel = window.getSelection();
-			sel.removeAllRanges();
-			sel.addRange(savedRange);
-		}
-	}
+        // Group stories by author
+        const grouped = new Map();
+        stories.forEach(s => {
+            const key = String(s.userId);
+            if (!grouped.has(key)) grouped.set(key, []);
+            grouped.get(key).push(s);
+        });
 
-	async function ensureUsersLoaded() {
-		if (cachedUsers.length) return cachedUsers;
-		try {
-			const res = await fetch(`${API_BASE}/api/users`, { credentials: "include", headers: getAuthHeaders() });
-			const data = await res.json().catch(() => ({}));
-			if (Array.isArray(data.users)) cachedUsers = data.users;
-		} catch {}
-		return cachedUsers;
-	}
+        grouped.forEach(userStories => {
+            const first = userStories[0];
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "story-item";
+            btn.innerHTML = `
+                <span class="story-ring${first.viewedByMe ? " is-seen" : ""}">
+                    <img src="${escapeHtml(first.userAvatar || "./DIEU.png")}" alt="${escapeHtml(first.userName)}">
+                </span>
+                <span class="story-item-label">${escapeHtml(first.userName)}</span>
+            `;
+            btn.onclick = () => openHomeStoryViewer(userStories, 0);
+            storyBarEl.append(btn);
+        });
+    } catch {
+        // Silent
+    }
+}
 
-	function getActiveMentionQuery() {
-		const sel = window.getSelection();
-		if (!sel || !sel.rangeCount || !richEditor.contains(sel.anchorNode)) return null;
-		const range = sel.getRangeAt(0);
-		if (range.startContainer.nodeType !== Node.TEXT_NODE) return null;
-		const textBefore = range.startContainer.textContent.slice(0, range.startOffset);
-		const match = textBefore.match(/@([^\s@]{0,40})$/);
-		if (!match) return null;
-		return {
-			node: range.startContainer,
-			start: range.startOffset - match[0].length,
-			end: range.startOffset,
-			query: match[1].toLowerCase()
-		};
-	}
+function openHomeStoryViewer(stories, idx = 0) {
+    if (!stories.length) return;
+    homeStoriesQueue = stories;
+    homeStoryIdx = idx;
+    renderHomeStory();
+    document.getElementById("home-story-viewer-overlay").hidden = false;
+}
 
-	function insertMention(user, matchInfo) {
-		const range = document.createRange();
-		range.setStart(matchInfo.node, matchInfo.start);
-		range.setEnd(matchInfo.node, matchInfo.end);
-		range.deleteContents();
+function renderHomeStory() {
+    const s = homeStoriesQueue[homeStoryIdx];
+    if (!s) {
+        document.getElementById("home-story-viewer-overlay").hidden = true;
+        return;
+    }
+    const track = document.getElementById("home-story-progress-track");
+    track.replaceChildren(...homeStoriesQueue.map((_, i) => {
+        const seg = document.createElement("div");
+        seg.className = `story-progress-seg${i < homeStoryIdx ? " done" : i === homeStoryIdx ? " active" : ""}`;
+        const fill = document.createElement("div");
+        fill.className = "story-progress-fill";
+        seg.append(fill);
+        return seg;
+    }));
+    document.getElementById("home-story-viewer-avatar").src = s.userAvatar || "./DIEU.png";
+    document.getElementById("home-story-viewer-name").textContent = s.userName || "Bạn học";
+    document.getElementById("home-story-viewer-time").textContent = new Date(s.createdAt).toLocaleString("vi-VN");
+    document.getElementById("home-story-viewer-caption").textContent = s.caption || "";
+    document.getElementById("home-story-viewer-views").textContent = `${s.viewCount || 0} lượt xem`;
+    document.getElementById("home-story-viewer-expiry").textContent = `Hết hạn: ${new Date(s.expiresAt).toLocaleString("vi-VN")}`;
 
-		const link = document.createElement("a");
-		link.className = "mention-tag";
-		link.href = `./profile.html?userId=${encodeURIComponent(user.id)}`;
-		link.setAttribute("contenteditable", "false");
-		link.textContent = `@${user.email}`;
+    const stage = document.getElementById("home-story-media-stage");
+    const prev = document.getElementById("home-story-prev");
+    const next = document.getElementById("home-story-next");
+    stage.querySelectorAll("img, video").forEach(n => n.remove());
 
-		const space = document.createTextNode("\u00A0");
-		range.insertNode(space);
-		range.insertNode(link);
+    const isVideo = s.mediaType === "video" || /\.(mp4|webm)(\?|$)/i.test(s.mediaUrl || "");
+    const el = document.createElement(isVideo ? "video" : "img");
+    el.src = s.mediaUrl;
+    if (isVideo) { el.controls = true; el.autoplay = true; el.playsInline = true; }
+    stage.insertBefore(el, prev);
 
-		const newRange = document.createRange();
-		newRange.setStartAfter(space);
-		newRange.collapse(true);
-		const sel = window.getSelection();
-		sel.removeAllRanges();
-		sel.addRange(newRange);
-		savedRange = newRange.cloneRange();
-		mentionDropdown.hidden = true;
-	}
+    prev.hidden = homeStoryIdx === 0;
+    next.hidden = homeStoryIdx >= homeStoriesQueue.length - 1;
 
-	async function updateMentionDropdown() {
-		const matchInfo = getActiveMentionQuery();
-		if (!matchInfo) {
-			mentionDropdown.hidden = true;
-			return;
-		}
-		const users = await ensureUsersLoaded();
-		const filtered = users.filter(u =>
-			(u.email || "").toLowerCase().includes(matchInfo.query)
-			|| (u.name || "").toLowerCase().includes(matchInfo.query)
-		).slice(0, 6);
+    fetch(`${HOME_API_BASE}/api/stories/${encodeURIComponent(s.id)}/view`, {
+        method: "POST",
+        credentials: "include",
+        headers: getHomeHeaders()
+    }).catch(() => {});
+}
 
-		if (!filtered.length) {
-			mentionDropdown.hidden = true;
-			return;
-		}
-		mentionDropdown.replaceChildren();
-		filtered.forEach(user => {
-			const btn = document.createElement("button");
-			btn.type = "button";
-			btn.className = "mention-option";
-			btn.innerHTML = `<img src="${escapeHtml(user.avatar || "./DIEU.png")}" alt=""><div class="mention-option-meta"><strong>${escapeHtml(user.name || user.email)}</strong><span>${escapeHtml(user.email || "")}</span></div>`;
-			btn.addEventListener("mousedown", e => {
-				e.preventDefault();
-				insertMention(user, matchInfo);
-			});
-			mentionDropdown.appendChild(btn);
-		});
-		mentionDropdown.hidden = false;
-	}
+document.getElementById("home-story-prev")?.addEventListener("click", () => { if (homeStoryIdx > 0) { homeStoryIdx--; renderHomeStory(); } });
+document.getElementById("home-story-next")?.addEventListener("click", () => { if (homeStoryIdx < homeStoriesQueue.length - 1) { homeStoryIdx++; renderHomeStory(); } });
+document.getElementById("home-story-viewer-close")?.addEventListener("click", () => { document.getElementById("home-story-viewer-overlay").hidden = true; });
+document.getElementById("home-story-close")?.addEventListener("click", () => { document.getElementById("home-story-modal-overlay").hidden = true; });
 
-	document.querySelectorAll("#post-rte-wrapper .rte-btn[data-cmd]").forEach(btn => {
-		btn.addEventListener("mousedown", e => {
-			e.preventDefault();
-			restoreEditorSelection();
-			document.execCommand(btn.dataset.cmd, false, null);
-			saveEditorSelection();
-		});
-	});
+document.getElementById("home-story-form")?.addEventListener("submit", async e => {
+    e.preventDefault();
+    const status = document.getElementById("home-story-status");
+    const file = document.getElementById("home-story-file").files[0];
+    if (!file) return;
+    try {
+        status.textContent = "Đang tải Story lên...";
+        const caption = document.getElementById("home-story-caption").value.trim();
+        const durationHours = Number(document.getElementById("home-story-duration").value || 24);
+        if (file.type.startsWith("image/")) {
+            const mediaUrl = window.DIEUNW?.compressImageToWebp ? await window.DIEUNW.compressImageToWebp(file, 1080, 0.85) : "";
+            await fetch(`${HOME_API_BASE}/api/stories`, {
+                method: "POST",
+                credentials: "include",
+                headers: getHomeHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({ mediaUrl, caption, durationHours })
+            });
+        } else {
+            const fd = new FormData();
+            fd.append("media", file);
+            fd.append("caption", caption);
+            fd.append("durationHours", String(durationHours));
+            await fetch(`${HOME_API_BASE}/api/stories`, {
+                method: "POST",
+                credentials: "include",
+                headers: getHomeHeaders(),
+                body: fd
+            });
+        }
+        e.currentTarget.reset();
+        status.textContent = "";
+        document.getElementById("home-story-modal-overlay").hidden = true;
+        await loadStoriesBar();
+    } catch (err) {
+        status.textContent = err.message || "Lỗi đăng Story.";
+    }
+});
 
-	headingSelect?.addEventListener("change", () => {
-		restoreEditorSelection();
-		document.execCommand("formatBlock", false, headingSelect.value);
-		saveEditorSelection();
-	});
+// =========================================================
+// COMPOSER: RICH TEXT, @MENTION, IMAGE UPLOAD, STUDY SET EMBED
+// =========================================================
+async function populateMyStudySetsSelect() {
+    const sel = document.getElementById("post-studyset-select");
+    if (!sel) return;
+    try {
+        const res = await fetch(`${HOME_API_BASE}/api/users/me/profile`, {
+            credentials: "include",
+            headers: getHomeHeaders()
+        });
+        const data = await res.json();
+        const sets = data.studySets || [];
+        sel.innerHTML = `<option value="">Không đính kèm bộ ôn tập</option>`;
+        sets.forEach(s => {
+            const op = document.createElement("option");
+            op.value = s.id;
+            op.textContent = `[${s.setType === "quiz" ? "Quiz" : "Flashcard"}] ${s.title}`;
+            sel.append(op);
+        });
+    } catch {
+        // Ignore
+    }
+}
 
-	colorPicker?.addEventListener("input", () => {
-		restoreEditorSelection();
-		document.execCommand("foreColor", false, colorPicker.value);
-		saveEditorSelection();
-	});
+document.querySelectorAll('input[name="post-visibility"]').forEach(opt => {
+    opt.addEventListener("change", () => {
+        const lbl = document.getElementById("post-privacy-label");
+        if (lbl) lbl.textContent = opt.value === "private" ? "Riêng tư" : "Công khai";
+    });
+});
 
-	mentionTrigger?.addEventListener("mousedown", e => {
-		e.preventDefault();
-		restoreEditorSelection();
-		document.execCommand("insertText", false, "@");
-		saveEditorSelection();
-		updateMentionDropdown();
-	});
+function openModal() {
+    if (!homeAccessEnabled || !modalOverlay) return;
+    modalOverlay.hidden = false;
+    requestAnimationFrame(() => modalOverlay.classList.add("open"));
+    postRichEditor?.focus();
+}
 
-	richEditor?.addEventListener("keyup", () => {
-		saveEditorSelection();
-		updateMentionDropdown();
-	});
-	richEditor?.addEventListener("mouseup", saveEditorSelection);
-	richEditor?.addEventListener("input", updateMentionDropdown);
+function closeModal() {
+    if (!modalOverlay) return;
+    modalOverlay.classList.remove("open");
+    modalOverlay.hidden = true;
+}
 
-	postImageFile?.addEventListener("change", async () => {
-		const file = postImageFile.files?.[0];
-		if (!file) return;
-		postImageFilename.textContent = "Đang xử lý ảnh...";
-		try {
-			selectedPostImageDataUrl = await compressImageFile(file);
-			postImageFilename.textContent = file.name;
-			postImagePreview.src = selectedPostImageDataUrl;
-			postImagePreviewWrap.hidden = false;
-			postImageClear.hidden = false;
-		} catch (error) {
-			selectedPostImageDataUrl = "";
-			postImageFile.value = "";
-			postImageFilename.textContent = error.message || "Không tải được ảnh";
-			postImagePreviewWrap.hidden = true;
-			postImageClear.hidden = true;
-		}
-	});
+triggerInput?.addEventListener("click", openModal);
+btnTriggerOpen?.addEventListener("click", openModal);
+btnModalClose?.addEventListener("click", closeModal);
+modalOverlay?.addEventListener("click", e => { if (e.target === modalOverlay) closeModal(); });
 
-	postImageClear?.addEventListener("click", () => {
-		selectedPostImageDataUrl = "";
-		postImageFile.value = "";
-		postImageFilename.textContent = "Chưa chọn ảnh";
-		postImagePreview.removeAttribute("src");
-		postImagePreviewWrap.hidden = true;
-		postImageClear.hidden = true;
-	});
+// Rich Text Toolbar & Mentions on Home Composer
+(() => {
+    const wrapper = document.getElementById("post-rte-wrapper");
+    const dropdown = document.getElementById("post-mention-dropdown");
+    if (!wrapper || !postRichEditor) return;
 
-	// --- TRẠNG THÁI TRUY CẬP TRANG CHỦ ---
-	function updateHomeAccess(user = null) {
-		const isAuthenticated = Boolean(user?.id);
-		currentHomeUser = isAuthenticated ? user : null;
-		if (feedAuthGate) feedAuthGate.hidden = isAuthenticated;
-		if (feedTriggerBox) feedTriggerBox.hidden = !isAuthenticated;
-		if (newsfeedContainer) newsfeedContainer.hidden = !isAuthenticated;
-		if (!isAuthenticated) closeModal();
+    wrapper.querySelectorAll(".rte-btn[data-cmd]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            postRichEditor.focus();
+            document.execCommand(btn.getAttribute("data-cmd"), false, null);
+        });
+    });
 
-		if (isAuthenticated) {
-			const name = user.name || user.email;
-			const authorName = document.getElementById("post-author-name");
-			const authorAvatar = document.getElementById("post-author-avatar");
-			const triggerText = document.getElementById("trigger-modal-input");
-			if (authorName) authorName.textContent = name;
-			if (authorAvatar) authorAvatar.src = user.avatar || "./DIEU.png";
-			if (triggerText) triggerText.textContent = `${name} ơi, bạn đang nghĩ gì thế?`;
-			if (!homeAccessEnabled) loadPosts();
-			ensureUsersLoaded();
-		}
-		homeAccessEnabled = isAuthenticated;
-	}
-	window.updateHomeAccess = updateHomeAccess;
+    document.getElementById("post-heading-select")?.addEventListener("change", e => {
+        postRichEditor.focus();
+        document.execCommand("formatBlock", false, e.target.value);
+    });
 
-	function showHomeAuth(view) {
-		const authContainer = document.getElementById("auth-container");
-		if (!authContainer) return;
-		authContainer.style.display = "block";
-		if (view === "register") {
-			document.getElementById("link-to-register")?.click();
-		} else {
-			document.getElementById("login-view").style.display = "block";
-			document.getElementById("register-view").style.display = "none";
-			document.getElementById("forgot-view").style.display = "none";
-		}
-		authContainer.scrollIntoView({ behavior: "smooth", block: "center" });
-		if (view === "login") document.getElementById("login-email")?.focus();
-	}
+    document.getElementById("post-color-picker")?.addEventListener("input", e => {
+        postRichEditor.focus();
+        document.execCommand("foreColor", false, e.target.value);
+    });
 
-	document.getElementById("feed-login-button")?.addEventListener("click", () => showHomeAuth("login"));
-	document.getElementById("feed-register-button")?.addEventListener("click", () => showHomeAuth("register"));
+    async function searchHomeMentions(query) {
+        if (!dropdown) return;
+        try {
+            const res = await fetch(`${HOME_API_BASE}/api/users/search?q=${encodeURIComponent(query)}`, {
+                credentials: "include",
+                headers: getHomeHeaders()
+            });
+            const data = await res.json();
+            const users = data.users || [];
+            if (!users.length) return (dropdown.hidden = true);
+            dropdown.replaceChildren();
+            users.slice(0, 6).forEach(u => {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "mention-option";
+                btn.innerHTML = `<img src="${escapeHtml(u.avatar || "./DIEU.png")}" alt=""><div class="mention-option-meta"><strong>${escapeHtml(u.name)}</strong><span>${escapeHtml(u.email)}</span></div>`;
+                btn.onclick = () => {
+                    const sel = window.getSelection();
+                    if (sel && sel.rangeCount) {
+                        const range = sel.getRangeAt(0);
+                        const node = range.startContainer;
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            const idx = node.textContent.lastIndexOf("@", range.startOffset);
+                            if (idx !== -1) {
+                                range.setStart(node, idx);
+                                range.deleteContents();
+                            }
+                        }
+                        const a = document.createElement("a");
+                        a.className = "mention-tag";
+                        a.href = `./profile.html?userId=${encodeURIComponent(u.id)}`;
+                        a.textContent = `@${u.name}`;
+                        a.contentEditable = "false";
+                        range.insertNode(a);
+                        const sp = document.createTextNode("\u00A0");
+                        a.after(sp);
+                        range.setStartAfter(sp);
+                        range.collapse(true);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    }
+                    dropdown.hidden = true;
+                };
+                dropdown.append(btn);
+            });
+            dropdown.hidden = false;
+        } catch {
+            dropdown.hidden = true;
+        }
+    }
 
-	document.querySelectorAll('input[name="post-visibility"]').forEach(option => {
-		option.addEventListener("change", () => {
-			const label = document.getElementById("post-privacy-label");
-			if (label) label.textContent = option.value === "private" ? "Riêng tư" : "Công khai";
-		});
-	});
+    document.getElementById("post-mention-trigger")?.addEventListener("click", () => {
+        postRichEditor.focus();
+        document.execCommand("insertText", false, "@");
+        searchHomeMentions("");
+    });
 
-	function openModal() {
-		if (!homeAccessEnabled || !modalOverlay) return;
-		modalOverlay.hidden = false;
-		requestAnimationFrame(() => modalOverlay.classList.add("open"));
-		richEditor?.focus();
-	}
+    postRichEditor.addEventListener("keyup", () => {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return;
+        const r = sel.getRangeAt(0);
+        if (r.startContainer.nodeType !== Node.TEXT_NODE) return (dropdown.hidden = true);
+        const before = r.startContainer.textContent.slice(0, r.startOffset);
+        const match = before.match(/@([^\s@]{0,24})$/);
+        if (match) searchHomeMentions(match[1]);
+        else dropdown.hidden = true;
+    });
+})();
 
-	function closeModal() {
-		if (!modalOverlay) return;
-		modalOverlay.classList.remove("open");
-		modalOverlay.hidden = true;
-		mentionDropdown.hidden = true;
-	}
+document.getElementById("post-image-file")?.addEventListener("change", async e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const filenameEl = document.getElementById("post-image-filename");
+    const previewWrap = document.getElementById("post-image-preview-wrap");
+    const previewImg = document.getElementById("post-image-preview");
+    const clearBtn = document.getElementById("post-image-clear");
+    filenameEl.textContent = "Đang tối ưu WebP...";
+    try {
+        pendingPostImageData = window.DIEUNW?.compressImageToWebp
+            ? await window.DIEUNW.compressImageToWebp(file, 1080, 0.84)
+            : "";
+        filenameEl.textContent = file.name;
+        previewImg.src = pendingPostImageData;
+        previewWrap.hidden = false;
+        clearBtn.hidden = false;
+    } catch {
+        filenameEl.textContent = "Lỗi đọc ảnh";
+    }
+});
 
-	triggerInput?.addEventListener("click", openModal);
-	btnTriggerOpen?.addEventListener("click", openModal);
-	btnModalClose?.addEventListener("click", closeModal);
-	modalOverlay?.addEventListener("click", e => {
-		if (e.target === modalOverlay) closeModal();
-	});
+document.getElementById("post-image-clear")?.addEventListener("click", () => {
+    pendingPostImageData = "";
+    document.getElementById("post-image-file").value = "";
+    document.getElementById("post-image-filename").textContent = "Chưa chọn ảnh";
+    document.getElementById("post-image-preview-wrap").hidden = true;
+    document.getElementById("post-image-clear").hidden = true;
+});
 
-	// --- BÁO CÁO BÀI VIẾT ---
-	function openReportModal(targetType, targetId, labelText) {
-		activeReportTarget = { targetType, targetId };
-		reportTargetLabel.textContent = labelText || "";
-		reportReasonInput.value = "";
-		reportStatus.textContent = "";
-		reportStatus.classList.remove("error");
-		reportOverlay.hidden = false;
-		requestAnimationFrame(() => reportOverlay.classList.add("open"));
-	}
+btnSubmit?.addEventListener("click", async () => {
+    if (!homeAccessEnabled || !currentHomeUser) return;
+    const plainText = postRichEditor.textContent.trim();
+    const htmlContent = postRichEditor.innerHTML.trim();
+    const studySetId = document.getElementById("post-studyset-select")?.value || "";
+    if (!plainText && !pendingPostImageData && !studySetId) {
+        return alert("Hãy nhập nội dung, chọn ảnh hoặc đính kèm bộ ôn tập nhé!");
+    }
+    const visibility = document.querySelector('input[name="post-visibility"]:checked')?.value || "public";
+    btnSubmit.innerText = "Đang đăng...";
+    btnSubmit.disabled = true;
+    try {
+        const res = await fetch(POSTS_API, {
+            method: "POST",
+            credentials: "include",
+            headers: getHomeHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({
+                content: htmlContent || plainText,
+                isRichHtml: true,
+                image: pendingPostImageData || "",
+                studySetId: studySetId || undefined,
+                visibility
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Đăng bài không thành công.");
+        postRichEditor.innerHTML = "";
+        pendingPostImageData = "";
+        document.getElementById("post-image-file").value = "";
+        document.getElementById("post-image-filename").textContent = "Chưa chọn ảnh";
+        document.getElementById("post-image-preview-wrap").hidden = true;
+        document.getElementById("post-image-clear").hidden = true;
+        if (document.getElementById("post-studyset-select")) document.getElementById("post-studyset-select").value = "";
+        closeModal();
+        await loadPosts();
+    } catch (err) {
+        alert(err.message || "Lỗi kết nối máy chủ.");
+    } finally {
+        btnSubmit.innerText = "Đăng";
+        btnSubmit.disabled = false;
+    }
+});
 
-	function closeReportModal() {
-		reportOverlay.classList.remove("open");
-		reportOverlay.hidden = true;
-		activeReportTarget = null;
-	}
+// =========================================================
+// INLINE INTERACTIVE STUDY SET PLAYER ON HOME FEED
+// =========================================================
+function openHomeStudySetPlayer(studySet) {
+    const overlay = document.getElementById("home-studyset-player-overlay");
+    const titleEl = document.getElementById("home-studyset-player-title");
+    const bodyEl = document.getElementById("home-studyset-player-body");
+    if (!overlay || !bodyEl) return;
+    titleEl.textContent = studySet.title;
+    const items = Array.isArray(studySet.items) ? studySet.items : [];
+    overlay.hidden = false;
 
-	document.querySelectorAll(".report-chip").forEach(chip => {
-		chip.addEventListener("click", () => {
-			const reason = chip.dataset.reason || chip.textContent;
-			reportReasonInput.value = reportReasonInput.value.trim()
-				? `${reportReasonInput.value.trim()}; ${reason}`
-				: reason;
-		});
-	});
+    if (!items.length) {
+        bodyEl.innerHTML = `<p class="profile-extra-empty">Bộ học liệu trống.</p>`;
+        return;
+    }
 
-	reportCloseBtn?.addEventListener("click", closeReportModal);
-	reportCancelBtn?.addEventListener("click", closeReportModal);
-	reportOverlay?.addEventListener("click", e => {
-		if (e.target === reportOverlay) closeReportModal();
-	});
+    if (studySet.setType === "quiz") {
+        let idx = 0, score = 0;
+        const start = Date.now();
+        const renderQ = () => {
+            bodyEl.replaceChildren();
+            if (idx >= items.length) {
+                const dur = Date.now() - start;
+                bodyEl.innerHTML = `<div class="empty-illustration-box"><h4>Điểm: ${score}/${items.length}</h4><p>Hoàn thành trong ${(dur / 1000).toFixed(1)} giây</p></div>`;
+                fetch(`${HOME_API_BASE}/api/study-sets/${encodeURIComponent(studySet.id)}/attempt`, {
+                    method: "POST",
+                    credentials: "include",
+                    headers: getHomeHeaders({ "Content-Type": "application/json" }),
+                    body: JSON.stringify({ score, total: items.length, durationMs: dur })
+                }).catch(() => {});
+                return;
+            }
+            const q = items[idx];
+            const h4 = document.createElement("h4");
+            h4.textContent = `${idx + 1}/${items.length}. ${q.front}`;
+            bodyEl.append(h4);
+            const opts = document.createElement("div");
+            opts.className = "quiz-options-list";
+            const nextBtn = document.createElement("button");
+            nextBtn.type = "button";
+            nextBtn.className = "btn-auth";
+            nextBtn.textContent = idx === items.length - 1 ? "Hoàn tất" : "Câu tiếp →";
+            nextBtn.hidden = true;
+            nextBtn.onclick = () => { idx++; renderQ(); };
+            (q.options || []).forEach((t, oIdx) => {
+                if (!t) return;
+                const b = document.createElement("button");
+                b.type = "button";
+                b.className = "quiz-option-btn";
+                b.textContent = `${["A", "B", "C", "D"][oIdx]}. ${t}`;
+                b.onclick = () => {
+                    opts.querySelectorAll("button").forEach(x => { x.disabled = true; });
+                    const ok = Number(q.correctIndex || 0);
+                    if (oIdx === ok) { b.classList.add("is-correct"); score++; }
+                    else { b.classList.add("is-wrong"); opts.querySelectorAll("button")[ok]?.classList.add("is-correct"); }
+                    nextBtn.hidden = false;
+                };
+                opts.append(b);
+            });
+            bodyEl.append(opts, nextBtn);
+        };
+        renderQ();
+    } else {
+        const queue = items.map((_, i) => i);
+        const renderFC = () => {
+            bodyEl.replaceChildren();
+            if (!queue.length) {
+                bodyEl.innerHTML = `<div class="empty-illustration-box"><h4>Đã thuộc toàn bộ thẻ!</h4><p>${escapeHtml(studySet.title)}</p></div>`;
+                return;
+            }
+            const card = items[queue[0]];
+            const pill = document.createElement("div");
+            pill.className = "sr-queue-pill";
+            pill.textContent = `Còn ${queue.length} thẻ • Chạm vào thẻ để lật 3D`;
+            const scene = document.createElement("div");
+            scene.className = "flashcard-scene";
+            const inner = document.createElement("div");
+            inner.className = "flashcard-inner";
+            inner.innerHTML = `<div class="flashcard-face flashcard-front"><strong>${escapeHtml(card.front)}</strong></div><div class="flashcard-face flashcard-back"><strong>${escapeHtml(card.back || "")}</strong></div>`;
+            scene.append(inner);
+            scene.onclick = () => inner.classList.toggle("is-flipped");
+            const ctrl = document.createElement("div");
+            ctrl.className = "flashcard-controls";
+            const b1 = document.createElement("button");
+            b1.type = "button";
+            b1.className = "btn-fc-review";
+            b1.textContent = "Cần ôn lại (+3)";
+            b1.onclick = () => { const c = queue.shift(); queue.splice(Math.min(3, queue.length), 0, c); renderFC(); };
+            const b2 = document.createElement("button");
+            b2.type = "button";
+            b2.className = "btn-fc-known";
+            b2.textContent = "Đã thuộc";
+            b2.onclick = () => { queue.shift(); renderFC(); };
+            ctrl.append(b1, b2);
+            bodyEl.append(pill, scene, ctrl);
+        };
+        renderFC();
+    }
+}
+document.getElementById("home-studyset-player-close")?.addEventListener("click", () => {
+    document.getElementById("home-studyset-player-overlay").hidden = true;
+});
 
-	reportSubmitBtn?.addEventListener("click", async () => {
-		if (!activeReportTarget) return;
-		const reason = reportReasonInput.value.trim() || "Nội dung vi phạm quy định cộng đồng";
-		reportSubmitBtn.disabled = true;
-		reportStatus.textContent = "Đang gửi báo cáo...";
-		reportStatus.classList.remove("error");
-		try {
-			const res = await fetch(`${API_BASE}/api/reports`, {
-				method: "POST",
-				credentials: "include",
-				headers: getAuthHeaders({ "Content-Type": "application/json" }),
-				body: JSON.stringify({
-					targetType: activeReportTarget.targetType,
-					targetId: activeReportTarget.targetId,
-					reason
-				})
-			});
-			const data = await res.json().catch(() => ({}));
-			if (!res.ok) throw new Error(data.error || "Không thể gửi báo cáo.");
-			reportStatus.textContent = "Đã gửi báo cáo tới Ban duyệt bài. Cảm ơn bạn!";
-			setTimeout(closeReportModal, 900);
-		} catch (err) {
-			reportStatus.textContent = err.message || "Không gửi được báo cáo.";
-			reportStatus.classList.add("error");
-		} finally {
-			reportSubmitBtn.disabled = false;
-		}
-	});
+// =========================================================
+// LOAD & RENDER NEWSFEED POSTS
+// =========================================================
+async function loadPosts() {
+    if (!newsfeedContainer || !homeAccessEnabled) return;
+    if (window.DIEUNW?.createSkeletonCardsHtml && !newsfeedContainer.children.length) {
+        newsfeedContainer.innerHTML = window.DIEUNW.createSkeletonCardsHtml(3);
+    }
+    try {
+        const res = await fetch(POSTS_API, { credentials: "include", headers: getHomeHeaders() });
+        const data = await res.json();
+        if (res.status === 401) {
+            localStorage.removeItem("dieuNwUser");
+            updateHomeAccess(null);
+            return;
+        }
+        if (!res.ok) throw new Error(data.error || "Không thể tải bài viết.");
+        renderPosts(data.posts || []);
+    } catch {
+        newsfeedContainer.innerHTML = "<p style='color:#dc2626; text-align:center;'>Không thể tải bài viết. Hãy tải lại trang.</p>";
+    }
+}
 
-	// --- TẢI VÀ HIỂN THỊ BÀI VIẾT ---
-	async function loadPosts() {
-		if (!newsfeedContainer || !homeAccessEnabled) return;
-		try {
-			const response = await fetch(POSTS_API, {
-				credentials: "include",
-				headers: getAuthHeaders()
-			});
-			const data = await response.json();
-			if (response.status === 401) {
-				localStorage.removeItem("dieuNwUser");
-				updateHomeAccess(null);
-				return;
-			}
-			if (!response.ok) throw new Error(data.error || "Không thể tải bài viết.");
-			renderPosts(data.posts || []);
-		} catch {
-			newsfeedContainer.innerHTML = "<p style='color:red; text-align:center;'>Không thể tải bài viết. Hãy tải lại trang.</p>";
-		}
-	}
+function renderPosts(posts) {
+    const viewer = currentHomeUser;
+    if (!viewer) return;
+    const viewerId = String(viewer.id || "");
+    const viewerEmail = String(viewer.email || "").toLowerCase();
 
-	function renderPostContentHtml(post) {
-		if (post.contentHtml) {
-			return sanitizeRichHtml(post.contentHtml);
-		}
-		return escapeHtml(post.content || "").replace(/\n/g, "<br>");
-	}
+    posts = posts.filter(p => {
+        if (["study-resource", "public-chat-room", "public-chat-message"].includes(p.type)) return false;
+        if (p.visibility !== "private") return true;
+        return String(p.userId || "") === viewerId || String(p.authorEmail || "").toLowerCase() === viewerEmail;
+    });
 
-	function renderPosts(posts) {
-		const viewer = currentHomeUser;
-		if (!viewer) return;
-		const viewerId = String(viewer.id || "");
-		const viewerEmail = String(viewer.email || "").toLowerCase();
+    newsfeedContainer.replaceChildren();
+    if (!posts.length) {
+        newsfeedContainer.innerHTML = window.DIEUNW?.createEmptyIllustrationHtml
+            ? window.DIEUNW.createEmptyIllustrationHtml({
+                title: "Bảng tin đang trống",
+                subtitle: "Hãy là người đầu tiên chia sẻ bài viết, ảnh hoặc bộ đề ôn tập cùng bạn bè!"
+            })
+            : `<p class="empty-text">Chưa có bài viết nào.</p>`;
+        return;
+    }
 
-		const visiblePosts = posts.filter(post => {
-			if (["study-resource", "public-chat-room", "public-chat-message"].includes(post.type)) return false;
-			if (post.visibility !== "private") return true;
-			return String(post.userId || "") === viewerId || String(post.authorEmail || "").toLowerCase() === viewerEmail;
-		});
+    posts.slice(0, 20).forEach(post => {
+        const el = document.createElement("article");
+        el.className = "post-card";
+        const hasValidImg = post.image && post.image.trim() !== "" && !post.image.includes("placeholder");
+        const imgHtml = hasValidImg ? `<img src="${escapeHtml(post.image)}" class="post-card-image" loading="lazy" alt="Ảnh bài viết">` : "";
+        const bodyHtml = post.isRichHtml
+            ? `<div class="post-rich-content">${sanitizeRichHtml(post.content || "")}</div>`
+            : `<p>${escapeHtml(post.content || "")}</p>`;
+        const badgesHtml = window.DIEUNW?.renderAuthorBadgesHtml ? window.DIEUNW.renderAuthorBadgesHtml(post) : "";
+        const savedComments = Array.isArray(post.comments) ? post.comments : [];
+        const profileHref = post.clubId
+            ? `./profile.html?clubId=${encodeURIComponent(post.clubId)}`
+            : `./profile.html?userId=${encodeURIComponent(post.userId)}`;
 
-		newsfeedContainer.replaceChildren();
-		if (!visiblePosts.length) {
-			newsfeedContainer.innerHTML = "<p class='empty-text'>Chưa có bài viết nào. Hãy là người đầu tiên đăng bài!</p>";
-			return;
-		}
+        const commentsHtml = savedComments.map(cmt => {
+            const stHtml = cmt.stickerUrl ? `<img src="${escapeHtml(cmt.stickerUrl)}" class="comment-sticker-img" alt="Sticker">` : "";
+            return `
+                <div class="comment-item">
+                    <img src="${escapeHtml(cmt.avatar || "./DIEU.png")}" class="post-card-avatar" style="width:32px !important; height:32px !important;">
+                    <div class="comment-content-box">
+                        <h5>${escapeHtml(cmt.name || "Thành viên")}</h5>
+                        ${cmt.text ? `<p>${escapeHtml(cmt.text)}</p>` : ""}
+                        ${stHtml}
+                    </div>
+                </div>
+            `;
+        }).join("");
 
-		visiblePosts.slice(0, 20).forEach(post => {
-			const postElement = document.createElement("article");
-			postElement.className = "post-card";
+        el.innerHTML = `
+            <div class="post-card-header">
+                <div class="post-avatar-wrap">
+                    <a href="${profileHref}">
+                        <img src="${escapeHtml(post.avatar || "./DIEU.png")}" class="post-card-avatar" alt="Avatar">
+                    </a>
+                    ${post.presenceStatus ? `<span class="nav-status-dot" data-status="${escapeHtml(post.presenceStatus)}"></span>` : ""}
+                </div>
+                <div>
+                    <h4 class="post-card-author">
+                        <a class="post-card-author-link" href="${profileHref}">${escapeHtml(post.name || "Thành viên DIEUNW")}</a>
+                        ${badgesHtml}
+                    </h4>
+                    <span class="post-card-time">${new Date(post.createdAt).toLocaleString("vi-VN")}</span>
+                </div>
+            </div>
+            <div class="post-card-body">
+                ${bodyHtml}
+                ${imgHtml}
+            </div>
+            <div class="post-visibility-label">${post.visibility === "private" ? "Riêng tư" : "Công khai"}</div>
+            <div class="post-status-info">
+                <span class="like-count-text">
+                    <picture><source srcset="./icon-like.avif" type="image/avif"><source srcset="./icon-like.webp" type="image/webp"><img src="./icon-like.png" class="status-like-icon" alt="Like"></picture>
+                    <span class="count">${post.likes || 0}</span> lượt thích
+                </span>
+                <span class="comment-count-text">
+                    <picture><source srcset="./icon-comment.avif" type="image/avif"><source srcset="./icon-comment.webp" type="image/webp"><img src="./icon-comment.png" class="status-comment-icon" alt="Comment"></picture>
+                    <span class="comment-count">${savedComments.length}</span> bình luận
+                </span>
+            </div>
+            <div class="post-interact-bar">
+                <button type="button" class="btn-interact btn-like${post.likedByMe ? " liked" : ""}" style="${post.likedByMe ? "color:#0078ff; font-weight:bold;" : ""}">
+                    <picture><source srcset="./icon-like.avif" type="image/avif"><source srcset="./icon-like.webp" type="image/webp"><img src="./icon-like.png" class="custom-interact-icon" alt=""></picture> Thích
+                </button>
+                <button type="button" class="btn-interact btn-comment">
+                    <picture><source srcset="./icon-comment.avif" type="image/avif"><source srcset="./icon-comment.webp" type="image/webp"><img src="./icon-comment.png" class="custom-interact-icon" alt=""></picture> Bình luận
+                </button>
+                <button type="button" class="btn-interact btn-bookmark">Lưu bài</button>
+            </div>
+            <div class="comment-section" style="display:none;">
+                <div class="comment-input-group">
+                    <img src="${escapeHtml(viewer.avatar || "./DIEU.png")}" class="user-avatar-mini" style="width:32px; height:32px;">
+                    <input type="text" class="comment-field" placeholder="Viết bình luận công khai hoặc chọn Sticker...">
+                </div>
+                <div class="comments-list">${commentsHtml}</div>
+            </div>
+        `;
 
-			const hasValidImage = post.image && post.image.trim() !== "" && !post.image.includes("placeholder");
-			const postImageHtml = hasValidImage ? `<img src="${escapeHtml(post.image)}" class="post-card-image" loading="lazy" alt="Ảnh bài viết">` : "";
-			const countLikes = post.likes || 0;
-			const authorName = escapeHtml(post.name || "Thành viên DIEUNW");
-			const authorAvatar = escapeHtml(post.avatar || "./DIEU.png");
-			const visibilityLabel = post.visibility === "private" ? "Riêng tư" : "Công khai";
-			const authorHref = post.clubId
-				? `./profile.html?clubId=${encodeURIComponent(post.clubId)}`
-				: `./profile.html?userId=${encodeURIComponent(post.userId || "")}`;
+        // Embedded Study Set Card
+        if (post.studySet) {
+            const setBox = document.createElement("div");
+            setBox.className = "study-set-inline-card";
+            setBox.innerHTML = `
+                <span class="study-set-badge">${post.studySet.setType === "quiz" ? "Quiz Tương tác" : "Flashcard 3D"} · ${escapeHtml(post.studySet.subject || "Học tập")}</span>
+                <strong>${escapeHtml(post.studySet.title)}</strong>
+                <div class="study-set-actions">
+                    <button type="button" class="study-set-btn primary btn-open-inline-set">Mở học / Thi thử ngay</button>
+                </div>
+            `;
+            setBox.querySelector(".btn-open-inline-set").onclick = () => openHomeStudySetPlayer(post.studySet);
+            el.querySelector(".post-card-body").append(setBox);
+        }
 
-			let savedComments = [];
-			try {
-				savedComments = typeof post.comments === "string" ? JSON.parse(post.comments) : (post.comments || []);
-			} catch {
-				savedComments = [];
-			}
+        el.querySelector(".btn-like").onclick = async btn => {
+            await fetch(`${POSTS_API}/${encodeURIComponent(post.id)}/like`, {
+                method: "POST",
+                credentials: "include",
+                headers: getHomeHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({ liked: !post.likedByMe })
+            });
+            await loadPosts();
+        };
 
-			const isLiked = Boolean(post.likedByMe);
-			const commentsListHtml = Array.isArray(savedComments) ? savedComments.map(cmt => `
-				<div class="comment-item">
-					<img src="./DIEU.png" class="post-card-avatar" style="width:32px; height:32px;" alt="">
-					<div class="comment-content-box">
-						<h5>${escapeHtml(cmt.name || "Thành viên")}</h5>
-						<p>${escapeHtml(cmt.text || "")}</p>
-					</div>
-				</div>
-			`).join("") : "";
+        const cmtSec = el.querySelector(".comment-section");
+        const cmtField = el.querySelector(".comment-field");
+        const cmtGroup = el.querySelector(".comment-input-group");
+        el.querySelector(".btn-comment").onclick = () => {
+            cmtSec.style.display = cmtSec.style.display === "none" ? "block" : "none";
+            if (cmtSec.style.display === "block") cmtField.focus();
+        };
 
-			postElement.innerHTML = `
-				<div class="post-card-header">
-					<a href="${authorHref}" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit;">
-						<img src="${authorAvatar}" class="post-card-avatar" alt="">
-						<div>
-							<h4 class="post-card-author">${authorName}</h4>
-							<span class="post-card-time">${new Date(post.createdAt).toLocaleString("vi-VN")}</span>
-						</div>
-					</a>
-				</div>
-				<div class="post-card-body">
-					<div class="post-rich-content">${renderPostContentHtml(post)}</div>
-					${postImageHtml}
-				</div>
-				<div class="post-visibility-label">${visibilityLabel}</div>
-				<div class="post-status-info">
-					<span class="like-count-text">
-						<img src="./icon-like.png" class="status-like-icon" alt="Like">
-						<span class="count">${countLikes}</span> lượt thích
-					</span>
-					<span class="comment-count-text">
-						<img src="./icon-comment.png" class="status-comment-icon" alt="Comment">
-						<span class="comment-count">${savedComments.length}</span> bình luận
-					</span>
-				</div>
-				<div class="post-interact-bar">
-					<button type="button" class="btn-interact btn-like ${isLiked ? "liked" : ""}" style="${isLiked ? "color:#0078ff;font-weight:bold;" : ""}">
-						<img src="./icon-like.png" class="custom-interact-icon" alt="Like"> Thích
-					</button>
-					<button type="button" class="btn-interact btn-comment">
-						<img src="./icon-comment.png" class="custom-interact-icon" alt="Comment"> Bình luận
-					</button>
-				</div>
-				<div class="comment-section" style="display:none;">
-					<div class="comment-input-group">
-						<img src="${escapeHtml(viewer.avatar || "./DIEU.png")}" class="user-avatar-mini" style="width:32px; height:32px;" alt="">
-						<input type="text" class="comment-field" placeholder="Viết bình luận công khai...">
-					</div>
-					<div class="comments-list">${commentsListHtml}</div>
-				</div>
-			`;
+        const submitCmt = async (text, stickerUrl = "") => {
+            await fetch(`${POSTS_API}/${encodeURIComponent(post.id)}/comments`, {
+                method: "POST",
+                credentials: "include",
+                headers: getHomeHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({ content: text, stickerUrl })
+            });
+            await loadPosts();
+        };
 
-			const likeBtn = postElement.querySelector(".btn-like");
-			likeBtn?.addEventListener("click", async () => {
-				likeBtn.disabled = true;
-				try {
-					const res = await fetch(`${POSTS_API}/${encodeURIComponent(post.id)}/like`, {
-						method: "POST",
-						credentials: "include",
-						headers: getAuthHeaders({ "Content-Type": "application/json" }),
-						body: JSON.stringify({ liked: !likeBtn.classList.contains("liked") })
-					});
-					if (!res.ok) throw new Error();
-					await loadPosts();
-				} catch {
-					likeBtn.disabled = false;
-				}
-			});
+        cmtField.addEventListener("keypress", async e => {
+            if (e.key === "Enter" && cmtField.value.trim()) {
+                e.preventDefault();
+                await submitCmt(cmtField.value.trim());
+            }
+        });
 
-			const commentBtn = postElement.querySelector(".btn-comment");
-			const commentSec = postElement.querySelector(".comment-section");
-			const commentInput = postElement.querySelector(".comment-field");
-			commentBtn?.addEventListener("click", () => {
-				const show = commentSec.style.display === "none";
-				commentSec.style.display = show ? "block" : "none";
-				if (show) commentInput.focus();
-			});
+        window.DIEUNW?.attachStickerPicker?.(cmtGroup, sticker => {
+            submitCmt(cmtField.value.trim(), sticker.imageUrl);
+        });
 
-			commentInput?.addEventListener("keypress", async e => {
-				if (e.key !== "Enter" || !commentInput.value.trim()) return;
-				e.preventDefault();
-				const content = commentInput.value.trim();
-				commentInput.disabled = true;
-				try {
-					const res = await fetch(`${POSTS_API}/${encodeURIComponent(post.id)}/comments`, {
-						method: "POST",
-						credentials: "include",
-						headers: getAuthHeaders({ "Content-Type": "application/json" }),
-						body: JSON.stringify({ content })
-					});
-					const data = await res.json();
-					if (!res.ok) throw new Error(data.error || "Không thể gửi bình luận.");
-					commentInput.value = "";
-					await loadPosts();
-				} catch (err) {
-					window.alert?.(err.message || "Không thể gửi bình luận.");
-					commentInput.disabled = false;
-				}
-			});
+        const bmBtn = el.querySelector(".btn-bookmark");
+        bmBtn.onclick = async () => {
+            const res = await fetch(`${HOME_API_BASE}/api/bookmarks/toggle`, {
+                method: "POST",
+                credentials: "include",
+                headers: getHomeHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({ itemType: "post", itemId: post.id })
+            });
+            const d = await res.json();
+            bmBtn.classList.toggle("is-saved", Boolean(d.saved));
+            bmBtn.textContent = d.saved ? "Đã lưu" : "Lưu bài";
+        };
 
-			const actions = document.createElement("div");
-			actions.className = "post-card-actions";
-			const reportBtn = document.createElement("button");
-			reportBtn.type = "button";
-			reportBtn.className = "post-report-button";
-			reportBtn.textContent = "⚑ Báo cáo";
-			reportBtn.addEventListener("click", () => {
-				openReportModal("post", post.id, `Báo cáo bài viết của ${post.name || "thành viên"}`);
-			});
-			actions.appendChild(reportBtn);
+        const actions = document.createElement("div");
+        actions.className = "post-card-actions";
+        if (String(post.userId || "") !== viewerId) {
+            const rep = document.createElement("button");
+            rep.type = "button";
+            rep.className = "post-report-button";
+            rep.textContent = "⚑ Báo cáo";
+            rep.onclick = () => {
+                activeHomeReportTarget = { targetType: "post", targetId: post.id };
+                document.getElementById("report-target-label").textContent = `Báo cáo bài viết của ${post.name}`;
+                document.getElementById("report-reason-input").value = "";
+                document.getElementById("report-modal-status").textContent = "";
+                document.getElementById("report-modal-overlay").hidden = false;
+            };
+            actions.append(rep);
+        }
+        if (String(post.userId || "") === viewerId || viewer.isAdmin) {
+            const del = document.createElement("button");
+            del.type = "button";
+            del.className = "post-delete-button";
+            del.textContent = "Xóa bài viết";
+            del.onclick = async () => {
+                if (!confirm("Bạn có chắc muốn xóa bài viết này?")) return;
+                await fetch(`${POSTS_API}/${encodeURIComponent(post.id)}`, {
+                    method: "DELETE",
+                    credentials: "include",
+                    headers: getHomeHeaders()
+                });
+                await loadPosts();
+            };
+            actions.append(del);
+        }
+        if (actions.childElementCount) el.append(actions);
+        newsfeedContainer.append(el);
+    });
+}
 
-			if (String(post.userId || "") === viewerId || viewer.isAdmin || viewer.isModerator) {
-				const deleteBtn = document.createElement("button");
-				deleteBtn.type = "button";
-				deleteBtn.className = "post-delete-button";
-				deleteBtn.textContent = "Xóa bài viết";
-				deleteBtn.addEventListener("click", async () => {
-					if (!window.confirm("Bạn có chắc muốn xóa bài viết này?")) return;
-					deleteBtn.disabled = true;
-					try {
-						const res = await fetch(`${POSTS_API}/${encodeURIComponent(post.id)}`, {
-							method: "DELETE",
-							credentials: "include",
-							headers: getAuthHeaders()
-						});
-						const data = await res.json();
-						if (!res.ok) throw new Error(data.error || "Không thể xóa bài viết.");
-						await loadPosts();
-					} catch (err) {
-						window.alert?.(err.message || "Không thể xóa bài viết.");
-						deleteBtn.disabled = false;
-					}
-				});
-				actions.appendChild(deleteBtn);
-			}
-			postElement.appendChild(actions);
-			newsfeedContainer.appendChild(postElement);
-		});
-	}
+// Report Modal Handlers
+document.querySelectorAll("#report-modal-overlay .report-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+        document.querySelectorAll("#report-modal-overlay .report-chip").forEach(c => c.classList.remove("active"));
+        chip.classList.add("active");
+        const input = document.getElementById("report-reason-input");
+        if (input && !input.value.trim()) input.value = chip.dataset.reason || "";
+    });
+});
+document.getElementById("report-modal-close")?.addEventListener("click", () => { document.getElementById("report-modal-overlay").hidden = true; });
+document.getElementById("report-modal-cancel")?.addEventListener("click", () => { document.getElementById("report-modal-overlay").hidden = true; });
+document.getElementById("report-modal-submit")?.addEventListener("click", async () => {
+    if (!activeHomeReportTarget) return;
+    const reason = document.getElementById("report-reason-input").value.trim();
+    const status = document.getElementById("report-modal-status");
+    if (!reason) return (status.textContent = "Vui lòng nhập lý do báo cáo.");
+    try {
+        const res = await fetch(`${HOME_API_BASE}/api/reports`, {
+            method: "POST",
+            credentials: "include",
+            headers: getHomeHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ ...activeHomeReportTarget, reason })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Không thể gửi báo cáo.");
+        document.getElementById("report-modal-overlay").hidden = true;
+        alert("Đã gửi báo cáo thành công!");
+    } catch (err) {
+        status.textContent = err.message;
+    }
+});
 
-	// --- ĐĂNG BÀI VIẾT MỚI ---
-	btnSubmit?.addEventListener("click", async () => {
-		if (!homeAccessEnabled || !currentHomeUser) {
-			updateHomeAccess(null);
-			return;
-		}
-		const content = (richEditor.innerText || "").trim();
-		const contentHtml = sanitizeRichHtml(richEditor.innerHTML);
-		if (!content && !selectedPostImageDataUrl) {
-			window.alert?.("Hãy nhập nội dung hoặc chọn ảnh trước khi đăng nhé!");
-			return;
-		}
+updateHomeAccess(null);
+fetch(`${HOME_API_BASE}/api/auth/me`, { credentials: "include", headers: getHomeHeaders() })
+    .then(r => r.json())
+    .then(data => {
+        if (data.user) {
+            localStorage.setItem("dieuNwUser", JSON.stringify(data.user));
+            updateHomeAccess(data.user);
+        }
+    })
+    .catch(() => {});
 
-		const visibility = document.querySelector('input[name="post-visibility"]:checked')?.value || "public";
-		btnSubmit.textContent = "Đang đăng...";
-		btnSubmit.disabled = true;
-
-		try {
-			const response = await fetch(POSTS_API, {
-				method: "POST",
-				credentials: "include",
-				headers: getAuthHeaders({ "Content-Type": "application/json" }),
-				body: JSON.stringify({
-					content: content || " ",
-					contentHtml,
-					image: selectedPostImageDataUrl,
-					visibility
-				})
-			});
-			const data = await response.json();
-			if (!response.ok) throw new Error(data.error || "Đăng bài không thành công.");
-
-			richEditor.innerHTML = "";
-			postImageClear?.click();
-			closeModal();
-			await loadPosts();
-		} catch (error) {
-			window.alert?.(error.message || "Đăng bài không thành công!");
-		} finally {
-			btnSubmit.textContent = "Đăng";
-			btnSubmit.disabled = false;
-		}
-	});
-
-	updateHomeAccess(null);
-	fetch(`${API_BASE}/api/auth/me`, { credentials: "include", headers: getAuthHeaders() })
-		.then(res => res.json())
-		.then(data => {
-			if (data.user) {
-				localStorage.setItem("dieuNwUser", JSON.stringify(data.user));
-				updateHomeAccess(data.user);
-			}
-		})
-		.catch(() => {});
-
-	window.addEventListener("storage", event => {
-		if (event.key === "dieuNwUser" && !event.newValue) updateHomeAccess(null);
-	});
+window.addEventListener("storage", event => {
+    if (event.key === "dieuNwUser" && !event.newValue) updateHomeAccess(null);
 });

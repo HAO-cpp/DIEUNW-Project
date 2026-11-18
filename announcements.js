@@ -3,107 +3,145 @@ document.addEventListener("DOMContentLoaded", () => {
 	const feed = document.getElementById("announcement-feed");
 	const composer = document.getElementById("announcement-composer");
 	const form = document.getElementById("announcement-form");
+
 	const imageInput = document.getElementById("announcement-image-file");
 	const imageNameEl = document.getElementById("announcement-image-name");
 	const imageClearBtn = document.getElementById("announcement-image-clear");
 	const imagePreviewWrap = document.getElementById("announcement-image-preview-wrap");
 	const imagePreview = document.getElementById("announcement-image-preview");
+
 	const fileInput = document.getElementById("announcement-file");
 	const fileNameEl = document.getElementById("announcement-file-name");
 	const fileClearBtn = document.getElementById("announcement-file-clear");
+	const scheduleInput = document.getElementById("announcement-schedule");
 
 	let currentUser = null;
 	let publishableClubs = [];
-	let compressedImageDataUrl = "";
+	let compressedImageFile = null;
 
-	function getToken() {
-		try {
-			return localStorage.getItem("session_token")
-				|| localStorage.getItem("dieuNwToken")
-				|| JSON.parse(localStorage.getItem("dieuNwUser") || "{}").token
-				|| "";
-		} catch {
-			return localStorage.getItem("session_token") || localStorage.getItem("dieuNwToken") || "";
+	function buildSkeletonMarkup(count = 3) {
+		if (window.DIEUNW && typeof window.DIEUNW.createSkeletonCardsHtml === "function") {
+			return window.DIEUNW.createSkeletonCardsHtml(count);
 		}
-	}
-
-	function getAuthHeaders(extra = {}) {
-		const token = getToken();
-		return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra };
+		return Array.from({ length: count }, () => `
+			<div class="skeleton-card" aria-hidden="true">
+				<div class="skeleton-line short"></div>
+				<div class="skeleton-line"></div>
+				<div class="skeleton-line medium"></div>
+			</div>
+		`).join("");
 	}
 
 	async function api(url, options = {}) {
+		const token = localStorage.getItem("session_token") || localStorage.getItem("dieuNwToken") || "";
+		const headers = {
+			...(token ? { Authorization: `Bearer ${token}` } : {}),
+			...(options.headers || {})
+		};
 		const response = await fetch(`${API_BASE}${url}`, {
 			credentials: "include",
 			...options,
-			headers: getAuthHeaders(options.headers || {})
+			headers
 		});
 		const data = await response.json().catch(() => ({}));
 		if (!response.ok) throw new Error(data.error || "Không thể hoàn tất yêu cầu.");
 		return data;
 	}
 
-	async function compressImageFile(file, maxWidth = 1080, maxBytes = 420000) {
-		const dataUrl = await new Promise((resolve, reject) => {
-			const reader = new FileReader();
-			reader.onload = () => resolve(String(reader.result || ""));
-			reader.onerror = () => reject(new Error("Không đọc được ảnh."));
-			reader.readAsDataURL(file);
+	function resolveUploadUrl(rawUrl) {
+		const url = String(rawUrl || "").trim();
+		if (!url) return "";
+		if (url.startsWith("/uploads/")) return `${API_BASE}${url}`;
+		return url;
+	}
+
+	function element(tag, className, text) {
+		const node = document.createElement(tag);
+		if (className) node.className = className;
+		if (text !== undefined) node.textContent = text;
+		return node;
+	}
+
+	async function compressImageToWebp(file) {
+		if (!file || !file.type.startsWith("image/") || file.type === "image/gif") return file;
+		return new Promise(resolve => {
+			const img = new Image();
+			const url = URL.createObjectURL(file);
+			img.onload = () => {
+				URL.revokeObjectURL(url);
+				const maxDim = 1600;
+				let { width, height } = img;
+				if (width > maxDim || height > maxDim) {
+					const ratio = Math.min(maxDim / width, maxDim / height);
+					width = Math.round(width * ratio);
+					height = Math.round(height * ratio);
+				}
+				const canvas = document.createElement("canvas");
+				canvas.width = width;
+				canvas.height = height;
+				const ctx = canvas.getContext("2d");
+				if (!ctx) return resolve(file);
+				ctx.drawImage(img, 0, 0, width, height);
+				canvas.toBlob(
+					blob => {
+						if (!blob) return resolve(file);
+						const baseName = file.name.replace(/\.[^.]+$/, "");
+						resolve(new File([blob], `${baseName}.webp`, { type: "image/webp" }));
+					},
+					"image/webp",
+					0.85
+				);
+			};
+			img.onerror = () => {
+				URL.revokeObjectURL(url);
+				resolve(file);
+			};
+			img.src = url;
 		});
-		const img = await new Promise((resolve, reject) => {
-			const i = new Image();
-			i.onload = () => resolve(i);
-			i.onerror = () => reject(new Error("Ảnh không hợp lệ."));
-			i.src = dataUrl;
-		});
-		const canvas = document.createElement("canvas");
-		let w = img.naturalWidth || img.width;
-		let h = img.naturalHeight || img.height;
-		if (w > maxWidth) {
-			h = Math.round((h * maxWidth) / w);
-			w = maxWidth;
-		}
-		canvas.width = w;
-		canvas.height = h;
-		canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-		for (const q of [0.82, 0.68, 0.52]) {
-			const res = canvas.toDataURL("image/jpeg", q);
-			if (res.length <= maxBytes * 1.37) return res;
-		}
-		return canvas.toDataURL("image/jpeg", 0.35);
 	}
 
 	imageInput?.addEventListener("change", async () => {
 		const file = imageInput.files?.[0];
-		if (!file) return;
-		imageNameEl.textContent = "Đang nén ảnh...";
-		try {
-			compressedImageDataUrl = await compressImageFile(file);
-			imageNameEl.textContent = file.name;
-			imagePreview.src = compressedImageDataUrl;
-			imagePreviewWrap.hidden = false;
-			imageClearBtn.hidden = false;
-		} catch (err) {
-			compressedImageDataUrl = "";
-			imageInput.value = "";
-			imageNameEl.textContent = err.message || "Không đọc được ảnh";
-			imagePreviewWrap.hidden = true;
-			imageClearBtn.hidden = true;
+		if (imagePreview?.dataset.objectUrl) {
+			URL.revokeObjectURL(imagePreview.dataset.objectUrl);
+			delete imagePreview.dataset.objectUrl;
 		}
+		if (!file) {
+			compressedImageFile = null;
+			imageNameEl.textContent = "Không có ảnh";
+			imageClearBtn.hidden = true;
+			imagePreviewWrap.hidden = true;
+			return;
+		}
+		imageNameEl.textContent = `Đang tối ưu: ${file.name}...`;
+		compressedImageFile = await compressImageToWebp(file);
+		imageNameEl.textContent = compressedImageFile.name;
+		imageClearBtn.hidden = false;
+		const previewUrl = URL.createObjectURL(compressedImageFile);
+		imagePreview.dataset.objectUrl = previewUrl;
+		imagePreview.src = previewUrl;
+		imagePreviewWrap.hidden = false;
 	});
 
 	imageClearBtn?.addEventListener("click", () => {
-		compressedImageDataUrl = "";
 		imageInput.value = "";
+		compressedImageFile = null;
+		if (imagePreview?.dataset.objectUrl) {
+			URL.revokeObjectURL(imagePreview.dataset.objectUrl);
+			delete imagePreview.dataset.objectUrl;
+		}
 		imageNameEl.textContent = "Không có ảnh";
-		imagePreview.removeAttribute("src");
-		imagePreviewWrap.hidden = true;
 		imageClearBtn.hidden = true;
+		imagePreviewWrap.hidden = true;
 	});
 
 	fileInput?.addEventListener("change", () => {
 		const file = fileInput.files?.[0];
-		if (!file) return;
+		if (!file) {
+			fileNameEl.textContent = "Không có tệp";
+			fileClearBtn.hidden = true;
+			return;
+		}
 		fileNameEl.textContent = file.name;
 		fileClearBtn.hidden = false;
 	});
@@ -113,21 +151,6 @@ document.addEventListener("DOMContentLoaded", () => {
 		fileNameEl.textContent = "Không có tệp";
 		fileClearBtn.hidden = true;
 	});
-
-	function element(tag, className, text) {
-		const node = document.createElement(tag);
-		if (className) node.className = className;
-		if (text !== undefined) node.textContent = text;
-		return node;
-	}
-
-	function safeMediaUrl(url) {
-		const raw = String(url || "").trim();
-		if (!raw) return "";
-		if (raw.startsWith("/uploads/")) return `${API_BASE}${raw}`;
-		if (/^https?:\/\//i.test(raw) || /^data:image\//i.test(raw)) return raw;
-		return "";
-	}
 
 	function renderPost(post, index) {
 		const article = element("article", "announcement-post");
@@ -139,49 +162,68 @@ document.addEventListener("DOMContentLoaded", () => {
 			const logo = element("img", "announcement-club-logo");
 			logo.src = post.clubLogo;
 			logo.alt = "";
+			logo.loading = "lazy";
 			header.append(logo);
 		} else {
 			header.append(element("span", "announcement-club-monogram", (post.clubName || "C").slice(0, 1).toUpperCase()));
 		}
-		const identity = element("div", "announcement-post-identity");
-		identity.append(
-			element("h2", "", post.clubName),
-			element("p", "", `${post.author?.name || "Quản lý CLB"} · ${new Date(post.createdAt).toLocaleString("vi-VN")}`)
-		);
-		header.append(identity, element("span", "announcement-label", "THÔNG BÁO"));
-		article.append(header, element("p", "announcement-post-content", post.content));
 
-		const imgSrc = safeMediaUrl(post.image);
-		const fileHref = safeMediaUrl(post.fileUrl);
-		if (imgSrc || fileHref) {
+		const identity = element("div", "announcement-post-identity");
+		const authorName = post.author?.name || "Ban quản trị CLB";
+		const dateText = post.createdAt ? new Date(post.createdAt).toLocaleString("vi-VN") : "";
+		identity.append(
+			element("h2", "", post.clubName || "Câu lạc bộ NQD"),
+			element("p", "", `${authorName}${dateText ? ` · ${dateText}` : ""}`)
+		);
+		header.append(identity);
+		header.append(element("span", "announcement-label", "THÔNG BÁO"));
+		article.append(header);
+
+		if (post.content) {
+			article.append(element("p", "announcement-post-content", post.content));
+		}
+
+		const imgUrl = resolveUploadUrl(post.imageUrl || post.image);
+		const fileUrl = resolveUploadUrl(post.fileUrl || post.attachmentUrl);
+		const fileName = post.fileName || post.attachmentName || "Tài liệu đính kèm";
+
+		if (imgUrl || fileUrl) {
 			const media = element("div", "announcement-post-media");
-			if (imgSrc) {
+			if (imgUrl) {
+				const picture = document.createElement("picture");
 				const img = element("img", "announcement-post-image");
-				img.src = imgSrc;
+				img.src = imgUrl;
+				img.alt = `Ảnh thông báo từ ${post.clubName || "CLB"}`;
 				img.loading = "lazy";
-				img.alt = "Ảnh thông báo CLB";
-				media.append(img);
+				picture.append(img);
+				media.append(picture);
 			}
-			if (fileHref) {
-				const dlHref = `${fileHref}${fileHref.includes("?") ? "&" : "?"}download=1`;
-				const fileCard = element("a", "announcement-file-card");
-				fileCard.href = dlHref;
-				fileCard.target = "_blank";
-				fileCard.rel = "noopener noreferrer";
-				fileCard.setAttribute("download", post.fileName || "tep-dinh-kem");
-				fileCard.textContent = `📎 ${post.fileName || "Tệp đính kèm"} — Bấm để tải xuống`;
-				media.append(fileCard);
+			if (fileUrl) {
+				const link = element("a", "club-attachment-link", `📎 Tải tệp: ${fileName}`);
+				link.href = fileUrl;
+				link.target = "_blank";
+				link.rel = "noopener noreferrer";
+				link.setAttribute("download", fileName);
+				media.append(link);
 			}
 			article.append(media);
 		}
+
 		return article;
 	}
 
 	async function loadFeed() {
+		feed.innerHTML = buildSkeletonMarkup(3);
 		const { posts } = await api("/api/announcements");
 		feed.replaceChildren(...(posts || []).map(renderPost));
 		if (!posts || !posts.length) {
-			feed.append(element("p", "clubs-empty", "Chưa có thông báo nào. Các cập nhật của CLB sẽ xuất hiện tại đây."));
+			feed.innerHTML = `
+				<div class="empty-state-box">
+					<span class="empty-illustration" aria-hidden="true">📢</span>
+					<h3>Chưa có thông báo CLB nào</h3>
+					<p>Các cập nhật, sự kiện và tin tức mới nhất từ câu lạc bộ sẽ xuất hiện tại đây.</p>
+				</div>
+			`;
 		}
 	}
 
@@ -189,28 +231,45 @@ document.addEventListener("DOMContentLoaded", () => {
 		event.preventDefault();
 		const button = form.querySelector("button[type='submit']");
 		const status = document.getElementById("announcement-status");
-		const content = document.getElementById("announcement-content").value.trim();
+		const contentVal = document.getElementById("announcement-content").value.trim();
 		const clubId = document.getElementById("announcement-club").value;
-		if (!content) {
-			status.textContent = "Hãy nhập nội dung thông báo.";
+		const scheduledRaw = scheduleInput?.value || "";
+
+		if (!clubId || !contentVal) {
+			status.textContent = "Vui lòng chọn CLB và nhập nội dung thông báo.";
 			return;
 		}
+
 		button.disabled = true;
-		status.textContent = "Đang đăng...";
+		status.textContent = scheduledRaw ? "Đang lên lịch thông báo..." : "Đang đăng thông báo...";
+
 		try {
 			const formData = new FormData();
-			formData.append("content", content);
-			if (compressedImageDataUrl) formData.append("image", compressedImageDataUrl);
-			if (fileInput?.files?.length) formData.append("attachment_file", fileInput.files[0]);
+			formData.append("content", contentVal);
+			if (compressedImageFile) {
+				formData.append("image", compressedImageFile);
+			}
+			if (fileInput?.files?.[0]) {
+				formData.append("file", fileInput.files[0]);
+			}
+			if (scheduledRaw) {
+				const scheduledDate = new Date(scheduledRaw);
+				if (!Number.isNaN(scheduledDate.getTime())) {
+					formData.append("scheduledAt", scheduledDate.toISOString());
+				}
+			}
 
 			await api(`/api/clubs/${encodeURIComponent(clubId)}/posts`, {
 				method: "POST",
 				body: formData
 			});
+
 			form.reset();
 			imageClearBtn?.click();
 			fileClearBtn?.click();
-			status.textContent = "Thông báo đã được đăng.";
+			status.textContent = scheduledRaw
+				? "Đã lên lịch đăng thông báo tự động cho CLB!"
+				: "Thông báo đã được đăng lên bảng tin!";
 			await loadFeed();
 		} catch (error) {
 			status.textContent = error.message;
@@ -219,20 +278,23 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 	});
 
-	Promise.all([api("/api/auth/me"), api("/api/clubs")])
+	feed.innerHTML = buildSkeletonMarkup(3);
+	Promise.all([api("/api/auth/me").catch(() => ({ user: null })), api("/api/clubs")])
 		.then(([auth, clubData]) => {
-			currentUser = auth.user;
-			const userEmail = String(currentUser?.email || "").toLowerCase();
+			currentUser = auth?.user || null;
+			const myEmail = String(currentUser?.email || "").toLowerCase();
 			publishableClubs = (clubData.clubs || []).filter(club => {
 				if (club.status !== "approved") return false;
 				if (currentUser?.isAdmin) return true;
-				if (club.manager?.id && String(club.manager.id) === String(currentUser?.id)) return true;
-				const managerEmails = Array.isArray(club.managerEmails) ? club.managerEmails.map(e => String(e).toLowerCase()) : [];
-				return Boolean(userEmail && managerEmails.includes(userEmail));
+				if (club.manager?.id && currentUser?.id && String(club.manager.id) === String(currentUser.id)) return true;
+				if (Array.isArray(club.managerEmails) && myEmail) {
+					return club.managerEmails.map(e => String(e).toLowerCase()).includes(myEmail);
+				}
+				return false;
 			});
+
 			if (publishableClubs.length) {
 				const select = document.getElementById("announcement-club");
-				select.replaceChildren();
 				for (const club of publishableClubs) {
 					const option = document.createElement("option");
 					option.value = club.id;
@@ -244,6 +306,7 @@ document.addEventListener("DOMContentLoaded", () => {
 			return loadFeed();
 		})
 		.catch(error => {
+			feed.replaceChildren();
 			document.getElementById("announcement-feed-status").textContent = error.message;
 		});
 });

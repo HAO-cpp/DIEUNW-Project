@@ -3,18 +3,28 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<link rel="stylesheet" href="./style.css?v=10">
-	<link rel="icon" type="image/png" href="./DIEU.png?v=1">
+	<link rel="stylesheet" href="./style.css?v=11">
+	<link rel="icon" type="image/png" href="./DIEU.png?v=3">
 	<title>DIEUNW - Trang Cá Nhân</title>
 </head>
 <body class="profile-page">
-	<header class="navbar">
-		<div class="nav-left">
-			<a href="./index.html" class="brand-logo-link">
-				<img src="./logo-banner.png" alt="DIEUNW Logo" class="custom-brand-logo">
+	<header class="navbar nav-scroll">
+		<div class="nav-corner-dock">
+			<button type="button" class="nav-brand-toggle" aria-expanded="false" aria-controls="main-nav-menu" aria-label="Mở menu điều hướng DIEUNW">
+				<picture>
+					<source srcset="./DIEU.avif" type="image/avif">
+					<source srcset="./DIEU.webp" type="image/webp">
+					<img src="./DIEU.png" alt="DIEUNW" class="nav-brand-icon">
+				</picture>
+				<span class="nav-brand-caret">▾</span>
+			</button>
+			<a href="./profile.html" class="nav-avatar-link active" aria-label="Trang cá nhân" title="Trang cá nhân" aria-current="page">
+				<img class="nav-user-avatar" src="./DIEU.png" alt="Trang cá nhân">
+				<span class="nav-status-dot" data-status="offline" aria-hidden="true"></span>
 			</a>
+			<button type="button" class="nav-theme-toggle" id="nav-theme-toggle" aria-label="Bật/tắt chế độ tối" title="Chế độ Sáng / Tối">🌙</button>
 		</div>
-		<nav class="nav-menu">
+		<nav id="main-nav-menu" class="nav-menu nav-dropdown-panel" aria-label="Điều hướng chính" hidden>
 			<a href="./index.html" class="nav-item">Trang chủ</a>
 			<a href="./tu-hoc.html" class="nav-item">Phòng tự học</a>
 			<a href="./hoc-nhom.html" class="nav-item">Học nhóm</a>
@@ -24,18 +34,17 @@
 			<a href="./clubs.html" class="nav-item">CLB</a>
 			<a href="./announcements.html" class="nav-item">Thông báo</a>
 		</nav>
-		<div class="nav-right">
-			<a href="./profile.html" class="nav-avatar-link active" aria-label="Trang cá nhân" title="Trang cá nhân" aria-current="page">
-				<img class="nav-user-avatar" src="./DIEU.png" alt="">
-			</a>
-		</div>
 	</header>
 
-	<div id="hero-banner" aria-hidden="true">
-		<img src="./DIEUNW.png" alt="">
+	<div id="hero-banner">
+		<picture>
+			<source srcset="./DIEUNW.avif" type="image/avif">
+			<source srcset="./DIEUNW.webp" type="image/webp">
+			<img src="./DIEUNW.png" alt="DIEUNW Banner">
+		</picture>
 	</div>
 
-	<main class="main-content page-enter">
+	<main class="main-content profile-main-shell page-enter">
 		<!-- 1. Hộp thoại Tài khoản 3 trong 1 -->
 		<div id="auth-container" class="auth-box">
 			<div id="login-view">
@@ -55,7 +64,7 @@
 				</div>
 				<button id="btn-login" class="btn-auth" type="button">Đăng nhập</button>
 				<div style="margin-top: 15px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px;">
-					<a href="#" id="link-to-forgot" style="color: #65676b; text-decoration: none;">Quên mật khẩu?</a>
+					<a href="#" id="link-to-forgot" style="color: var(--text-muted); text-decoration: none;">Quên mật khẩu?</a>
 					<p>Chưa có tài khoản? <a href="#" id="link-to-register" style="color: #0078ff; font-weight: 600; text-decoration: none;">Đăng ký</a></p>
 				</div>
 			</div>
@@ -98,169 +107,372 @@
 			</div>
 		</div>
 
-		<!-- 2. Hồ sơ cá nhân / Hồ sơ bạn bè / Fanpage CLB -->
-		<div id="profile-container" style="display: none; max-width: 680px; margin: 10px auto 30px;">
-			<div class="profile-card-box" style="max-width: 100%; margin: 0 0 25px 0;">
-				<div class="profile-cover">
-					<img id="profile-cover-image" alt="Ảnh bìa hồ sơ">
-				</div>
-				<div class="profile-header-info">
-					<img id="user-display-avatar" src="./DIEU.png" alt="Avatar" class="profile-avatar-large">
-					<h1 id="user-display-name" class="profile-main-name">Tên Học Sinh</h1>
-					<p id="user-display-email" class="profile-sub-email">email@nqd.edu.vn</p>
-					<p id="user-display-class" class="user-class-badge">Học sinh trường NQD</p>
-					<div id="profile-role-tags" class="profile-role-tags" aria-label="Vai trò"></div>
-					<p id="user-display-bio" class="user-bio-text">Chào mừng đến với góc học tập của mình trên DIEUNW!</p>
+		<!-- 2. Hồ sơ 2 Cột (35% Cột trái cố định / 65% Cột phải nội dung) -->
+		<div id="profile-container" class="profile-two-col" style="display: none;">
+			<!-- CỘT TRÁI (35% STICKY) -->
+			<aside class="profile-col-left" aria-label="Hồ sơ học tập">
+				<section class="profile-sidebar-card profile-identity-card">
+					<div>
+						<h1 id="user-display-name" class="profile-main-name">Tên Học Sinh</h1>
+						<div id="profile-role-tags" class="profile-role-tags" aria-label="Vai trò và chức vụ"></div>
+						<p id="user-display-email" class="profile-sub-email">email@nqd.edu.vn</p>
+					</div>
+
+					<div class="profile-class-row">
+						<span id="user-display-class" class="user-class-badge">Học sinh trường NQD</span>
+						<span id="user-display-cohort" class="user-cohort-badge" hidden>Niên khóa</span>
+					</div>
+
 					<span class="verified-badge">✓ Đã xác thực học sinh trường NQD</span>
-				</div>
+					<p id="user-display-bio" class="user-bio-text">Chào mừng đến với góc học tập của mình trên DIEUNW!</p>
 
-				<div class="profile-stats">
-					<div class="stat-item">
-						<strong id="stat-posts">0</strong>
-						<span>Bài viết</span>
-					</div>
-					<div class="stat-item">
-						<strong id="stat-likes">0</strong>
-						<span>Lượt thích</span>
-					</div>
-				</div>
-
-				<div class="profile-actions" id="profile-actions-bar">
-					<button id="btn-edit-profile" class="btn-auth" type="button" style="width: auto; padding: 10px 20px;">Chỉnh sửa hồ sơ</button>
-					<button id="btn-logout" class="btn-logout" type="button" style="margin-top: 0;">Đăng xuất</button>
-					<a id="btn-friend-message" class="btn-auth" href="./messages.html" hidden style="width:auto; padding:10px 20px; text-decoration:none;">Nhắn tin</a>
-					<a id="btn-friend-back" class="btn-timer outline" href="./friends.html" hidden style="padding:10px 18px; text-decoration:none;">← Quay lại Bạn bè</a>
-					<button id="btn-report-account" class="post-report-button" type="button" hidden>⚑ Báo cáo tài khoản</button>
-				</div>
-
-				<!-- Form chỉnh sửa thông tin (upload ảnh từ máy) -->
-				<div id="edit-profile-form" class="edit-form-box" style="display: none;">
-					<h2 id="update">Cập nhật thông tin cá nhân</h2>
-					<div class="input-group">
-						<input type="text" id="edit-name-input" placeholder="Tên hiển thị mới (VD: Nguyễn Văn Diệu)">
-					</div>
-					<div class="input-group">
-						<input type="email" id="edit-email-input" placeholder="Email hiển thị">
-					</div>
-					<div class="input-group">
-						<input type="text" id="edit-class-input" placeholder="Lớp của bạn (VD: 10TH)">
-					</div>
-
-					<div class="image-upload-box" style="margin-bottom: 14px;">
-						<div class="image-upload-row">
-							<label class="image-upload-label" for="edit-avatar-file">Chọn ảnh đại diện</label>
-							<input id="edit-avatar-file" type="file" accept="image/*" hidden>
-							<span id="edit-avatar-filename" class="image-upload-filename">Giữ nguyên ảnh hiện tại</span>
-							<button type="button" id="edit-avatar-clear" class="btn-clear-upload" hidden>Xóa ảnh</button>
+					<div class="profile-stats">
+						<div class="stat-item">
+							<strong id="stat-posts">0</strong>
+							<span>Bài viết</span>
 						</div>
-						<div id="edit-avatar-preview-wrap" class="image-preview-wrap" hidden>
-							<img id="edit-avatar-preview" class="image-preview-thumb" alt="Xem trước ảnh đại diện">
+						<div class="stat-item">
+							<strong id="stat-likes">0</strong>
+							<span>Lượt thích</span>
+						</div>
+						<div class="stat-item">
+							<strong id="stat-study-sets">0</strong>
+							<span>Bộ thẻ/Đề</span>
 						</div>
 					</div>
 
-					<div class="image-upload-box" style="margin-bottom: 14px;">
-						<div class="image-upload-row">
-							<label class="image-upload-label" for="edit-cover-file">Chọn ảnh bìa</label>
-							<input id="edit-cover-file" type="file" accept="image/*" hidden>
-							<span id="edit-cover-filename" class="image-upload-filename">Giữ nguyên ảnh hiện tại</span>
-							<button type="button" id="edit-cover-clear" class="btn-clear-upload" hidden>Xóa ảnh</button>
-						</div>
-						<div id="edit-cover-preview-wrap" class="image-preview-wrap" hidden>
-							<img id="edit-cover-preview" class="image-preview-thumb" alt="Xem trước ảnh bìa">
-						</div>
+					<div id="profile-social-links" class="social-links-row" aria-label="Liên kết mạng xã hội"></div>
+
+					<div class="profile-actions" id="profile-actions-bar">
+						<button id="btn-edit-profile" class="btn-auth" type="button" style="width: auto;">Chỉnh sửa hồ sơ</button>
+						<button id="btn-ecard-open" class="btn-auth outline" type="button" style="width: auto;">Thẻ HS QR</button>
+						<button id="btn-dieunw-plus" class="btn-auth outline" type="button" style="width: auto;">DIEUNW+</button>
+						<a id="btn-friend-message" class="btn-auth" href="./messages.html" hidden style="width:auto; text-decoration:none;">Nhắn tin</a>
+						<a id="btn-friend-back" class="btn-auth outline" href="./friends.html" hidden style="width:auto; text-decoration:none;">← Bạn bè</a>
+						<button id="btn-report-account" class="post-report-button" type="button" hidden>⚑ Báo cáo tài khoản</button>
+						<button id="btn-logout" class="btn-logout" type="button">Đăng xuất</button>
 					</div>
 
-					<div class="input-group">
-						<input type="text" id="edit-bio-input" placeholder="Tiểu sử ngắn hoặc câu châm ngôn yêu thích...">
-					</div>
-					<div style="display: flex; gap: 10px; justify-content: center;">
-						<button id="btn-save-profile" class="btn-auth btn-success" type="button" style="width: auto; padding: 10px 24px;">Lưu thay đổi</button>
-						<button id="btn-cancel-edit" class="btn-logout" type="button" style="margin-top: 0;">Hủy</button>
-					</div>
-				</div>
-			</div>
-
-			<!-- Quản trị hệ thống (Chỉ Admin) -->
-			<section id="admin-tools" class="admin-tools" hidden>
-				<div>
-					<p class="clubs-eyebrow">QUẢN TRỊ HỆ THỐNG</p>
-					<h2>Quản lý Admin &amp; Ban duyệt bài</h2>
-				</div>
-				<form id="admin-add-form" class="admin-add-form">
-					<label for="admin-email-input">Thêm Admin (Email trường)</label>
-					<div class="admin-add-row">
-						<input id="admin-email-input" type="email" placeholder="ten@nqd.edu.vn" required>
-						<button class="clubs-button" type="submit">Thêm admin</button>
-					</div>
-					<p id="admin-action-status" class="clubs-form-status" role="status" aria-live="polite"></p>
-				</form>
-				<ul id="admin-list" class="admin-list" aria-label="Danh sách admin"></ul>
-
-				<div class="admin-tools-divider">
-					<form id="moderator-add-form" class="admin-add-form">
-						<label for="moderator-email-input">Thêm thành viên Ban duyệt bài (Email trường)</label>
-						<div class="admin-add-row">
-							<input id="moderator-email-input" type="email" placeholder="duyetbai@nqd.edu.vn" required>
-							<button class="clubs-button" type="submit">Thêm Ban duyệt bài</button>
+					<!-- Form chỉnh sửa thông tin cơ bản & upload ảnh -->
+					<div id="edit-profile-form" class="edit-form-box" style="display: none;">
+						<h2 id="update">Cập nhật thông tin cá nhân</h2>
+						<div class="input-group">
+							<label class="input-group-label" for="edit-name-input">Tên hiển thị</label>
+							<input type="text" id="edit-name-input" placeholder="Tên hiển thị mới">
 						</div>
-						<p id="moderator-action-status" class="clubs-form-status" role="status" aria-live="polite"></p>
-					</form>
-					<ul id="moderator-list" class="admin-list" aria-label="Danh sách Ban duyệt bài"></ul>
-				</div>
-			</section>
-
-			<!-- Hàng đợi duyệt báo cáo (Admin & Ban duyệt bài — Max-Heap theo số lượt báo cáo) -->
-			<section id="moderation-panel" class="moderation-panel" hidden>
-				<div>
-					<p class="clubs-eyebrow">BAN DUYỆT BÀI</p>
-					<h2>Hàng đợi báo cáo (Ưu tiên cao nhất trước)</h2>
-				</div>
-				<div class="mod-tabs" role="tablist">
-					<button type="button" class="mod-tab active" data-mod-tab="posts">Bài viết bị báo cáo (<span id="mod-posts-count">0</span>)</button>
-					<button type="button" class="mod-tab" data-mod-tab="users">Tài khoản bị báo cáo (<span id="mod-users-count">0</span>)</button>
-				</div>
-				<div id="mod-queue-list" class="mod-queue-list" aria-live="polite"></div>
-			</section>
-
-			<div class="profile-extras">
-				<section class="profile-extra-section" aria-labelledby="profile-achievements-title">
-					<header class="profile-extra-heading">
-						<div>
-							<p class="profile-extra-eyebrow">DẤU MỐC CÁ NHÂN</p>
-							<h2 id="profile-achievements-title">Góc thành tích</h2>
+						<div class="input-group">
+							<label class="input-group-label" for="edit-email-input">Email hiển thị</label>
+							<input type="email" id="edit-email-input" placeholder="Email hiển thị">
 						</div>
-					</header>
-					<form id="achievement-form" class="profile-extra-form">
-						<label for="achievement-title">Tên giải thưởng hoặc thành tích</label>
-						<input id="achievement-title" maxlength="100" placeholder="Ví dụ: Giải Nhất học sinh giỏi cấp thành phố" required>
-						<label for="achievement-certificate">Ảnh chứng nhận (không bắt buộc)</label>
-						<input id="achievement-certificate" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
-						<p class="profile-extra-hint">Ảnh PNG, JPG, WEBP hoặc GIF, tối đa 500 KB.</p>
-						<button class="profile-extra-button" type="submit">Thêm thành tích</button>
-						<p id="achievement-status" class="profile-extra-status" role="status" aria-live="polite"></p>
-					</form>
-					<div id="profile-achievements-list" class="profile-achievements-list" aria-live="polite"></div>
+						<div class="input-group">
+							<label class="input-group-label" for="edit-class-input">Lớp học</label>
+							<input type="text" id="edit-class-input" placeholder="VD: 12A1 hoặc 10TH">
+						</div>
+						<div class="input-group">
+							<label class="input-group-label" for="edit-cohort-input">Niên khóa</label>
+							<input type="text" id="edit-cohort-input" placeholder="VD: Niên khóa 2024-2027">
+						</div>
+						<div class="input-group" style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+							<input type="checkbox" id="edit-alumni-checkbox" style="width:auto; margin:0;">
+							<label for="edit-alumni-checkbox" style="font-size:12.5px; font-weight:700; cursor:pointer;">Cựu học sinh trường NQD</label>
+						</div>
+
+						<div class="image-upload-box" style="margin-bottom: 12px;">
+							<div class="image-upload-row">
+								<label class="image-upload-label" for="edit-avatar-file">Chọn ảnh đại diện</label>
+								<input id="edit-avatar-file" type="file" accept="image/*" hidden>
+								<span id="edit-avatar-filename" class="image-upload-filename">Giữ nguyên ảnh hiện tại</span>
+								<button type="button" id="edit-avatar-clear" class="btn-clear-upload" hidden>Xóa ảnh</button>
+							</div>
+							<div id="edit-avatar-preview-wrap" class="image-preview-wrap" hidden>
+								<img id="edit-avatar-preview" class="image-preview-thumb" alt="Xem trước ảnh đại diện">
+							</div>
+						</div>
+
+						<div class="image-upload-box" style="margin-bottom: 12px;">
+							<div class="image-upload-row">
+								<label class="image-upload-label" for="edit-cover-file">Chọn ảnh bìa</label>
+								<input id="edit-cover-file" type="file" accept="image/*" hidden>
+								<span id="edit-cover-filename" class="image-upload-filename">Giữ nguyên ảnh hiện tại</span>
+								<button type="button" id="edit-cover-clear" class="btn-clear-upload" hidden>Xóa ảnh</button>
+							</div>
+							<div id="edit-cover-preview-wrap" class="image-preview-wrap" hidden>
+								<img id="edit-cover-preview" class="image-preview-thumb" alt="Xem trước ảnh bìa">
+							</div>
+						</div>
+
+						<div class="input-group">
+							<label class="input-group-label" for="edit-bio-input">Tiểu sử</label>
+							<input type="text" id="edit-bio-input" placeholder="Tiểu sử ngắn hoặc câu châm ngôn yêu thích...">
+						</div>
+						<div class="input-group">
+							<label class="input-group-label" for="edit-schedule-input">Khung giờ thường online tự học</label>
+							<input type="text" id="edit-schedule-input" placeholder="VD: 20:00 - 22:30 (Thứ 2 - Thứ 6)">
+						</div>
+						<div class="input-group">
+							<label class="input-group-label" for="edit-fb-input">Link Facebook</label>
+							<input type="url" id="edit-fb-input" placeholder="https://facebook.com/...">
+						</div>
+						<div class="input-group">
+							<label class="input-group-label" for="edit-ig-input">Link Instagram</label>
+							<input type="url" id="edit-ig-input" placeholder="https://instagram.com/...">
+						</div>
+						<div class="input-group">
+							<label class="input-group-label" for="edit-gh-input">Link GitHub</label>
+							<input type="url" id="edit-gh-input" placeholder="https://github.com/...">
+						</div>
+						<div style="display: flex; gap: 10px; justify-content: center;">
+							<button id="btn-save-profile" class="btn-auth btn-success" type="button" style="width: auto; padding: 10px 20px;">Lưu thay đổi</button>
+							<button id="btn-cancel-edit" class="btn-logout" type="button">Hủy</button>
+						</div>
+					</div>
 				</section>
 
-				<section class="profile-extra-section" aria-labelledby="profile-interests-title">
+				<!-- Thẻ Hoạt động & Chuỗi ngày tự học -->
+				<section class="profile-sidebar-card" id="study-metrics-card">
+					<div class="profile-sidebar-heading">
+						<h3>Chuỗi tự học &amp; Đóng góp</h3>
+					</div>
+					<div class="study-metrics-grid">
+						<div class="study-metric-box">
+							<strong id="metric-weekly-hours">0 giờ</strong>
+							<span>Tự học tuần này</span>
+						</div>
+						<div class="study-metric-box">
+							<strong id="metric-study-streak">0 ngày</strong>
+							<span>Chuỗi ngày tự học</span>
+						</div>
+					</div>
+					<p id="metric-studyset-stats" class="profile-extra-hint" style="font-weight:700;">Đã tạo 0 bộ • 0 lượt học từ bạn bè</p>
+					<div id="metric-study-schedule" class="study-schedule-chip" hidden></div>
+				</section>
+
+				<!-- Thẻ Môn thế mạnh / Cần hỗ trợ -->
+				<section class="profile-sidebar-card" id="study-tags-card">
+					<div class="profile-sidebar-heading">
+						<h3>Thẻ môn học (Study Tags)</h3>
+						<button type="button" id="btn-toggle-study-tag-form" class="section-add-btn" hidden>+ Thêm tag</button>
+					</div>
+					<div id="study-tag-accordion" class="inline-accordion" hidden>
+						<form id="study-tag-form" class="profile-extra-form">
+							<label for="study-tag-input">Tên thẻ môn học</label>
+							<input id="study-tag-input" maxlength="40" placeholder="VD: #Giỏi_Toán hoặc #Cần_kèm_Anh" required>
+							<label for="study-tag-type">Phân loại</label>
+							<select id="study-tag-type">
+								<option value="strength">Môn thế mạnh (Xanh lá)</option>
+								<option value="need_help">Cần hỗ trợ (Cam)</option>
+							</select>
+							<button type="submit" class="profile-extra-button">Lưu thẻ môn học</button>
+							<p id="study-tag-status" class="profile-extra-status"></p>
+						</form>
+					</div>
+					<div class="study-tags-group">
+						<span class="study-tags-subtitle">Môn thế mạnh (Bấm +1 để xác nhận cho bạn)</span>
+						<div id="study-tags-strength" class="study-tags-wrap"></div>
+					</div>
+					<div class="study-tags-group">
+						<span class="study-tags-subtitle">Môn đang cần hỗ trợ</span>
+						<div id="study-tags-need-help" class="study-tags-wrap"></div>
+					</div>
+				</section>
+
+				<!-- Thẻ Danh sách CLB đang tham gia -->
+				<section class="profile-sidebar-card" id="joined-clubs-card">
+					<div class="profile-sidebar-heading">
+						<h3>CLB đang tham gia</h3>
+						<a href="./clubs.html" style="font-size:12px; color:var(--brand-blue); font-weight:700; text-decoration:none;">Khám phá →</a>
+					</div>
+					<div id="profile-joined-clubs" class="joined-clubs-grid">
+						<p class="profile-extra-empty">Chưa tham gia CLB nào.</p>
+					</div>
+				</section>
+			</aside>
+
+			<!-- CỘT PHẢI (65% NỘI DUNG CHÍNH) -->
+			<div class="profile-col-right">
+				<!-- Ảnh bìa, Note 24h, Avatar + Khung + Trạng thái + Story ring -->
+				<section class="profile-hero-card">
+					<div class="profile-cover">
+						<img id="profile-cover-image" alt="Ảnh bìa hồ sơ" hidden>
+					</div>
+					<div class="profile-hero-stage">
+						<div class="avatar-stage-wrap">
+							<div id="profile-note-display" class="profile-note-bubble" hidden>
+								<span id="profile-note-text"></span>
+							</div>
+							<button type="button" id="btn-open-note-modal" class="btn-note-trigger" hidden>+ Ghi chú 24h (Note)</button>
+							<div id="profile-avatar-ring" class="avatar-ring-wrap frame-none">
+								<img id="user-display-avatar" src="./DIEU.png" alt="Avatar" class="profile-avatar-large">
+								<span id="profile-avatar-status-dot" class="profile-status-dot" data-status="offline" title="Trạng thái hoạt động"></span>
+							</div>
+						</div>
+						<div class="profile-actions" id="profile-quick-media-actions" hidden>
+							<button type="button" id="btn-open-story-modal" class="btn-auth" style="width:auto;">+ Đăng Story 24h/48h</button>
+							<button type="button" id="btn-open-moment-modal" class="btn-auth outline" style="width:auto;">+ Khoảnh khắc 24h</button>
+						</div>
+					</div>
+				</section>
+
+				<!-- Moment 24h đang ghim -->
+				<section id="profile-moment-section" class="moment-banner-card" hidden></section>
+
+				<!-- Showcase sản phẩm/link CLB ghim trên hồ sơ -->
+				<section id="profile-showcase-section" class="profile-extra-section" hidden>
 					<header class="profile-extra-heading">
 						<div>
-							<p class="profile-extra-eyebrow">NHỮNG ĐIỀU YÊU THÍCH</p>
-							<h2 id="profile-interests-title">Sở thích &amp; album ảnh</h2>
+							<p class="profile-extra-eyebrow">NỔI BẬT</p>
+							<h2>Góc ghim sản phẩm &amp; Liên kết</h2>
 						</div>
+						<button type="button" id="btn-open-showcase-modal" class="section-add-btn" hidden>+ Ghim mới</button>
 					</header>
-					<div class="profile-subsection">
-						<h3>Sở thích</h3>
-						<form id="interest-form" class="profile-interest-form">
-							<label class="sr-only" for="interest-name">Thêm sở thích</label>
-							<input id="interest-name" maxlength="40" placeholder="Ví dụ: Nhiếp ảnh" required>
-							<button class="profile-extra-button" type="submit">Thêm tag</button>
-						</form>
-						<p id="interest-status" class="profile-extra-status" role="status" aria-live="polite"></p>
-						<div id="profile-interests-list" class="profile-interests-list" aria-live="polite"></div>
+					<div id="profile-showcase-grid" class="pinned-showcase-grid"></div>
+				</section>
+
+				<!-- Khung đăng bài cho Fanpage CLB (Rich Text + Lên lịch + Upload ảnh) -->
+				<form id="club-post-composer" class="edit-form-box profile-extra-section" style="display: none; flex-direction: column; gap: 12px; margin: 0;">
+					<h3 style="margin: 0;">Đăng bài với tư cách Fanpage CLB</h3>
+					<div class="rte-wrapper" id="club-rte-wrapper">
+						<div class="rte-toolbar">
+							<button type="button" class="rte-btn" data-cmd="bold" title="In đậm"><b>B</b></button>
+							<button type="button" class="rte-btn" data-cmd="italic" title="In nghiêng"><i>I</i></button>
+							<select class="rte-select" id="club-heading-select" aria-label="Cỡ tiêu đề">
+								<option value="P">Văn bản thường</option>
+								<option value="H1">Tiêu đề H1</option>
+								<option value="H2">Tiêu đề H2</option>
+								<option value="H3">Tiêu đề H3</option>
+								<option value="H4">Tiêu đề H4</option>
+								<option value="H5">Tiêu đề H5</option>
+							</select>
+							<label class="rte-color-wrap" title="Màu chữ">
+								<span>Màu chữ</span>
+								<input type="color" id="club-color-picker" value="#173853">
+							</label>
+							<button type="button" class="rte-btn" id="club-mention-trigger">@Tag</button>
+						</div>
+						<div id="club-post-rich-editor" class="rte-editor" contenteditable="true" data-placeholder="Chia sẻ hoạt động, sự kiện mới của CLB... Gõ @ để gắn thẻ..."></div>
+						<div id="club-mention-dropdown" class="mention-dropdown" hidden></div>
 					</div>
-					<div class="profile-subsection profile-album-section">
-						<h3>Album ảnh</h3>
+
+					<div class="image-upload-box">
+						<div class="image-upload-row">
+							<label class="image-upload-label" for="club-post-image-file">Chọn ảnh đính kèm</label>
+							<input id="club-post-image-file" type="file" accept="image/*" hidden>
+							<span id="club-post-image-filename" class="image-upload-filename">Không có ảnh</span>
+							<button type="button" id="club-post-image-clear" class="btn-clear-upload" hidden>Xóa ảnh</button>
+						</div>
+						<div id="club-post-image-preview-wrap" class="image-preview-wrap" hidden>
+							<img id="club-post-image-preview" class="image-preview-thumb" alt="Xem trước ảnh bài viết CLB">
+						</div>
+					</div>
+
+					<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+						<label style="font-size:12px; font-weight:700; display:flex; align-items:center; gap:6px;">
+							Lên lịch đăng (tùy chọn):
+							<input type="datetime-local" id="club-post-schedule-input" style="padding:6px 8px; border:1px solid var(--border-strong); border-radius:6px; background:var(--bg-surface-soft); color:var(--text-main);">
+						</label>
+						<button type="submit" class="btn-auth" style="width: auto; padding: 10px 20px;">Đăng lên Fanpage</button>
+					</div>
+				</form>
+
+				<!-- Thanh Tab Hồ sơ -->
+				<nav class="profile-tabs-bar" id="profile-tabs-bar" aria-label="Các mục trên hồ sơ">
+					<button type="button" class="profile-tab-btn active" data-profile-tab="posts">Bài viết</button>
+					<button type="button" class="profile-tab-btn" data-profile-tab="study-sets">Bộ thẻ &amp; Đề ôn tập</button>
+					<button type="button" class="profile-tab-btn" data-profile-tab="saved-materials">Tài liệu đã chia sẻ / Đã lưu</button>
+					<button type="button" class="profile-tab-btn" data-profile-tab="achievements-interests">Thành tích &amp; Sở thích</button>
+					<button type="button" class="profile-tab-btn" data-profile-tab="album">Album ảnh</button>
+				</nav>
+
+				<!-- TAB 1: BÀI VIẾT & BÀI ĐÃ LƯU -->
+				<section class="profile-tab-panel" data-tab-panel="posts">
+					<div class="posts-subfilter-row">
+						<h3 id="posts-section-heading" style="color: var(--text-main);">Bài viết đã đăng</h3>
+						<div id="posts-subfilter-pills" class="subfilter-pills" hidden>
+							<button type="button" class="subfilter-btn active" data-post-filter="mine">Của tôi</button>
+							<button type="button" class="subfilter-btn" data-post-filter="saved">Bài đã lưu</button>
+						</div>
+					</div>
+					<div id="my-posts-container"></div>
+				</section>
+
+				<!-- TAB 2: BỘ THẺ & ĐỀ ÔN TẬP (STUDY SETS) -->
+				<section class="profile-tab-panel profile-extra-section" data-tab-panel="study-sets" hidden>
+					<header class="profile-extra-heading">
+						<div>
+							<p class="profile-extra-eyebrow">ÔN TẬP &amp; THÁCH ĐẤU</p>
+							<h2>Bộ thẻ Flashcard &amp; Đề trắc nghiệm</h2>
+						</div>
+						<button type="button" id="btn-open-studyset-builder" class="section-add-btn" hidden>+ Tạo Bộ thẻ / Đề</button>
+					</header>
+					<div id="profile-studysets-list" class="study-sets-grid"></div>
+				</section>
+
+				<!-- TAB 3: TÀI LIỆU ĐÃ CHIA SẺ / ĐÃ LƯU -->
+				<section class="profile-tab-panel profile-extra-section" data-tab-panel="saved-materials" hidden>
+					<header class="profile-extra-heading">
+						<div>
+							<p class="profile-extra-eyebrow">KHO TÀI LIỆU HỌC TẬP</p>
+							<h2>Tài liệu đã chia sẻ &amp; Đã lưu</h2>
+						</div>
+						<a href="./hoc-nhom.html" class="section-add-btn" style="text-decoration:none;">Mở Kệ sách →</a>
+					</header>
+					<div id="profile-materials-list" class="study-sets-grid"></div>
+				</section>
+
+				<!-- TAB 4: THÀNH TÍCH & SỞ THÍCH -->
+				<section class="profile-tab-panel profile-extras" data-tab-panel="achievements-interests" hidden>
+					<section class="profile-extra-section" aria-labelledby="profile-achievements-title">
+						<header class="profile-extra-heading">
+							<div>
+								<p class="profile-extra-eyebrow">DẤU MỐC CÁ NHÂN</p>
+								<h2 id="profile-achievements-title">Góc thành tích</h2>
+							</div>
+							<button type="button" id="btn-toggle-achievement-form" class="section-add-btn" hidden>+ Thêm thành tích</button>
+						</header>
+						<div id="achievement-accordion" class="inline-accordion" hidden>
+							<form id="achievement-form" class="profile-extra-form">
+								<label for="achievement-title">Tên giải thưởng hoặc thành tích</label>
+								<input id="achievement-title" maxlength="100" placeholder="Ví dụ: Giải Nhất học sinh giỏi cấp thành phố" required>
+								<label for="achievement-certificate">Ảnh chứng nhận (không bắt buộc)</label>
+								<input id="achievement-certificate" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+								<p class="profile-extra-hint">Ảnh sẽ được tự động nén tối ưu WebP trước khi lưu.</p>
+								<button class="profile-extra-button" type="submit">Lưu thành tích</button>
+								<p id="achievement-status" class="profile-extra-status" role="status" aria-live="polite"></p>
+							</form>
+						</div>
+						<div id="profile-achievements-list" class="profile-achievements-list" aria-live="polite"></div>
+					</section>
+
+					<section class="profile-extra-section" aria-labelledby="profile-interests-title">
+						<header class="profile-extra-heading">
+							<div>
+								<p class="profile-extra-eyebrow">NHỮNG ĐIỀU YÊU THÍCH</p>
+								<h2 id="profile-interests-title">Sở thích cá nhân</h2>
+							</div>
+							<button type="button" id="btn-toggle-interest-form" class="section-add-btn" hidden>+ Thêm sở thích</button>
+						</header>
+						<div id="interest-accordion" class="inline-accordion" hidden>
+							<form id="interest-form" class="profile-interest-form">
+								<label class="sr-only" for="interest-name">Thêm sở thích</label>
+								<input id="interest-name" maxlength="40" placeholder="Ví dụ: Nhiếp ảnh" required>
+								<button class="profile-extra-button" type="submit">Thêm tag</button>
+							</form>
+							<p id="interest-status" class="profile-extra-status" role="status" aria-live="polite"></p>
+						</div>
+						<div id="profile-interests-list" class="profile-interests-list" aria-live="polite"></div>
+					</section>
+				</section>
+
+				<!-- TAB 5: ALBUM ẢNH -->
+				<section class="profile-tab-panel profile-extra-section" data-tab-panel="album" hidden>
+					<header class="profile-extra-heading">
+						<div>
+							<p class="profile-extra-eyebrow">KỶ NIỆM HỌC ĐƯỜNG</p>
+							<h2>Album ảnh cá nhân</h2>
+						</div>
+						<button type="button" id="btn-toggle-album-form" class="section-add-btn" hidden>+ Thêm ảnh</button>
+					</header>
+					<div id="album-accordion" class="inline-accordion" hidden>
 						<form id="album-form" class="profile-extra-form profile-album-form">
 							<label for="album-photo">Chọn ảnh</label>
 							<input id="album-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required>
@@ -269,69 +481,303 @@
 							<button class="profile-extra-button" type="submit">Thêm vào album</button>
 							<p id="album-status" class="profile-extra-status" role="status" aria-live="polite"></p>
 						</form>
-						<div id="profile-album-list" class="profile-album-list" aria-live="polite"></div>
 					</div>
+					<div id="profile-album-list" class="profile-album-list" aria-live="polite"></div>
 				</section>
-			</div>
 
-			<!-- Khung đăng bài cho Fanpage CLB (Rich Text + @tag + Upload ảnh) -->
-			<form id="club-post-composer" class="edit-form-box" style="display: none; flex-direction: column; gap: 12px; margin-bottom: 20px;">
-				<h3 style="margin: 0;">Đăng bài với tư cách Fanpage CLB</h3>
-				<div class="rte-wrapper" id="club-rte-wrapper">
-					<div class="rte-toolbar">
-						<button type="button" class="rte-btn" data-cmd="bold" title="In đậm"><b>B</b></button>
-						<button type="button" class="rte-btn" data-cmd="italic" title="In nghiêng"><i>I</i></button>
-						<select class="rte-select" id="club-heading-select" aria-label="Cỡ tiêu đề">
-							<option value="P">Văn bản thường</option>
-							<option value="H1">Tiêu đề H1</option>
-							<option value="H2">Tiêu đề H2</option>
-							<option value="H3">Tiêu đề H3</option>
-							<option value="H4">Tiêu đề H4</option>
-							<option value="H5">Tiêu đề H5</option>
-						</select>
-						<label class="rte-color-wrap" title="Màu chữ">
-							<span>Màu chữ</span>
-							<input type="color" id="club-color-picker" value="#173853">
-						</label>
-						<button type="button" class="rte-btn" id="club-mention-trigger">@Tag</button>
-					</div>
-					<div id="club-post-rich-editor" class="rte-editor" contenteditable="true" data-placeholder="Chia sẻ hoạt động, sự kiện mới của CLB... Gõ @ để gắn thẻ..."></div>
-					<div id="club-mention-dropdown" class="mention-dropdown" hidden></div>
-				</div>
-
-				<div class="image-upload-box">
-					<div class="image-upload-row">
-						<label class="image-upload-label" for="club-post-image-file">Chọn ảnh đính kèm</label>
-						<input id="club-post-image-file" type="file" accept="image/*" hidden>
-						<span id="club-post-image-filename" class="image-upload-filename">Không có ảnh</span>
-						<button type="button" id="club-post-image-clear" class="btn-clear-upload" hidden>Xóa ảnh</button>
-					</div>
-					<div id="club-post-image-preview-wrap" class="image-preview-wrap" hidden>
-						<img id="club-post-image-preview" class="image-preview-thumb" alt="Xem trước ảnh bài viết CLB">
-					</div>
-				</div>
-
-				<button type="submit" class="btn-auth" style="width: auto; align-self: flex-end; padding: 10px 20px;">Đăng lên Fanpage</button>
-			</form>
-
-			<!-- Danh sách bài viết -->
-			<div class="my-posts-section">
-				<h3 id="posts-section-heading" style="margin-bottom: 15px; color: #1c1e21;">Bài viết đã đăng của bạn</h3>
-				<div id="my-posts-container">
-					<p style="text-align: center; color: #65676b;">Đang tải bài viết...</p>
-				</div>
+				<!-- KHUNG GẮN KẾT QUẢN TRỊ & BAN DUYỆT BÀI (RENDER ĐỘNG 100% TỪ BACKEND RBAC) -->
+				<div id="privileged-workspace-mount"></div>
 			</div>
 		</div>
 	</main>
 
-	<!-- Modal Báo cáo (cho bài viết hoặc tài khoản bạn bè) -->
+	<!-- MODAL: Note 24h -->
+	<div id="note-modal-overlay" class="report-modal-overlay" hidden>
+		<section class="report-modal-box" role="dialog" aria-modal="true" aria-labelledby="note-modal-title">
+			<div class="report-modal-header">
+				<h3 id="note-modal-title">Ghi chú nhanh 24h</h3>
+				<button type="button" class="close-badge" data-close-modal="note-modal-overlay">&times;</button>
+			</div>
+			<p class="profile-extra-hint">Ghi chú hiển thị trên ảnh đại diện của bạn trong 24 giờ (tối đa 60 ký tự). Để trống để xóa ghi chú.</p>
+			<input type="text" id="note-text-input" maxlength="60" placeholder="VD: Đang cày đề Toán THPTQG...">
+			<div class="mod-actions-row">
+				<button type="button" id="btn-clear-note" class="btn-auth outline" style="width:auto;">Xóa Note</button>
+				<button type="button" id="btn-save-note" class="btn-auth" style="width:auto;">Lưu Note 24h</button>
+			</div>
+		</section>
+	</div>
+
+	<!-- MODAL: Moment 24h -->
+	<div id="moment-modal-overlay" class="report-modal-overlay" hidden>
+		<section class="report-modal-box" role="dialog" aria-modal="true" aria-labelledby="moment-modal-title">
+			<div class="report-modal-header">
+				<h3 id="moment-modal-title">Đăng Khoảnh khắc 24h</h3>
+				<button type="button" class="close-badge" data-close-modal="moment-modal-overlay">&times;</button>
+			</div>
+			<form id="moment-form" class="profile-extra-form">
+				<label for="moment-image-file">Chọn ảnh từ thư viện</label>
+				<input type="file" id="moment-image-file" accept="image/*" required>
+				<label for="moment-caption-input">Chú thích ngắn</label>
+				<input type="text" id="moment-caption-input" maxlength="140" placeholder="Góc học tập hôm nay...">
+				<p id="moment-form-status" class="profile-extra-status"></p>
+				<button type="submit" class="btn-auth">Đăng Moment 24h</button>
+			</form>
+		</section>
+	</div>
+
+	<!-- MODAL: Đăng Story 24h / 48h -->
+	<div id="story-modal-overlay" class="report-modal-overlay" hidden>
+		<section class="report-modal-box" role="dialog" aria-modal="true" aria-labelledby="story-modal-title">
+			<div class="report-modal-header">
+				<h3 id="story-modal-title">Đăng Story Ảnh / Video</h3>
+				<button type="button" class="close-badge" data-close-modal="story-modal-overlay">&times;</button>
+			</div>
+			<form id="story-form" class="profile-extra-form">
+				<label for="story-media-file">Chọn ảnh hoặc video ngắn (.mp4/.webm)</label>
+				<input type="file" id="story-media-file" accept="image/*,video/mp4,video/webm" required>
+				<label for="story-caption-input">Chú thích Story</label>
+				<input type="text" id="story-caption-input" maxlength="160" placeholder="Chia sẻ khoảnh khắc cùng bạn bè NQD...">
+				<label for="story-duration-select">Thời gian tồn tại</label>
+				<select id="story-duration-select">
+					<option value="24">24 giờ</option>
+					<option value="48">48 giờ</option>
+				</select>
+				<p id="story-form-status" class="profile-extra-status"></p>
+				<button type="submit" class="btn-auth">Đăng Story ngay</button>
+			</form>
+		</section>
+	</div>
+
+	<!-- MODAL: Trình xem Story -->
+	<div id="story-viewer-overlay" class="story-viewer-overlay" hidden>
+		<div class="story-viewer-box" role="dialog" aria-modal="true">
+			<div id="story-progress-track" class="story-progress-track"></div>
+			<div class="story-viewer-header">
+				<div class="story-viewer-author">
+					<img id="story-viewer-avatar" src="./DIEU.png" alt="">
+					<div>
+						<strong id="story-viewer-name" style="font-size:13.5px;">Tên học sinh</strong>
+						<p id="story-viewer-time" style="font-size:11px; color:#9eb7cc;"></p>
+					</div>
+				</div>
+				<div style="display:flex; gap:6px;">
+					<button type="button" id="story-viewer-delete" class="btn-clear-upload" hidden>Xóa</button>
+					<button type="button" class="close-badge" data-close-modal="story-viewer-overlay">&times;</button>
+				</div>
+			</div>
+			<div class="story-media-stage" id="story-media-stage">
+				<button type="button" id="story-prev-btn" class="story-nav-btn prev" aria-label="Story trước">‹</button>
+				<button type="button" id="story-next-btn" class="story-nav-btn next" aria-label="Story tiếp">›</button>
+			</div>
+			<div class="story-viewer-footer">
+				<p id="story-viewer-caption" class="story-caption-text"></p>
+				<div class="story-meta-row">
+					<span id="story-viewer-views">0 lượt xem</span>
+					<span id="story-viewer-expiry"></span>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- MODAL: Ghim Showcase -->
+	<div id="showcase-modal-overlay" class="report-modal-overlay" hidden>
+		<section class="report-modal-box" role="dialog" aria-modal="true" aria-labelledby="showcase-modal-title">
+			<div class="report-modal-header">
+				<h3 id="showcase-modal-title">Ghim Sản phẩm / Liên kết CLB</h3>
+				<button type="button" class="close-badge" data-close-modal="showcase-modal-overlay">&times;</button>
+			</div>
+			<form id="showcase-form" class="profile-extra-form">
+				<label for="showcase-title-input">Tiêu đề</label>
+				<input type="text" id="showcase-title-input" maxlength="80" placeholder="VD: Poster tuyển thành viên CLB Tin học" required>
+				<label for="showcase-desc-input">Mô tả ngắn</label>
+				<input type="text" id="showcase-desc-input" maxlength="160" placeholder="Thông tin chi tiết...">
+				<label for="showcase-url-input">Đường dẫn (tùy chọn)</label>
+				<input type="url" id="showcase-url-input" placeholder="https://...">
+				<label for="showcase-image-file">Ảnh minh họa (tùy chọn)</label>
+				<input type="file" id="showcase-image-file" accept="image/*">
+				<p id="showcase-form-status" class="profile-extra-status"></p>
+				<button type="submit" class="btn-auth">Ghim lên hồ sơ</button>
+			</form>
+		</section>
+	</div>
+
+	<!-- MODAL: Tạo / Sửa Bộ thẻ & Đề ôn tập -->
+	<div id="studyset-builder-overlay" class="report-modal-overlay" hidden>
+		<section class="report-modal-box" style="width:min(600px, 100%);" role="dialog" aria-modal="true" aria-labelledby="studyset-builder-title">
+			<div class="report-modal-header">
+				<h3 id="studyset-builder-title">Tạo Bộ thẻ / Đề ôn tập</h3>
+				<button type="button" class="close-badge" data-close-modal="studyset-builder-overlay">&times;</button>
+			</div>
+			<form id="studyset-builder-form" class="profile-extra-form">
+				<label for="studyset-title-input">Tên bộ thẻ / đề ôn tập</label>
+				<input type="text" id="studyset-title-input" maxlength="100" placeholder="VD: 30 Công thức Nguyên hàm - Tích phân" required>
+				<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+					<div>
+						<label for="studyset-subject-input">Môn học</label>
+						<input type="text" id="studyset-subject-input" maxlength="40" placeholder="VD: Toán học">
+					</div>
+					<div>
+						<label for="studyset-type-select">Loại học liệu</label>
+						<select id="studyset-type-select">
+							<option value="flashcard">Flashcard lật 2 mặt</option>
+							<option value="quiz">Quiz Trắc nghiệm A/B/C/D</option>
+						</select>
+					</div>
+				</div>
+				<label style="display:flex; align-items:center; gap:6px;">
+					<input type="checkbox" id="studyset-pin-checkbox" style="width:auto; min-height:auto;"> Ghim bộ này lên đầu hồ sơ
+				</label>
+				<div id="studyset-items-builder" style="display:grid; gap:10px; max-height:280px; overflow-y:auto; padding-right:4px;"></div>
+				<button type="button" id="btn-add-studyset-item" class="btn-auth outline">+ Thêm thẻ / câu hỏi</button>
+				<p id="studyset-builder-status" class="profile-extra-status"></p>
+				<button type="submit" class="btn-auth">Lưu Bộ ôn tập</button>
+			</form>
+		</section>
+	</div>
+
+	<!-- MODAL: Học Flashcard 3D & Thách đấu Quiz + BXH Top 3 -->
+	<div id="studyset-player-overlay" class="report-modal-overlay" hidden>
+		<section class="report-modal-box" style="width:min(620px, 100%);" role="dialog" aria-modal="true" aria-labelledby="studyset-player-title">
+			<div class="report-modal-header">
+				<h3 id="studyset-player-title">Ôn tập</h3>
+				<button type="button" class="close-badge" data-close-modal="studyset-player-overlay">&times;</button>
+			</div>
+			<div id="studyset-player-body" style="display:grid; gap:12px;"></div>
+		</section>
+	</div>
+
+	<!-- MODAL: Thẻ Học Sinh Điện Tử QR -->
+	<div id="ecard-modal-overlay" class="report-modal-overlay" hidden>
+		<section class="report-modal-box" role="dialog" aria-modal="true" aria-labelledby="ecard-modal-title">
+			<div class="report-modal-header">
+				<h3 id="ecard-modal-title">Thẻ Học Sinh Điện Tử NQD</h3>
+				<button type="button" class="close-badge" data-close-modal="ecard-modal-overlay">&times;</button>
+			</div>
+			<div class="ecard-preview" id="ecard-preview-card">
+				<div class="ecard-header">
+					<span>DIEUNW · E-STUDENT CARD</span>
+					<span id="ecard-cohort-label">NQD</span>
+				</div>
+				<div class="ecard-body">
+					<div style="display:grid; gap:6px; min-width:0;">
+						<img id="ecard-avatar-img" src="./DIEU.png" alt="Avatar" style="width:52px; height:52px; border-radius:50%; object-fit:cover; border:2px solid #fff;">
+						<strong id="ecard-name-label" style="font-size:17px;">Tên Học Sinh</strong>
+						<span id="ecard-class-label" style="font-size:13px; opacity:0.92;">Lớp</span>
+						<span id="ecard-email-label" style="font-size:11.5px; opacity:0.85; overflow-wrap:anywhere;"></span>
+					</div>
+					<div class="ecard-qr-box" title="Quét để mở hồ sơ bạn học">
+						<canvas id="ecard-qr-canvas" width="140" height="140"></canvas>
+					</div>
+				</div>
+			</div>
+			<div class="mod-actions-row">
+				<button type="button" id="btn-copy-profile-link" class="btn-auth outline" style="width:auto;">Sao chép liên kết hồ sơ</button>
+				<button type="button" id="btn-download-ecard" class="btn-auth" style="width:auto;">Tải mã QR về máy</button>
+			</div>
+		</section>
+	</div>
+
+	<!-- MODAL: DIEUNW+ (Gradient, Khung Avatar, Ghost Mode, Quyền riêng tư, Sticker) -->
+	<div id="dieunw-plus-overlay" class="report-modal-overlay" hidden>
+		<section class="report-modal-box" style="width:min(580px, 100%);" role="dialog" aria-modal="true" aria-labelledby="dieunw-plus-title">
+			<div class="report-modal-header">
+				<h3 id="dieunw-plus-title">DIEUNW+ Tùy chỉnh Nâng cao</h3>
+				<button type="button" class="close-badge" data-close-modal="dieunw-plus-overlay">&times;</button>
+			</div>
+			<div style="display:grid; gap:14px;">
+				<div>
+					<label class="input-group-label">Màu Gradient hồ sơ (2 màu)</label>
+					<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
+						<input type="color" id="plus-grad-1" value="#1769aa" style="width:44px; height:34px; border:0; background:none; cursor:pointer;">
+						<input type="color" id="plus-grad-2" value="#2298f8" style="width:44px; height:34px; border:0; background:none; cursor:pointer;">
+						<div class="gradient-presets-row">
+							<button type="button" class="gradient-swatch-btn" data-g1="#1769aa" data-g2="#2298f8" style="background:linear-gradient(135deg,#1769aa,#2298f8);" title="Xanh NQD"></button>
+							<button type="button" class="gradient-swatch-btn" data-g1="#0f766e" data-g2="#10b981" style="background:linear-gradient(135deg,#0f766e,#10b981);" title="Xanh Ngọc"></button>
+							<button type="button" class="gradient-swatch-btn" data-g1="#4338ca" data-g2="#ec4899" style="background:linear-gradient(135deg,#4338ca,#ec4899);" title="Cực quang"></button>
+							<button type="button" class="gradient-swatch-btn" data-g1="#c2410c" data-g2="#f59e0b" style="background:linear-gradient(135deg,#c2410c,#f59e0b);" title="Hoàng hôn"></button>
+						</div>
+					</div>
+				</div>
+
+				<div>
+					<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+						<label class="input-group-label" style="margin:0;">Cửa hàng Khung Avatar (Mở khóa bằng Điểm tự học)</label>
+						<span id="plus-study-points-badge" class="study-set-badge">0 điểm tự học</span>
+					</div>
+					<div id="plus-frame-shop-grid" class="frame-shop-grid"></div>
+				</div>
+
+				<div style="display:grid; gap:8px;">
+					<label class="input-group-label" style="margin:0;">Quyền riêng tư &amp; Chế độ Ẩn danh (Ghost Mode)</label>
+					<label class="privacy-toggle-row">
+						<span>Chế độ Ẩn danh (Ẩn chấm online, "Đang soạn tin..." &amp; "Đã xem")</span>
+						<input type="checkbox" id="plus-ghost-mode">
+					</label>
+					<div class="privacy-toggle-row">
+						<span>Ai có thể xem Album ảnh?</span>
+						<select id="plus-privacy-album" style="width:auto;">
+							<option value="public">Mọi người</option>
+							<option value="friends">Chỉ Bạn bè</option>
+							<option value="private">Chỉ mình tôi</option>
+						</select>
+					</div>
+					<div class="privacy-toggle-row">
+						<span>Ai có thể xem Góc thành tích?</span>
+						<select id="plus-privacy-achievements" style="width:auto;">
+							<option value="public">Mọi người</option>
+							<option value="friends">Chỉ Bạn bè</option>
+							<option value="private">Chỉ mình tôi</option>
+						</select>
+					</div>
+					<div class="privacy-toggle-row">
+						<span>Hiển thị Trạng thái hoạt động (Online / Đang tự học)?</span>
+						<select id="plus-privacy-activity" style="width:auto;">
+							<option value="public">Mọi người</option>
+							<option value="friends">Chỉ Bạn bè</option>
+							<option value="private">Ẩn hoàn toàn</option>
+						</select>
+					</div>
+				</div>
+
+				<div style="display:grid; gap:8px; padding-top:8px; border-top:1px solid var(--border-color);">
+					<label class="input-group-label" style="margin:0;">Bộ Sticker / Emoji cá nhân (Dùng trong Bình luận &amp; Nhắn tin)</label>
+					<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+						<input type="text" id="plus-sticker-name" maxlength="30" placeholder="Tên sticker (VD: Đậu Đại Học)" style="flex:1; min-width:140px;">
+						<input type="file" id="plus-sticker-file" accept="image/png,image/webp,image/gif" style="flex:1; min-width:160px;">
+						<button type="button" id="btn-add-sticker" class="profile-extra-button">+ Tải Sticker</button>
+					</div>
+					<div id="plus-stickers-list" class="sticker-grid" style="max-height:130px;"></div>
+				</div>
+
+				<p id="plus-save-status" class="profile-extra-status"></p>
+				<button type="button" id="btn-save-dieunw-plus" class="btn-auth">Lưu cài đặt DIEUNW+</button>
+			</div>
+		</section>
+	</div>
+
+	<!-- MODAL: Xác nhận Study Tag (+1 & Lời nhận xét) -->
+	<div id="endorse-modal-overlay" class="report-modal-overlay" hidden>
+		<section class="report-modal-box" role="dialog" aria-modal="true" aria-labelledby="endorse-modal-title">
+			<div class="report-modal-header">
+				<h3 id="endorse-modal-title">Xác nhận thế mạnh cho bạn học</h3>
+				<button type="button" class="close-badge" data-close-modal="endorse-modal-overlay">&times;</button>
+			</div>
+			<p id="endorse-tag-label" style="font-size:13px; font-weight:700;"></p>
+			<div id="endorse-existing-comments" class="endorsement-comments"></div>
+			<input type="text" id="endorse-comment-input" maxlength="120" placeholder="Lời nhận xét ngắn (VD: Giải đề Lý siêu đỉnh!)...">
+			<p id="endorse-status" class="profile-extra-status"></p>
+			<button type="button" id="btn-submit-endorse" class="btn-auth">Gửi +1 Xác nhận</button>
+		</section>
+	</div>
+
+	<!-- Modal Báo cáo -->
 	<div id="report-modal-overlay" class="report-modal-overlay" hidden>
 		<section class="report-modal-box" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
 			<div class="report-modal-header">
 				<h3 id="report-modal-title">Báo cáo vi phạm</h3>
 				<button type="button" id="report-modal-close" class="close-badge" aria-label="Đóng">&times;</button>
 			</div>
-			<p id="report-target-label" style="font-size:13px; color:#5e7488; margin-bottom:10px;"></p>
+			<p id="report-target-label" style="font-size:13px; color:var(--text-muted);"></p>
 			<div class="report-reason-chips">
 				<button type="button" class="report-chip" data-reason="Nội dung không phù hợp">Nội dung không phù hợp</button>
 				<button type="button" class="report-chip" data-reason="Ngôn từ thù ghét hoặc xúc phạm">Xúc phạm / Thù ghét</button>
@@ -339,14 +785,14 @@
 			</div>
 			<textarea id="report-reason-input" rows="3" maxlength="500" placeholder="Nhập lý do chi tiết..."></textarea>
 			<p id="report-modal-status" class="form-message" role="status"></p>
-			<div style="display:flex; justify-content:flex-end; gap:10px; margin-top:12px;">
+			<div style="display:flex; justify-content:flex-end; gap:10px;">
 				<button type="button" id="report-modal-cancel" class="btn-timer outline" style="padding:8px 16px;">Hủy</button>
 				<button type="button" id="report-modal-submit" class="btn-auth" style="width:auto; padding:8px 18px; background:#b42318;">Gửi báo cáo</button>
 			</div>
 		</section>
 	</div>
 
-	<!-- Modal Chi tiết kiểm duyệt (Admin & Ban duyệt bài) -->
+	<!-- Modal Chi tiết kiểm duyệt -->
 	<div id="mod-inspect-overlay" class="report-modal-overlay" hidden>
 		<section class="report-modal-box" role="dialog" aria-modal="true" aria-labelledby="mod-inspect-title">
 			<div class="report-modal-header">
@@ -364,8 +810,8 @@
 			emailjs.init({ publicKey: "dViu70h7kpGKrNHN0" });
 		}
 	</script>
-	<script src="./nav-profile.js?v=2" defer></script>
-	<script src="./profile-auth.js?v=2" defer></script>
-	<script src="./profile-sections.js?v=2" defer></script>
+	<script src="./nav-profile.js?v=3" defer></script>
+	<script src="./profile-auth.js?v=3" defer></script>
+	<script src="./profile-sections.js?v=3" defer></script>
 </body>
 </html>
