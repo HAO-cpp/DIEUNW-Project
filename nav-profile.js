@@ -67,7 +67,8 @@
         return raw;
     }
     window.dieunwResolveMedia = resolveMedia;
-        // =========================================================
+
+    // =========================================================
     // 1. TOAST & HỘP THOẠI XÁC NHẬN THAY THẾ ALERT / CONFIRM
     // =========================================================
     function ensureToastHost() {
@@ -369,9 +370,9 @@
                 if (found) {
                     return {
                         mode: "library",
-                                                musicId: found.id,
+                        musicId: found.id,
                         id: found.id,
-                        musicUrl: found.audioUrl || found.audio_url || "",
+                                                musicUrl: found.audioUrl || found.audio_url || "",
                         audioUrl: found.audioUrl || found.audio_url || "",
                         musicTitle: found.title || "",
                         title: found.title || "",
@@ -471,6 +472,43 @@
     let musicBtnRef = null;
     let musicPopoverRef = null;
     let lastSaveTick = 0;
+    let isPageUnloading = false;
+
+    function openMusicDB() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open("DieunwLocalMusicDB", 1);
+            req.onupgradeneeded = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains("files")) {
+                    db.createObjectStore("files", { keyPath: "id" });
+                }
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    async function saveLocalTrackToDB(id, fileBlob) {
+        try {
+            const db = await openMusicDB();
+            const tx = db.transaction("files", "readwrite");
+            tx.objectStore("files").put({ id, blob: fileBlob });
+        } catch {}
+    }
+
+    async function getLocalTrackFromDB(id) {
+        try {
+            const db = await openMusicDB();
+            return await new Promise((resolve) => {
+                const tx = db.transaction("files", "readonly");
+                const req = tx.objectStore("files").get(id);
+                req.onsuccess = () => resolve(req.result?.blob || null);
+                req.onerror = () => resolve(null);
+            });
+        } catch {
+            return null;
+        }
+    }
 
     function ensureGlobalAudio() {
         if (!globalAudioEl) {
@@ -488,29 +526,25 @@
     }
 
     function saveGlobalMusicState(force = false) {
-        if (!globalAudioEl) return;
+        if (!globalAudioEl || isPageUnloading) return;
         const now = Date.now();
-        if (!force && now - lastSaveTick < 400) return;
+        if (!force && now - lastSaveTick < 350) return;
         lastSaveTick = now;
 
-        const persistableList = globalPlaylist.filter(item => {
-            const u = String(item.audioUrl || item.audio_url || item.url || "");
-            return u && !u.startsWith("blob:");
-        });
+        if (!globalPlaylist.length) return;
 
-        const currentTrack = globalIndex >= 0 ? globalPlaylist.at(globalIndex) : null;
-        const currentUrl = currentTrack ? String(currentTrack.audioUrl || currentTrack.audio_url || currentTrack.url || "") : "";
-        const isBlob = currentUrl.startsWith("blob:");
+        const cleanList = globalPlaylist.map(item => ({
+            id: item.id,
+            title: item.title,
+            artist: item.artist || "",
+            isLocal: Boolean(item.isLocal),
+            audioUrl: item.isLocal ? "" : String(item.audioUrl || item.audio_url || item.url || "")
+        }));
 
-        if (!persistableList.length || isBlob) {
-            if (isBlob) localStorage.removeItem(MUSIC_STATE_KEY);
-            return;
-        }
-
-        const mappedIndex = persistableList.findIndex(t => String(t.id) === String(currentTrack?.id));
+        const safeIdx = globalIndex >= 0 && globalIndex < cleanList.length ? globalIndex : 0;
         const state = {
-            playlist: persistableList,
-            index: mappedIndex >= 0 ? mappedIndex : 0,
+            playlist: cleanList,
+            index: safeIdx,
             currentTime: Number.isFinite(globalAudioEl.currentTime) ? globalAudioEl.currentTime : 0,
             isPlaying: Boolean(!globalAudioEl.paused && globalAudioEl.src),
             playbackRate: globalAudioEl.playbackRate || 1,
@@ -519,9 +553,7 @@
         };
         try {
             localStorage.setItem(MUSIC_STATE_KEY, JSON.stringify(state));
-        } catch {
-            // Bỏ qua nếu đầy storage
-        }
+        } catch {}
     }
 
     function readGlobalMusicState() {
@@ -535,8 +567,7 @@
             return null;
         }
     }
-
-    function positionMusicPopover() {
+        function positionMusicPopover() {
         if (!musicBtnRef || !musicPopoverRef) return;
         const isHidden = musicPopoverRef.hidden || getComputedStyle(musicPopoverRef).display === "none";
         if (isHidden) return;
@@ -587,7 +618,7 @@
         btn.style.cssText = "position:relative;width:40px;height:40px;flex:0 0 40px;border-radius:50%;border:2px solid rgba(255,255,255,0.92);background:radial-gradient(circle at center,#2c3240 0%,#0f141d 60%,#1e293b 100%);display:grid;place-items:center;cursor:pointer;padding:0;box-shadow:0 3px 10px rgba(0,0,0,0.22);";
         btn.innerHTML = `
             <span class="nav-music-disc-center" style="width:14px;height:14px;border-radius:50%;background:linear-gradient(135deg,#38bdf8,#1769aa);border:2px solid #fff;display:block;"></span>
-                        <span style="position:absolute;top:-3px;right:-3px;width:16px;height:16px;border-radius:50%;background:#0ea5e9;color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center;border:1.5px solid #fff;">♪</span>
+            <span style="position:absolute;top:-3px;right:-3px;width:16px;height:16px;border-radius:50%;background:#0ea5e9;color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center;border:1.5px solid #fff;">♪</span>
         `;
 
         const avatarLink = dock.querySelector(".nav-avatar-link");
@@ -678,7 +709,7 @@
                 pick.type = "button";
                 pick.style.cssText = "flex:1;border:0;background:none;text-align:left;font:inherit;font-size:12.5px;font-weight:700;color:inherit;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
                 pick.textContent = `${idx + 1}. ${tr.title}${tr.artist ? ` - ${tr.artist}` : ""}`;
-                pick.onclick = () => playAtIndex(idx);
+                                pick.onclick = () => playAtIndex(idx);
                 li.appendChild(pick);
                 listEl.appendChild(li);
             });
@@ -699,8 +730,9 @@
                             saveGlobalMusicState(true);
                         }).catch(() => {});
                     };
-                    document.addEventListener("pointerdown", unlock, { once: true });
-                    document.addEventListener("keydown", unlock, { once: true });
+                    ["pointerdown", "keydown", "touchstart"].forEach(evt => {
+                        document.addEventListener(evt, unlock, { once: true });
+                    });
                 });
             };
 
@@ -711,12 +743,20 @@
             }
         }
 
-        function playAtIndex(idx, options = {}) {
+        async function playAtIndex(idx, options = {}) {
             if (!globalPlaylist.length) return;
             globalIndex = ((idx % globalPlaylist.length) + globalPlaylist.length) % globalPlaylist.length;
             const tr = globalPlaylist.at(globalIndex);
             if (!tr) return;
-            const src = resolveMedia(tr.audioUrl || tr.audio_url || tr.url);
+
+            let src = resolveMedia(tr.audioUrl || tr.audio_url || tr.url);
+            if (tr.isLocal && (!src || src.startsWith("blob:"))) {
+                const blob = await getLocalTrackFromDB(tr.id);
+                if (blob) {
+                    src = URL.createObjectURL(blob);
+                    tr.audioUrl = src;
+                }
+            }
             if (!src) return;
 
             audio.src = src;
@@ -738,7 +778,7 @@
                     if (audio.readyState >= 1) setPos();
                     else audio.addEventListener("loadedmetadata", setPos, { once: true });
                 }
-                                syncPlayState();
+                syncPlayState();
                 saveGlobalMusicState(true);
                 return;
             }
@@ -812,18 +852,21 @@
             playAtIndex(0);
         });
 
-        fileInput.addEventListener("change", (e) => {
+        fileInput.addEventListener("change", async (e) => {
             const files = Array.from(e.target.files || []);
             if (!files.length) return;
             const start = globalPlaylist.length;
-            files.forEach(f => {
+            for (const f of files) {
+                const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                await saveLocalTrackToDB(localId, f);
                 globalPlaylist.push({
-                    id: `local-${Date.now()}-${Math.random()}`,
+                    id: localId,
                     title: f.name.replace(/\.[^.]+$/, ""),
                     artist: "Từ máy",
+                    isLocal: true,
                     audioUrl: URL.createObjectURL(f)
                 });
-            });
+            }
             e.target.value = "";
             playAtIndex(start);
         });
@@ -873,6 +916,7 @@
             saveGlobalMusicState(true);
         });
         audio.addEventListener("pause", () => {
+            if (isPageUnloading) return;
             syncPlayState();
             saveGlobalMusicState(true);
         });
@@ -886,8 +930,12 @@
             }
         });
 
-        window.addEventListener("beforeunload", () => saveGlobalMusicState(true));
-        window.addEventListener("pagehide", () => saveGlobalMusicState(true));
+        const handleUnload = () => {
+            saveGlobalMusicState(true);
+            isPageUnloading = true;
+        };
+        window.addEventListener("beforeunload", handleUnload);
+        window.addEventListener("pagehide", handleUnload);
         window.addEventListener("resize", positionMusicPopover);
         window.addEventListener("scroll", positionMusicPopover, { passive: true });
 
@@ -907,8 +955,7 @@
             syncPlayState();
         }
     }
-
-    // =========================================================
+        // =========================================================
     // 6. CHUẨN HÓA NAVBAR DOCK + MENU 6 CỘT KHÔNG BỊ LÕM
     // =========================================================
     function detectCurrentPageFile() {
@@ -996,7 +1043,7 @@
         const existingLinks = menu ? Array.from(menu.querySelectorAll("a.nav-item")) : [];
 
         if (!dock) {
-                        const currentFile = detectCurrentPageFile();
+            const currentFile = detectCurrentPageFile();
             const isProfilePage = currentFile === "profile.html";
 
             header.className = "navbar nav-scroll";
