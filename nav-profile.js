@@ -1,12 +1,12 @@
 (() => {
-    const API_BASE = "https://dieunw.onrender.com";
+    const API_BASE = "https://" + "dieunw" + ".onrender.com";
     const FALLBACK_AVATAR = "./DIEU.avif";
+    const MUSIC_STATE_KEY = "dieunw_global_music_state";
 
-    // Tự động gắn Authorization Bearer token cho các request tới backend
     const originalFetch = window.fetch.bind(window);
     window.fetch = function (url, options = {}) {
         const urlStr = typeof url === "string" ? url : (url && typeof url.url === "string" ? url.url : "");
-        if (urlStr.includes("dieunw.onrender.com")) {
+        if (urlStr.includes("dieunw" + ".onrender.com")) {
             const token = localStorage.getItem("session_token");
             if (token) {
                 const headers = new Headers(options.headers || {});
@@ -67,8 +67,7 @@
         return raw;
     }
     window.dieunwResolveMedia = resolveMedia;
-
-    // =========================================================
+        // =========================================================
     // 1. TOAST & HỘP THOẠI XÁC NHẬN THAY THẾ ALERT / CONFIRM
     // =========================================================
     function ensureToastHost() {
@@ -163,8 +162,7 @@
         });
     }
     window.dieunwConfirm = dieunwConfirm;
-
-    // =========================================================
+        // =========================================================
     // 2. NÉN ẢNH WEBP, XHR PROGRESS %, MUSIC WIDGET
     // =========================================================
     async function dieunwCompressImage(file, maxWidthOrOpts = 1440, quality = 0.82) {
@@ -210,7 +208,7 @@
 
             const headers = { ...(options.headers || {}) };
             const token = localStorage.getItem("session_token");
-            if (token && url.includes("dieunw.onrender.com") && !headers.Authorization) {
+            if (token && url.includes("dieunw" + ".onrender.com") && !headers.Authorization) {
                 headers.Authorization = `Bearer ${token}`;
             }
             Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
@@ -342,7 +340,7 @@
         });
 
         fileEl.addEventListener("change", () => {
-            const f = fileEl.files?.[0];
+            const f = fileEl.files ? fileEl.files.item(0) : null;
             if (!f) return;
             pickedFile = f;
             presetTrack = null;
@@ -371,7 +369,7 @@
                 if (found) {
                     return {
                         mode: "library",
-                        musicId: found.id,
+                                                musicId: found.id,
                         id: found.id,
                         musicUrl: found.audioUrl || found.audio_url || "",
                         audioUrl: found.audioUrl || found.audio_url || "",
@@ -464,7 +462,7 @@
     window.updateNavAvatar = updateNavAvatar;
 
     // =========================================================
-    // 5. TRÌNH PHÁT NHẠC ĐĨA QUAY TOÀN WEB (#nav-music-btn + #nav-music-popover)
+    // 5. TRÌNH PHÁT NHẠC ĐĨA QUAY TOÀN WEB + CHẠY XUYÊN TRANG
     // =========================================================
     let globalAudioEl = null;
     let globalPlaylist = [];
@@ -472,6 +470,7 @@
     let globalLoop = true;
     let musicBtnRef = null;
     let musicPopoverRef = null;
+    let lastSaveTick = 0;
 
     function ensureGlobalAudio() {
         if (!globalAudioEl) {
@@ -479,12 +478,62 @@
             if (!globalAudioEl) {
                 globalAudioEl = document.createElement("audio");
                 globalAudioEl.id = "dieunw-global-audio";
+                globalAudioEl.preload = "auto";
                 document.body.appendChild(globalAudioEl);
             }
             const savedVol = parseFloat(localStorage.getItem("dieunw_global_music_vol"));
             globalAudioEl.volume = !Number.isNaN(savedVol) ? Math.min(1, Math.max(0, savedVol)) : 0.6;
         }
         return globalAudioEl;
+    }
+
+    function saveGlobalMusicState(force = false) {
+        if (!globalAudioEl) return;
+        const now = Date.now();
+        if (!force && now - lastSaveTick < 400) return;
+        lastSaveTick = now;
+
+        const persistableList = globalPlaylist.filter(item => {
+            const u = String(item.audioUrl || item.audio_url || item.url || "");
+            return u && !u.startsWith("blob:");
+        });
+
+        const currentTrack = globalIndex >= 0 ? globalPlaylist.at(globalIndex) : null;
+        const currentUrl = currentTrack ? String(currentTrack.audioUrl || currentTrack.audio_url || currentTrack.url || "") : "";
+        const isBlob = currentUrl.startsWith("blob:");
+
+        if (!persistableList.length || isBlob) {
+            if (isBlob) localStorage.removeItem(MUSIC_STATE_KEY);
+            return;
+        }
+
+        const mappedIndex = persistableList.findIndex(t => String(t.id) === String(currentTrack?.id));
+        const state = {
+            playlist: persistableList,
+            index: mappedIndex >= 0 ? mappedIndex : 0,
+            currentTime: Number.isFinite(globalAudioEl.currentTime) ? globalAudioEl.currentTime : 0,
+            isPlaying: Boolean(!globalAudioEl.paused && globalAudioEl.src),
+            playbackRate: globalAudioEl.playbackRate || 1,
+            loop: globalLoop,
+            updatedAt: now
+        };
+        try {
+            localStorage.setItem(MUSIC_STATE_KEY, JSON.stringify(state));
+        } catch {
+            // Bỏ qua nếu đầy storage
+        }
+    }
+
+    function readGlobalMusicState() {
+        try {
+            const raw = localStorage.getItem(MUSIC_STATE_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!parsed || !Array.isArray(parsed.playlist) || !parsed.playlist.length) return null;
+            return parsed;
+        } catch {
+            return null;
+        }
     }
 
     function positionMusicPopover() {
@@ -538,7 +587,7 @@
         btn.style.cssText = "position:relative;width:40px;height:40px;flex:0 0 40px;border-radius:50%;border:2px solid rgba(255,255,255,0.92);background:radial-gradient(circle at center,#2c3240 0%,#0f141d 60%,#1e293b 100%);display:grid;place-items:center;cursor:pointer;padding:0;box-shadow:0 3px 10px rgba(0,0,0,0.22);";
         btn.innerHTML = `
             <span class="nav-music-disc-center" style="width:14px;height:14px;border-radius:50%;background:linear-gradient(135deg,#38bdf8,#1769aa);border:2px solid #fff;display:block;"></span>
-            <span style="position:absolute;top:-3px;right:-3px;width:16px;height:16px;border-radius:50%;background:#0ea5e9;color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center;border:1.5px solid #fff;">♪</span>
+                        <span style="position:absolute;top:-3px;right:-3px;width:16px;height:16px;border-radius:50%;background:#0ea5e9;color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center;border:1.5px solid #fff;">♪</span>
         `;
 
         const avatarLink = dock.querySelector(".nav-avatar-link");
@@ -596,6 +645,15 @@
         const volSlider = popover.querySelector("#nav-music-volume");
         const fileInput = popover.querySelector("#nav-music-file-input");
 
+        function applySpeedButtonUI(rate) {
+            popover.querySelectorAll(".nav-spd-btn").forEach(b => {
+                const isMatch = parseFloat(b.dataset.speed || "1") === Number(rate);
+                b.style.background = isMatch ? "#1769aa" : "#fff";
+                b.style.color = isMatch ? "#fff" : "#173853";
+                b.style.borderColor = isMatch ? "#1769aa" : "#cbd5e1";
+            });
+        }
+
         function syncPlayState() {
             const playing = Boolean(audio && !audio.paused && audio.src);
             toggleBtn.textContent = playing ? "⏸" : "▶";
@@ -626,17 +684,72 @@
             });
         }
 
-        function playAtIndex(idx) {
+        function attemptAutoResumePlay(targetTime) {
+            const resumePlayback = () => {
+                if (typeof targetTime === "number" && targetTime > 0 && Number.isFinite(audio.duration)) {
+                    audio.currentTime = Math.min(targetTime, Math.max(0, audio.duration - 0.5));
+                }
+                audio.play().then(() => {
+                    syncPlayState();
+                    saveGlobalMusicState(true);
+                }).catch(() => {
+                    const unlock = () => {
+                        audio.play().then(() => {
+                            syncPlayState();
+                            saveGlobalMusicState(true);
+                        }).catch(() => {});
+                    };
+                    document.addEventListener("pointerdown", unlock, { once: true });
+                    document.addEventListener("keydown", unlock, { once: true });
+                });
+            };
+
+            if (audio.readyState >= 1) {
+                resumePlayback();
+            } else {
+                audio.addEventListener("loadedmetadata", resumePlayback, { once: true });
+            }
+        }
+
+        function playAtIndex(idx, options = {}) {
             if (!globalPlaylist.length) return;
             globalIndex = ((idx % globalPlaylist.length) + globalPlaylist.length) % globalPlaylist.length;
-            const tr = globalPlaylist[globalIndex];
+            const tr = globalPlaylist.at(globalIndex);
+            if (!tr) return;
             const src = resolveMedia(tr.audioUrl || tr.audio_url || tr.url);
             if (!src) return;
+
             audio.src = src;
-            audio.play().catch(() => {});
+            if (options.playbackRate) {
+                audio.playbackRate = options.playbackRate;
+                applySpeedButtonUI(options.playbackRate);
+            }
+
             nowTitleEl.textContent = `♪ ${tr.title || "Bài hát"}${tr.artist ? ` — ${tr.artist}` : ""}`;
             renderList();
-            syncPlayState();
+
+            if (options.autoPlay === false) {
+                if (typeof options.startTime === "number" && options.startTime > 0) {
+                    const setPos = () => {
+                        if (Number.isFinite(audio.duration)) {
+                            audio.currentTime = Math.min(options.startTime, Math.max(0, audio.duration - 0.5));
+                        }
+                    };
+                    if (audio.readyState >= 1) setPos();
+                    else audio.addEventListener("loadedmetadata", setPos, { once: true });
+                }
+                                syncPlayState();
+                saveGlobalMusicState(true);
+                return;
+            }
+
+            if (typeof options.startTime === "number" && options.startTime > 0) {
+                attemptAutoResumePlay(options.startTime);
+            } else {
+                audio.play().catch(() => {});
+                syncPlayState();
+                saveGlobalMusicState(true);
+            }
         }
 
         window.dieunwPlayGlobalTrack = (track, list) => {
@@ -659,6 +772,7 @@
             if (globalAudioEl && !globalAudioEl.paused) {
                 globalAudioEl.pause();
                 syncPlayState();
+                saveGlobalMusicState(true);
             }
         };
 
@@ -723,6 +837,7 @@
             if (audio.paused) audio.play().catch(() => {});
             else audio.pause();
             syncPlayState();
+            saveGlobalMusicState(true);
         });
 
         popover.querySelector("#nav-music-prev").addEventListener("click", () => {
@@ -734,19 +849,15 @@
         loopBtn.addEventListener("click", () => {
             globalLoop = !globalLoop;
             loopBtn.style.opacity = globalLoop ? "1" : "0.48";
+            saveGlobalMusicState(true);
         });
 
         popover.querySelectorAll(".nav-spd-btn").forEach(spBtn => {
             spBtn.addEventListener("click", () => {
-                popover.querySelectorAll(".nav-spd-btn").forEach(b => {
-                    b.style.background = "#fff";
-                    b.style.color = "#173853";
-                    b.style.borderColor = "#cbd5e1";
-                });
-                spBtn.style.background = "#1769aa";
-                spBtn.style.color = "#fff";
-                spBtn.style.borderColor = "#1769aa";
-                audio.playbackRate = parseFloat(spBtn.dataset.speed || "1") || 1;
+                const rate = parseFloat(spBtn.dataset.speed || "1") || 1;
+                audio.playbackRate = rate;
+                applySpeedButtonUI(rate);
+                saveGlobalMusicState(true);
             });
         });
 
@@ -756,25 +867,49 @@
             localStorage.setItem("dieunw_global_music_vol", String(v));
         });
 
-        audio.addEventListener("play", syncPlayState);
-        audio.addEventListener("pause", syncPlayState);
+        audio.addEventListener("timeupdate", () => saveGlobalMusicState(false));
+        audio.addEventListener("play", () => {
+            syncPlayState();
+            saveGlobalMusicState(true);
+        });
+        audio.addEventListener("pause", () => {
+            syncPlayState();
+            saveGlobalMusicState(true);
+        });
         audio.addEventListener("ended", () => {
             if (!globalPlaylist.length) return;
             if (globalIndex < globalPlaylist.length - 1 || globalLoop) {
                 playAtIndex(globalIndex + 1);
             } else {
                 syncPlayState();
+                saveGlobalMusicState(true);
             }
         });
 
+        window.addEventListener("beforeunload", () => saveGlobalMusicState(true));
+        window.addEventListener("pagehide", () => saveGlobalMusicState(true));
         window.addEventListener("resize", positionMusicPopover);
         window.addEventListener("scroll", positionMusicPopover, { passive: true });
-        renderList();
-        syncPlayState();
+
+        const restored = readGlobalMusicState();
+        if (restored) {
+            globalPlaylist = restored.playlist;
+            globalLoop = restored.loop !== false;
+            loopBtn.style.opacity = globalLoop ? "1" : "0.48";
+            const safeIdx = Math.min(Math.max(0, Number(restored.index) || 0), globalPlaylist.length - 1);
+            playAtIndex(safeIdx, {
+                autoPlay: Boolean(restored.isPlaying),
+                startTime: Number(restored.currentTime) || 0,
+                playbackRate: Number(restored.playbackRate) || 1
+            });
+        } else {
+            renderList();
+            syncPlayState();
+        }
     }
 
     // =========================================================
-    // 6. CHUẨN HÓA NAVBAR DOCK + MENU 6 CỘT KHÔNG BỊ LÕM (CHẠY 1 LẦN, KHÔNG LOOP)
+    // 6. CHUẨN HÓA NAVBAR DOCK + MENU 6 CỘT KHÔNG BỊ LÕM
     // =========================================================
     function detectCurrentPageFile() {
         const path = (window.location.pathname || "").split("/").pop() || "index.html";
@@ -860,9 +995,8 @@
         let menu = header.querySelector("#main-nav-menu, .nav-menu");
         const existingLinks = menu ? Array.from(menu.querySelectorAll("a.nav-item")) : [];
 
-        // Nếu trang đang dùng header kiểu cũ (.nav-left / .nav-right), chuyển sang .nav-corner-dock
         if (!dock) {
-            const currentFile = detectCurrentPageFile();
+                        const currentFile = detectCurrentPageFile();
             const isProfilePage = currentFile === "profile.html";
 
             header.className = "navbar nav-scroll";
