@@ -5847,3 +5847,45 @@ header img {
     border-radius: 50% !important;
     object-fit: cover !important;
 }
+
+/* Khóa cứng toàn bộ ảnh/logo trong MỌI kiểu thanh điều hướng (bao gồm Tin nhắn & Phòng trò chuyện) */
+nav img,
+nav svg,
+.navbar img,
+.navbar svg,
+.nav-scroll img,
+.nav-scroll svg,
+.chat-page .navbar img,
+.chat-page nav img,
+img[src*="DIEUNW"],
+img[src*="DIEU"] {
+    width: 30px !important;
+    height: 30px !important;
+    max-width: 30px !important;
+    max-height: 30px !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    object-fit: contain !important;
+}
+
+/* Ngoại trừ ảnh banner đầu trang (#hero-banner) và avatar người dùng phải giữ nguyên kích thước */
+#hero-banner img,
+#hero-banner picture img {
+    width: 100% !important;
+    height: clamp(145px, 22vw, 230px) !important;
+    max-width: none !important;
+    max-height: 230px !important;
+    object-fit: cover !important;
+}
+
+.nav-avatar-link img,
+.nav-user-avatar,
+.post-card-avatar,
+.profile-avatar-large,
+.user-avatar-mini {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: cover !important;
+}
