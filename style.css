@@ -5801,3 +5801,24 @@ img.custom-brand-logo {
     object-fit: contain !important;
     display: block;
 }
+.navbar .nav-brand-toggle img,
+.navbar .nav-brand-icon,
+.navbar .nav-brand-badge img {
+    width: 30px !important;
+    height: 30px !important;
+    max-width: 30px !important;
+    max-height: 30px !important;
+    object-fit: cover !important;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+/* Đề phòng logo nằm ngoài nút toggle trong header .navbar */
+header.navbar > a > img,
+header.navbar .nav-corner-dock > img {
+    width: 32px !important;
+    height: 32px !important;
+    max-width: 32px !important;
+    max-height: 32px !important;
+    object-fit: contain !important;
+}
