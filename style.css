@@ -5901,3 +5901,483 @@ img[src*="DIEU"] {
     object-fit: cover;
     flex-shrink: 0;
 }
+
+/* =========================================================
+   THIẾT KẾ LẠI TRANG KHO NHẠC TRỰC TUYẾN (MUSIC SOUND HUB)
+   ========================================================= */
+.music-main {
+    width: min(1040px, calc(100% - 32px));
+    margin: 0 auto 110px;
+    padding-top: 74px;
+}
+
+/* Hero Banner Gradient hiện đại */
+.music-hero {
+    position: relative;
+    overflow: hidden;
+    padding: 28px 30px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #0f273d 0%, #1769aa 55%, #0ea5e9 100%);
+    color: #ffffff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 22px;
+    box-shadow: 0 16px 36px rgba(18, 77, 123, 0.24);
+}
+
+.music-hero::after {
+    content: "🎵";
+    position: absolute;
+    right: -10px;
+    bottom: -24px;
+    font-size: 130px;
+    opacity: 0.08;
+    pointer-events: none;
+    transform: rotate(-12deg);
+}
+
+.music-hero h1 {
+    font-size: 28px;
+    font-weight: 800;
+    margin: 4px 0 6px;
+    letter-spacing: -0.3px;
+}
+
+.music-hero p {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.88);
+    max-width: 540px;
+    line-height: 1.5;
+}
+
+#btn-toggle-music-upload {
+    padding: 11px 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: #ffffff;
+    color: #124d7b;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    z-index: 2;
+}
+
+#btn-toggle-music-upload:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+}
+
+/* Form đăng nhạc dạng thẻ nổi gọn gàng */
+#music-upload-panel {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-top: 4px solid var(--brand-blue);
+    border-radius: 16px;
+    padding: 22px 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-soft);
+    animation: nav-pop-in 0.2s ease both;
+}
+
+#music-upload-panel h2 {
+    font-size: 18px;
+    margin-bottom: 14px;
+    color: var(--text-main);
+}
+
+#music-upload-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 16px;
+}
+
+#music-upload-form .full-span,
+#music-upload-progress,
+.music-form-actions {
+    grid-column: 1 / -1;
+}
+
+#music-upload-form input[type="text"],
+#music-upload-form select {
+    width: 100%;
+    height: 40px;
+    padding: 0 12px;
+    border-radius: 9px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg-surface-soft);
+    color: var(--text-main);
+    font-size: 13.5px;
+    outline: none;
+}
+
+#music-upload-form input[type="text"]:focus,
+#music-upload-form select:focus {
+    border-color: var(--brand-blue);
+    box-shadow: 0 0 0 3px rgba(34, 152, 248, 0.18);
+}
+
+.music-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+/* Thanh tìm kiếm & Bộ lọc thể loại (Pills) */
+.music-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+#music-search-input {
+    width: 100%;
+    height: 44px;
+    padding: 0 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg-surface);
+    color: var(--text-main);
+    font-size: 14px;
+    box-shadow: var(--shadow-card);
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+#music-search-input:focus {
+    border-color: var(--brand-blue);
+    box-shadow: 0 0 0 3px rgba(34, 152, 248, 0.18);
+}
+
+.music-genre-bar {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+}
+
+.music-genre-chip {
+    padding: 7px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    font-size: 12.5px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+
+.music-genre-chip:hover {
+    border-color: var(--brand-blue);
+    color: var(--brand-blue);
+    background: var(--brand-soft);
+}
+
+.music-genre-chip.active {
+    background: linear-gradient(135deg, #1769aa, #2298f8);
+    border-color: transparent;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(23, 105, 170, 0.25);
+}
+
+/* Danh sách thẻ bài hát (Track Cards) */
+.music-track-list {
+    display: grid;
+    gap: 14px;
+}
+
+.music-track-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-card);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.music-track-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--brand-blue);
+    box-shadow: 0 10px 26px rgba(18, 77, 123, 0.12);
+}
+
+.music-track-card.is-active {
+    border: 1.5px solid var(--brand-blue);
+    background: linear-gradient(135deg, var(--brand-soft) 0%, var(--bg-surface) 100%);
+}
+
+/* Ảnh bìa vuông bo góc + nút Play nổi ở giữa */
+.music-cover-btn {
+    position: relative;
+    width: 82px;
+    height: 82px;
+    flex: 0 0 82px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    padding: 0;
+    cursor: pointer;
+    background: linear-gradient(135deg, #1769aa, #38bdf8);
+}
+
+.music-cover-btn img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.3s ease;
+}
+
+.music-track-card:hover .music-cover-btn img {
+    transform: scale(1.06);
+}
+
+.music-cover-overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgba(11, 25, 38, 0.38);
+    color: #ffffff;
+    font-size: 22px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.music-cover-btn:hover .music-cover-overlay,
+.music-track-card.is-active .music-cover-overlay {
+    opacity: 1;
+}
+
+/* Nội dung bên phải thẻ bài hát */
+.music-track-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.music-track-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.music-track-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text-main);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.music-track-artist {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.music-genre-tag {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--brand-soft);
+    color: var(--brand-blue-deep);
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.music-progress-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.music-time-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.music-track-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.music-action-btn {
+    padding: 5px 11px;
+    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg-surface-soft);
+    color: var(--text-main);
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.16s ease;
+}
+
+.music-action-btn:hover {
+    background: var(--brand-soft);
+    border-color: var(--brand-blue);
+    color: var(--brand-blue-deep);
+}
+
+.music-action-btn.liked {
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #dc2626;
+}
+
+.music-action-btn.delete {
+    margin-left: auto;
+    color: #dc2626;
+    border-color: rgba(220, 38, 38, 0.3);
+}
+
+.music-action-btn.delete:hover {
+    background: rgba(220, 38, 38, 0.12);
+}
+
+/* Thanh phát nhạc nổi cố định dưới đáy màn hình (Glassmorphism Deck Bar) */
+#music-deck-bar {
+    position: fixed;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(960px, calc(100vw - 24px));
+    padding: 10px 18px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-strong);
+    box-shadow: 0 14px 38px rgba(15, 38, 62, 0.22);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    z-index: 1250;
+}
+
+html.dark-mode #music-deck-bar,
+body.dark-mode #music-deck-bar {
+    background: rgba(17, 36, 54, 0.9);
+    border-color: #2f587b;
+    box-shadow: 0 16px 42px rgba(0, 0, 0, 0.5);
+}
+
+.deck-track-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    flex: 0 1 260px;
+}
+
+#deck-cover {
+    width: 46px;
+    height: 46px;
+    border-radius: 10px;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1px solid var(--border-color);
+}
+
+.deck-controls-center {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.deck-buttons {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.deck-buttons button {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid var(--border-strong);
+    background: var(--bg-surface);
+    color: var(--text-main);
+    font-size: 14px;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+#deck-play-btn {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #1769aa, #2298f8);
+    border-color: transparent;
+    color: #ffffff;
+    font-size: 16px;
+    box-shadow: 0 4px 12px rgba(34, 152, 248, 0.35);
+}
+
+.deck-seek-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+#deck-send-global-btn {
+    padding: 8px 13px;
+    border-radius: 10px;
+    border: 1px solid var(--brand-blue);
+    background: var(--brand-soft);
+    color: var(--brand-blue-deep);
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+#deck-send-global-btn:hover {
+    background: #1769aa;
+    color: #ffffff;
+}
+
+@media (max-width: 720px) {
+    #music-upload-form { grid-template-columns: 1fr; }
+    .music-track-card { align-items: flex-start; padding: 12px; gap: 12px; }
+    .music-cover-btn { width: 68px; height: 68px; flex-basis: 68px; }
+    #music-deck-bar { flex-wrap: wrap; padding: 10px 14px; gap: 10px; }
+    .deck-track-info { flex: 1 1 60%; }
+    #deck-send-global-btn { margin-left: auto; }
+    .deck-controls-center { order: 3; flex: 1 1 100%; }
+}

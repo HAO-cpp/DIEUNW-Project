@@ -422,86 +422,103 @@
 		</div>
 	</header>
 
-	<main class="music-hub-main page-enter">
-		<section class="music-hub-hero">
-			<div>
-				<p class="music-hub-eyebrow">DIEUNW SOUND HUB</p>
-				<h1>Kho nhạc trực tuyến</h1>
-				<p>Đăng bài nhạc yêu thích, lắng nghe cùng bạn học hoặc đính kèm vào Story, Bài viết và Phòng tự học.</p>
-			</div>
-			<div class="music-hero-actions">
-				<button type="button" id="btn-toggle-music-upload" class="music-upload-toggle-btn" hidden>+ Đăng nhạc lên kho</button>
-			</div>
-		</section>
+	<main class="music-main page-enter">
+    <section class="music-hero">
+        <div>
+            <span class="home-auth-eyebrow" style="color: #bae6fd;">DIEUNW SOUND HUB</span>
+            <h1>Kho nhạc trực tuyến</h1>
+            <p>Đăng bài nhạc yêu thích, lắng nghe cùng bạn học hoặc đính kèm vào Story, Bài viết và Phòng tự học.</p>
+        </div>
+        <button type="button" id="btn-toggle-music-upload" hidden>+ Đăng nhạc lên kho</button>
+    </section>
 
-		<section id="music-upload-panel" class="music-upload-panel" hidden>
-			<h2>Đăng bài hát mới lên Kho nhạc</h2>
-			<form id="music-upload-form">
-				<div class="music-upload-grid">
-					<div class="music-field">
-						<label for="music-title-input">Tên bài hát *</label>
-						<input type="text" id="music-title-input" maxlength="120" placeholder="VD: Rainy Lofi Study" required>
-					</div>
-					<div class="music-field">
-						<label for="music-artist-input">Nghệ sĩ / Tác giả</label>
-						<input type="text" id="music-artist-input" maxlength="100" placeholder="VD: Chillhop hoặc tên bạn">
-					</div>
-					<div class="music-field">
-						<label for="music-genre-select">Thể loại</label>
-						<select id="music-genre-select">
-							<option value="Lo-fi / Chill">Lo-fi / Chill</option>
-							<option value="Nhạc trẻ">Nhạc trẻ</option>
-							<option value="Acoustic / Indie">Acoustic / Indie</option>
-							<option value="Không lời / Piano">Không lời / Piano</option>
-							<option value="Anime / OST">Anime / OST</option>
-							<option value="US-UK">US-UK</option>
-							<option value="Khác">Khác</option>
-						</select>
-					</div>
-				</div>
+    <!-- Panel đăng nhạc (ẩn mặc định) -->
+    <section id="music-upload-panel" hidden>
+        <h2>Đăng bài hát mới lên Kho nhạc</h2>
+        <form id="music-upload-form">
+            <div>
+                <label class="input-group-label" for="music-title-input">Tên bài hát *</label>
+                <input type="text" id="music-title-input" placeholder="Nhập tên bài hát..." required>
+            </div>
+            <div>
+                <label class="input-group-label" for="music-artist-input">Nghệ sĩ / Tác giả</label>
+                <input type="text" id="music-artist-input" placeholder="Tên ca sĩ hoặc tác giả...">
+            </div>
+            <div>
+                <label class="input-group-label" for="music-genre-select">Thể loại</label>
+                <select id="music-genre-select">
+                    <option value="Lo-fi / Chill">Lo-fi / Chill</option>
+                    <option value="Nhạc trẻ">Nhạc trẻ</option>
+                    <option value="Acoustic / Indie">Acoustic / Indie</option>
+                    <option value="Không lời / Piano">Không lời / Piano</option>
+                    <option value="Anime / OST">Anime / OST</option>
+                    <option value="US-UK">US-UK</option>
+                    <option value="Khác">Khác</option>
+                </select>
+            </div>
+            <div>
+                <label class="input-group-label" for="music-audio-file">Chọn tệp âm thanh (MP3/WAV/M4A/OGG/FLAC) *</label>
+                <input type="file" id="music-audio-file" accept="audio/*">
+                <div id="music-audio-filename" class="profile-extra-hint">Chưa chọn tệp âm thanh</div>
+            </div>
+            <div class="full-span">
+                <label class="input-group-label" for="music-cover-file">Ảnh bìa bài hát (tùy chọn)</label>
+                <input type="file" id="music-cover-file" accept="image/*">
+                <span id="music-cover-filename" class="profile-extra-hint">Mặc định logo DIEUNW</span>
+                <img id="music-cover-preview" class="image-preview-thumb" alt="Xem trước bìa" hidden style="margin-top:8px;">
+                <button type="button" id="music-cover-clear" class="btn-clear-upload" hidden>Xóa bìa</button>
+            </div>
+            <div id="music-upload-progress"></div>
+            <div class="music-form-actions">
+                <button type="button" id="btn-cancel-music-upload" class="btn-auth outline" style="width:auto;">Đóng</button>
+                <button type="submit" id="btn-submit-music" class="btn-auth" style="width:auto;">Tải lên Kho nhạc</button>
+            </div>
+        </form>
+    </section>
 
-				<div class="music-file-row">
-					<label class="dieunw-file-btn" for="music-audio-file">Chọn tệp âm thanh (MP3/WAV/M4A/OGG) *</label>
-					<input type="file" id="music-audio-file" accept="audio/*" hidden>
-					<span id="music-audio-filename" class="image-upload-filename">Chưa chọn tệp âm thanh</span>
-				</div>
+    <!-- Tìm kiếm & Bộ lọc thể loại -->
+    <div class="music-toolbar">
+        <input type="search" id="music-search-input" placeholder="Tìm theo tên bài hát, nghệ sĩ hoặc người đăng...">
+        <div class="music-genre-bar">
+            <button type="button" class="music-genre-chip active" data-genre="">Tất cả</button>
+            <button type="button" class="music-genre-chip" data-genre="Lo-fi / Chill">Lo-fi / Chill</button>
+            <button type="button" class="music-genre-chip" data-genre="Nhạc trẻ">Nhạc trẻ</button>
+            <button type="button" class="music-genre-chip" data-genre="Acoustic / Indie">Acoustic</button>
+            <button type="button" class="music-genre-chip" data-genre="Không lời / Piano">Không lời</button>
+            <button type="button" class="music-genre-chip" data-genre="Anime / OST">Anime / OST</button>
+            <button type="button" class="music-genre-chip" data-genre="US-UK">US-UK</button>
+        </div>
+    </div>
 
-				<div class="music-file-row">
-					<label class="dieunw-file-btn" for="music-cover-file">Ảnh bìa bài hát (tùy chọn)</label>
-					<input type="file" id="music-cover-file" accept="image/*" hidden>
-					<span id="music-cover-filename" class="image-upload-filename">Mặc định logo DIEUNW</span>
-					<img id="music-cover-preview" class="music-cover-preview" alt="Xem trước bìa" hidden>
-					<button type="button" id="music-cover-clear" class="btn-clear-upload" hidden>Xóa bìa</button>
-				</div>
+    <!-- Danh sách bài hát -->
+    <section id="music-track-list" class="music-track-list">
+        <p class="feed-state">Đang tải danh sách nhạc...</p>
+    </section>
 
-				<div id="music-upload-progress"></div>
-
-				<div style="display:flex; gap:10px; justify-content:flex-end; margin-top:12px;">
-					<button type="button" id="btn-cancel-music-upload" class="btn-timer outline" style="padding:8px 16px;">Đóng</button>
-					<button type="submit" id="btn-submit-music" class="btn-auth" style="width:auto; padding:9px 22px;">Tải lên Kho nhạc</button>
-				</div>
-			</form>
-		</section>
-
-		<section class="music-toolbar">
-			<div class="music-search-box">
-				<input type="search" id="music-search-input" placeholder="Tìm theo tên bài hát, nghệ sĩ, người đăng...">
-			</div>
-			<div class="music-genre-tabs" id="music-genre-tabs">
-				<button type="button" class="music-genre-chip active" data-genre="">Tất cả</button>
-				<button type="button" class="music-genre-chip" data-genre="Lo-fi / Chill">Lo-fi / Chill</button>
-				<button type="button" class="music-genre-chip" data-genre="Nhạc trẻ">Nhạc trẻ</button>
-				<button type="button" class="music-genre-chip" data-genre="Acoustic / Indie">Acoustic</button>
-				<button type="button" class="music-genre-chip" data-genre="Không lời / Piano">Không lời</button>
-				<button type="button" class="music-genre-chip" data-genre="Anime / OST">Anime / OST</button>
-				<button type="button" class="music-genre-chip" data-genre="US-UK">US-UK</button>
-			</div>
-		</section>
-
-		<section id="music-track-list" class="music-track-list" aria-live="polite">
-			<p class="loading-text">Đang tải danh sách nhạc...</p>
-		</section>
-	</main>
+    <!-- Thanh điều khiển phát nhạc cố định dưới đáy -->
+    <div id="music-deck-bar" hidden>
+        <div class="deck-track-info">
+            <img id="deck-cover" src="./DIEU.avif" alt="">
+            <div style="min-width:0;">
+                <div id="deck-title" style="font-weight:800; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Chưa phát bài hát</div>
+                <div id="deck-artist" style="font-size:12px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">--</div>
+            </div>
+        </div>
+        <div class="deck-controls-center">
+            <div class="deck-buttons">
+                <button type="button" id="deck-prev-btn" title="Bài trước">⏮</button>
+                <button type="button" id="deck-play-btn" title="Phát / Tạm dừng">▶</button>
+                <button type="button" id="deck-next-btn" title="Bài tiếp">⏭</button>
+            </div>
+            <div class="deck-seek-row">
+                <span id="deck-current-time">0:00</span>
+                <input type="range" id="deck-seek-slider" min="0" max="100" step="0.5" value="0">
+                <span id="deck-duration-time">0:00</span>
+            </div>
+        </div>
+        <button type="button" id="deck-send-global-btn">💿 Nghe xuyên trang</button>
+        <audio id="music-hub-audio" preload="metadata"></audio>
+    </div>
 
 	<!-- Thanh phát nhạc cố định cuối trang -->
 	<div id="music-deck-bar" class="music-deck-bar" hidden>
