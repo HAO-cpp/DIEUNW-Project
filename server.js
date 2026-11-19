@@ -166,7 +166,7 @@ async function parseMultipart(request) {
 	return parts;
 }
 
-function saveUploadedFile(filePart, allowedType = "any") {
+async function saveUploadedFile(filePart, allowedType = "any") {
 	if (!filePart || !filePart.fileName || !filePart.body.length) return null;
 	const ext = path.extname(filePart.fileName).toLowerCase();
 	const imageExts = new Set([".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif"]);
@@ -183,6 +183,45 @@ function saveUploadedFile(filePart, allowedType = "any") {
 	if (!valid) {
 		throw makeError(400, "Định dạng tệp không được hỗ trợ.");
 	}
+
+	const isVideoOrAudio = videoExts.has(ext) || audioExts.has(ext);
+	const resourceType = imageExts.has(ext) ? "image" : (isVideoOrAudio ? "video" : "raw");
+
+	const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+	const apiKey = process.env.CLOUDINARY_API_KEY;
+	const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+	if (cloudName && apiKey && apiSecret) {
+		const timestamp = Math.floor(Date.now() / 1000);
+		const folder = "dieunw_uploads";
+		const signatureStr = `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
+		const signature = createHash("sha1").update(signatureStr).digest("hex");
+
+		const formData = new FormData();
+		const blob = new Blob([filePart.body], { type: filePart.contentType || "application/octet-stream" });
+		formData.append("file", blob, filePart.fileName);
+		formData.append("api_key", apiKey);
+		formData.append("timestamp", String(timestamp));
+		formData.append("folder", folder);
+		formData.append("signature", signature);
+
+		const res = await fetch(`https://cloudinary.com{cloudName}/${resourceType}/upload`, {
+			method: "POST",
+			body: formData
+		});
+		const data = await res.json();
+		if (!res.ok) throw makeError(502, data.error?.message || "Lỗi tải tệp lên Cloudinary.");
+
+		return {
+			fileUrl: data.secure_url,
+			fileName: filePart.fileName,
+			fileType: filePart.contentType || ext.slice(1).toUpperCase(),
+			fileSize: filePart.body.length,
+			isVideo: videoExts.has(ext),
+			isAudio: audioExts.has(ext)
+		};
+	}
+
 	mkdirSync(UPLOAD_DIR, { recursive: true });
 	const storedName = `${randomBytes(16).toString("hex")}${ext}`;
 	writeFileSync(path.join(UPLOAD_DIR, storedName), filePart.body);
@@ -195,6 +234,7 @@ function saveUploadedFile(filePart, allowedType = "any") {
 		isAudio: audioExts.has(ext)
 	};
 }
+
 
 function sanitizeMediaRef(value, maxLen = 500) {
 	const str = String(value || "").trim();
@@ -1902,7 +1942,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			}
 			text = String(fields.text || "").trim().slice(0, 80);
 			if (audioPart) {
-				const saved = saveUploadedFile(audioPart, "audio");
+				const saved = await saveUploadedFile(audioPart, "audio");
 				if (saved) {
 					noteMusicUrl = saved.fileUrl;
 					noteMusicTitle = String(fields.musicTitle || audioPart.fileName).trim().slice(0, 120);
@@ -2202,14 +2242,14 @@ async function handleApi({ request, response, url, db, env, secure }) {
 					fields[p.name] = p.body.toString("utf8");
 				}
 			}
-			const saved = saveUploadedFile(filePart, "story");
+			const saved = await saveUploadedFile(filePart, "story");
 			if (!saved) throw makeError(400, "Chọn ảnh hoặc video ngắn cho Story.");
 			mediaUrl = saved.fileUrl;
 			mediaType = saved.isVideo ? "video" : "image";
 			caption = String(fields.caption || "").trim().slice(0, 200);
 			durationHours = Number(fields.durationHours) === 48 ? 48 : 24;
 			if (musicPart) {
-				const savedAudio = saveUploadedFile(musicPart, "audio");
+				const savedAudio = await saveUploadedFile(musicPart, "audio");
 				if (savedAudio) {
 					musicUrl = savedAudio.fileUrl;
 					musicTitle = String(fields.musicTitle || savedAudio.fileName || "Nhạc đính kèm").trim().slice(0, 120);
@@ -2283,13 +2323,13 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			genre = String(fields.genre || "Lo-fi / Chill").trim().slice(0, 40) || "Lo-fi / Chill";
 			durationSec = Math.max(0, Math.min(7200, Math.round(Number(fields.durationSec || 0))));
 			if (audioPart) {
-				const savedAudio = saveUploadedFile(audioPart, "audio");
+				const savedAudio = await saveUploadedFile(audioPart, "audio");
 				if (savedAudio) audioUrl = savedAudio.fileUrl;
 			} else if (fields.audioUrl) {
 				audioUrl = sanitizeMediaRef(fields.audioUrl, 1200);
 			}
 			if (coverPart) {
-				const savedCover = saveUploadedFile(coverPart, "image");
+				const savedCover = await saveUploadedFile(coverPart, "image");
 				if (savedCover) coverImage = savedCover.fileUrl;
 			} else if (fields.coverImage) {
 				coverImage = validateProfileImage(fields.coverImage, false, 1500000);
@@ -2377,19 +2417,19 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			musicUrl = sanitizeMediaRef(fields.musicUrl, 600);
 
 			if (videoPart) {
-				const savedVideo = saveUploadedFile(videoPart, "video");
+				const savedVideo = await saveUploadedFile(videoPart, "video");
 				if (savedVideo) videoUrl = savedVideo.fileUrl;
 			} else if (fields.videoUrl) {
 				videoUrl = sanitizeMediaRef(fields.videoUrl, 1200);
 			}
 			if (coverPart) {
-				const savedCover = saveUploadedFile(coverPart, "image");
+				const savedCover = await saveUploadedFile(coverPart, "image");
 				if (savedCover) coverImage = savedCover.fileUrl;
 			} else if (fields.coverImage) {
 				coverImage = validateProfileImage(fields.coverImage, false, 1500000);
 			}
 			if (musicPart) {
-				const savedAudio = saveUploadedFile(musicPart, "audio");
+				const savedAudio = await saveUploadedFile(musicPart, "audio");
 				if (savedAudio) {
 					musicUrl = savedAudio.fileUrl;
 					musicTitle = musicTitle || savedAudio.fileName || "Âm thanh tải lên";
@@ -2709,16 +2749,16 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			const fields = {};
 			for (const p of parts) {
 				if (p.fileName && p.name === "image") {
-					const savedImg = saveUploadedFile(p, "image");
+					const savedImg = await saveUploadedFile(p, "image");
 					if (savedImg) image = savedImg.fileUrl;
 				} else if (p.fileName && (p.name === "music" || p.name === "audio")) {
-					const savedAudio = saveUploadedFile(p, "audio");
+					const savedAudio = await saveUploadedFile(p, "audio");
 					if (savedAudio) {
 						musicUrl = savedAudio.fileUrl;
 						musicTitle = savedAudio.fileName || "Nhạc đính kèm";
 					}
 				} else if (p.fileName) {
-					const savedFile = saveUploadedFile(p, "any");
+					const savedFile = await saveUploadedFile(p, "any");
 					if (savedFile) {
 						fileUrl = savedFile.fileUrl;
 						fileName = savedFile.fileName;
@@ -2954,7 +2994,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			if (!title) throw makeError(400, "Tiêu đề tài liệu không được để trống.");
 			let fUrl = "", fName = "", fType = "", fSize = 0;
 			if (filePart) {
-				const saved = saveUploadedFile(filePart, "any");
+				const saved = await saveUploadedFile(filePart, "any");
 				if (saved) {
 					fUrl = saved.fileUrl;
 					fName = saved.fileName;
@@ -2978,13 +3018,13 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			const content = String(fields.content || "").trim();
 			let image = fields.image ? validateProfileImage(fields.image, false, 2500000) : "";
 			if (!image && imagePart) {
-				const savedImg = saveUploadedFile(imagePart, "image");
+				const savedImg = await saveUploadedFile(imagePart, "image");
 				if (savedImg) image = savedImg.fileUrl;
 			}
 			let musicUrl = "";
 			let musicTitle = "";
 			if (musicPart) {
-				const savedAudio = saveUploadedFile(musicPart, "audio");
+				const savedAudio = await saveUploadedFile(musicPart, "audio");
 				if (savedAudio) {
 					musicUrl = savedAudio.fileUrl;
 					musicTitle = String(fields.musicTitle || savedAudio.fileName || "Nhạc đính kèm").trim().slice(0, 120);
