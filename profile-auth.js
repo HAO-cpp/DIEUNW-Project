@@ -1,6 +1,28 @@
 const API_BASE = "https://dieunw.onrender.com";
 
 document.addEventListener("DOMContentLoaded", () => {
+	window.dieunwCreateProgressBar = function (host) {
+		if (!host) return { set() {}, hide() {} };
+		host.hidden = false;
+		host.innerHTML = `
+			<div style="width:100%;height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:8px 0 4px;">
+				<div class="bar-fill" style="width:0%;height:100%;background:#1769aa;transition:width .2s;"></div>
+			<div class="bar-label" style="font-size:12px;color:#65676b;"></div>
+		`;
+		const fill = host.querySelector(".bar-fill");
+		const label = host.querySelector(".bar-label");
+		return {
+			set(pct, text = "") {
+				host.hidden = false;
+				if (fill) fill.style.width = `${Math.max(0, Math.min(100, Number(pct) || 0))}%`;
+				if (label) label.textContent = text;
+			},
+			hide() {
+				host.hidden = true;
+				host.innerHTML = "";
+			}
+		};
+	};
 	function createSafeProgressBar(host) {
 		const raw = window.dieunwCreateProgressBar ? window.dieunwCreateProgressBar(host) : null;
 		if (raw && typeof raw.set === "function") {
