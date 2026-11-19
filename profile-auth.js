@@ -815,7 +815,7 @@ document.addEventListener("DOMContentLoaded", () => {
 						` : "";
 						postEl.innerHTML = `
 							<div class="post-card-header">
-								<img src="${escapeHtml(resolveMedia(club.logo) || "./DIEU.avif")}" class="post-card-avatar" style="object-fit:cover;">
+								<img src="${escapeHtml(resolveMedia(club.logo) || "./DIEU.avif")}" width="44" height="44" class="post-card-avatar" style="width:44px !important; height:44px !important; min-width:44px !important; border-radius:50% !important; object-fit:cover !important;">
 								<div>
 									<h4 class="post-card-author">${escapeHtml(club.name)}</h4>
 									<span class="post-card-time">${new Date(post.createdAt).toLocaleString("vi-VN")}</span>

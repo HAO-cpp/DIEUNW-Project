@@ -5880,7 +5880,6 @@ img[src*="DIEU"] {
 
 .nav-avatar-link img,
 .nav-user-avatar,
-.post-card-avatar,
 .profile-avatar-large,
 .user-avatar-mini {
     width: 100% !important;
@@ -6552,4 +6551,17 @@ body.dark-mode .music-deck-bar {
 	border-radius: 50%;
 	object-fit: cover;
 	display: block;
+}
+
+/* Avatar trong bài viết: khoá cứng 44px, không bị rule chung phóng to 100% */
+.post-card-header .post-card-avatar,
+img.post-card-avatar {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    max-height: 44px !important;
+    border-radius: 50% !important;
+    object-fit: cover !important;
+    flex-shrink: 0;
 }
