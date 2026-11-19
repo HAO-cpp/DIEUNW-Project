@@ -5822,3 +5822,28 @@ header.navbar .nav-corner-dock > img {
     max-height: 32px !important;
     object-fit: contain !important;
 }
+
+/* Ép cứng MỌI ảnh/icon bên trong thanh điều hướng của tất cả các trang */
+.navbar img,
+.navbar svg,
+header img {
+    width: 30px !important;
+    height: 30px !important;
+    max-width: 30px !important;
+    max-height: 30px !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    object-fit: contain !important;
+    display: inline-block !important;
+}
+
+/* Riêng avatar người dùng trên navbar giữ hình tròn 36px */
+.navbar .nav-avatar-link img,
+.navbar .nav-user-avatar {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 36px !important;
+    max-height: 36px !important;
+    border-radius: 50% !important;
+    object-fit: cover !important;
+}
