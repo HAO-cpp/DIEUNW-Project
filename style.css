@@ -6381,3 +6381,159 @@ body.dark-mode #music-deck-bar {
     #deck-send-global-btn { margin-left: auto; }
     .deck-controls-center { order: 3; flex: 1 1 100%; }
 }
+
+/* =========================================================
+   FIX GHI ĐÈ CLASS CŨ CỦA MUSIC.HTML & ẢNH BÌA BÀI HÁT
+   ========================================================= */
+
+/* 1. Giải phóng ảnh bìa nhạc khỏi quy tắc ép 30px của img[src*="DIEU"] */
+.music-cover-btn img,
+#deck-cover,
+.music-deck-bar img {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    object-fit: cover !important;
+}
+
+#deck-cover,
+.music-deck-bar img {
+    width: 48px !important;
+    height: 48px !important;
+    border-radius: 10px !important;
+    flex-shrink: 0;
+}
+
+/* 2. Làm đẹp nút "+ Đăng nhạc lên kho" */
+#btn-toggle-music-upload,
+.music-hero button {
+    padding: 11px 20px !important;
+    border-radius: 12px !important;
+    border: none !important;
+    background: #ffffff !important;
+    color: #124d7b !important;
+    font-size: 13.5px !important;
+    font-weight: 800 !important;
+    cursor: pointer !important;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18) !important;
+    transition: transform 0.18s ease, box-shadow 0.18s ease !important;
+}
+
+#btn-toggle-music-upload:hover,
+.music-hero button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* 3. Căn chỉnh thanh tìm kiếm và dãy thể loại nằm gọn đẹp */
+.music-controls-bar,
+.music-toolbar {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 12px !important;
+    margin-bottom: 20px !important;
+}
+
+#music-search-input {
+    flex: 1 1 260px !important;
+    height: 42px !important;
+    padding: 0 16px !important;
+    border-radius: 12px !important;
+    border: 1px solid var(--border-strong) !important;
+    background: var(--bg-surface) !important;
+    color: var(--text-main) !important;
+    font-size: 13.5px !important;
+    box-shadow: var(--shadow-card) !important;
+}
+
+/* 4. Biến thanh phát nhạc dưới đáy thành thanh nổi ngang cố định (Glassmorphism) */
+#music-deck-bar,
+.music-deck-bar {
+    position: fixed !important;
+    bottom: 14px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: min(980px, calc(100vw - 24px)) !important;
+    padding: 10px 18px !important;
+    border-radius: 16px !important;
+    background: rgba(255, 255, 255, 0.92) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border: 1px solid var(--border-strong) !important;
+    box-shadow: 0 14px 38px rgba(15, 38, 62, 0.22) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 16px !important;
+    z-index: 1250 !important;
+}
+
+#music-deck-bar[hidden],
+.music-deck-bar[hidden] {
+    display: none !important;
+}
+
+html.dark-mode #music-deck-bar,
+body.dark-mode #music-deck-bar,
+html.dark-mode .music-deck-bar,
+body.dark-mode .music-deck-bar {
+    background: rgba(17, 36, 54, 0.94) !important;
+    border-color: #2f587b !important;
+}
+
+/* Căn ngang các cụm bên trong thanh phát nhạc */
+#music-deck-bar > div,
+.music-deck-bar > div {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+
+#music-deck-bar > div:nth-child(2),
+.music-deck-bar > div:nth-child(2) {
+    flex: 1 !important;
+    min-width: 0 !important;
+}
+
+#deck-prev-btn,
+#deck-play-btn,
+#deck-next-btn {
+    width: 34px !important;
+    height: 34px !important;
+    flex-shrink: 0 !important;
+    border-radius: 50% !important;
+    border: 1px solid var(--border-strong) !important;
+    background: var(--bg-surface) !important;
+    color: var(--text-main) !important;
+    cursor: pointer !important;
+    display: grid !important;
+    place-items: center !important;
+}
+
+#deck-play-btn {
+    width: 40px !important;
+    height: 40px !important;
+    background: linear-gradient(135deg, #1769aa, #2298f8) !important;
+    border-color: transparent !important;
+    color: #ffffff !important;
+}
+
+#deck-send-global-btn {
+    padding: 8px 14px !important;
+    border-radius: 10px !important;
+    border: 1px solid var(--brand-blue) !important;
+    background: var(--brand-soft) !important;
+    color: var(--brand-blue-deep) !important;
+    font-size: 12.5px !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+}
+
+#deck-send-global-btn:hover {
+    background: #1769aa !important;
+    color: #ffffff !important;
+}
