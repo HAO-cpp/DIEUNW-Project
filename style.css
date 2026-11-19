@@ -2826,6 +2826,13 @@ body#study-page-body.theme-sunset {
     place-items: center;
 }
 
+.nav-brand-badge img{
+    max-width: 100%;
+    max-height: 12px;
+    border-radius: 8px;
+    object-fit: cover;
+}
+
 .vinyl-disc {
     position: relative;
     width: 72px;
