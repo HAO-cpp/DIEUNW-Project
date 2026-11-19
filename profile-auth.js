@@ -1,6 +1,41 @@
 const API_BASE = "https://dieunw.onrender.com";
 
 document.addEventListener("DOMContentLoaded", () => {
+	function createSafeProgressBar(host) {
+		const raw = window.dieunwCreateProgressBar ? window.dieunwCreateProgressBar(host) : null;
+		if (raw && typeof raw.set === "function") {
+			return raw;
+		}
+		// Fallback nếu dieunwCreateProgressBar chưa định nghĩa hoặc thiếu .set()
+		if (host) {
+			host.innerHTML = `
+				<div style="width:100%;background:#e5e7eb;border-radius:999px;overflow:hidden;height:8px;margin-top:8px;">
+					<div class="safe-bar-fill" style="width:0%;height:100%;background:#1769aa;transition:width .2s;"></div>
+				</div>
+				<div class="safe-bar-text" style="font-size:12px;color:#65676b;margin-top:4px;"></div>
+			`;
+			host.hidden = false;
+		}
+		return {
+			set(pct, text) {
+				if (typeof raw?.update === "function") return raw.update(pct, text);
+				if (!host) return;
+				host.hidden = false;
+				const fill = host.querySelector(".safe-bar-fill");
+				const label = host.querySelector(".safe-bar-text");
+				if (fill) fill.style.width = `${Math.max(0, Math.min(100, Number(pct) || 0))}%`;
+				if (label && text) label.textContent = text;
+			},
+			hide() {
+				if (typeof raw?.hide === "function") return raw.hide();
+				if (host) {
+					host.hidden = true;
+					host.innerHTML = "";
+				}
+			}
+		};
+	}
+
 	const authContainer = document.getElementById("auth-container");
 	const profileContainer = document.getElementById("profile-container");
 	const loginView = document.getElementById("login-view");
