@@ -236,7 +236,7 @@ document.addEventListener("DOMContentLoaded", () => {
 			fd.append("artist", artist);
 			fd.append("genre", genre);
 			fd.append("audio", audioFile);
-			if (compressedCoverDataUrl) fd.append("coverData", compressedCoverDataUrl);
+			if (compressedCoverDataUrl) fd.append("coverImage", compressedCoverDataUrl);
 
 			updateProgress(5, "Đang tải bài hát lên máy chủ...");
 			const res = await uploadWithProgress(MUSIC_API, {
@@ -293,7 +293,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		hubAudio.play().catch(() => {});
 
 		if (deckBar) deckBar.hidden = false;
-		if (deckCover) deckCover.src = resolveMedia(track.coverUrl || track.cover_url) || "./DIEU.avif";
+		if (deckCover) deckCover.src = resolveMedia(track.coverImage || track.coverUrl || track.cover_url) || "./DIEU.avif";
 		if (deckTitle) deckTitle.textContent = track.title || "Không rõ tiêu đề";
 		if (deckArtist) deckArtist.textContent = track.artist || track.authorName || "Thành viên DIEUNW";
 
@@ -409,7 +409,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		coverBtn.className = "music-cover-btn";
 		coverBtn.title = "Phát / Tạm dừng";
 		const img = document.createElement("img");
-		img.src = resolveMedia(track.coverUrl || track.cover_url) || "./DIEU.avif";
+		img.src = resolveMedia(track.coverImage || track.coverUrl || track.cover_url) || "./DIEU.avif";
 		img.alt = "";
 		img.loading = "lazy";
 		const overlay = document.createElement("span");
@@ -514,7 +514,7 @@ document.addEventListener("DOMContentLoaded", () => {
 					title: track.title,
 					artist: track.artist || track.authorName || "",
 					audioUrl: resolveMedia(track.audioUrl || track.audio_url),
-					coverUrl: resolveMedia(track.coverUrl || track.cover_url)
+					coverUrl: resolveMedia(track.coverImage || track.coverUrl || track.cover_url)
 				});
 				notify(`Đang phát "${track.title}" trên đĩa nhạc góc trên!`, "success");
 			}
