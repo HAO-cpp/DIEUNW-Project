@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-	const API_BASE = "https://dieunw.onrender.com";
+	const API_BASE = "https://onrender.com";
 	const MUSIC_API = `${API_BASE}/api/music`;
 
 	const toggleUploadBtn = document.getElementById("btn-toggle-music-upload");
@@ -42,15 +42,27 @@ document.addEventListener("DOMContentLoaded", () => {
 	let isSeeking = false;
 	const countedPlays = new Set();
 
+	function getAuthHeaders(extra = {}) {
+		const token = localStorage.getItem("session_token");
+		return {
+			...(token ? { Authorization: `Bearer ${token}` } : {}),
+			...extra
+		};
+	}
+
 	function notify(message, type = "info") {
 		if (typeof window.dieunwToast === "function") {
 			window.dieunwToast(message, type);
 		}
 	}
 
-	async function askConfirm(message) {
+	async function askConfirm(message, title = "Xác nhận", danger = true) {
 		if (typeof window.dieunwConfirm === "function") {
-			return window.dieunwConfirm(message);
+			try {
+				return await window.dieunwConfirm(message, title, danger);
+			} catch {
+				return window.confirm(message);
+			}
 		}
 		return window.confirm(message);
 	}
@@ -73,14 +85,15 @@ document.addEventListener("DOMContentLoaded", () => {
 	}
 
 	function uploadWithProgress(url, { method = "POST", body, headers = {} }, onPercent) {
+		const mergedHeaders = getAuthHeaders(headers);
 		if (typeof window.dieunwUploadWithProgress === "function") {
-			return window.dieunwUploadWithProgress(url, { method, body, headers }, onPercent);
+			return window.dieunwUploadWithProgress(url, { method, body, headers: mergedHeaders }, onPercent);
 		}
 		return new Promise((resolve, reject) => {
 			const xhr = new XMLHttpRequest();
 			xhr.open(method, url, true);
 			xhr.withCredentials = true;
-			Object.entries(headers || {}).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+			Object.entries(mergedHeaders).forEach(([k, v]) => xhr.setRequestHeader(k, v));
 			xhr.upload.onprogress = (ev) => {
 				if (ev.lengthComputable && typeof onPercent === "function") {
 					onPercent(Math.round((ev.loaded / ev.total) * 100));
@@ -261,7 +274,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		} catch (err) {
 			resetProgress();
 			notify(err.message || "Không thể đăng bài hát.", "error");
-		} finally {
+					} finally {
 			submitBtn.disabled = false;
 			submitBtn.textContent = "Tải lên Kho nhạc";
 		}
@@ -301,7 +314,8 @@ document.addEventListener("DOMContentLoaded", () => {
 			countedPlays.add(String(track.id));
 			fetch(`${MUSIC_API}/${encodeURIComponent(track.id)}/play`, {
 				method: "POST",
-				credentials: "include"
+				credentials: "include",
+				headers: getAuthHeaders()
 			}).then(r => r.ok ? r.json() : null).then(data => {
 				if (data && typeof data.plays === "number") {
 					track.plays = data.plays;
@@ -352,13 +366,13 @@ document.addEventListener("DOMContentLoaded", () => {
 				title: tr.title,
 				artist: tr.artist || tr.authorName || "",
 				audioUrl: resolveMedia(tr.audioUrl || tr.audio_url),
-				coverUrl: resolveMedia(tr.coverUrl || tr.cover_url)
+				coverUrl: resolveMedia(tr.coverImage || tr.coverUrl || tr.cover_url)
 			}, filteredTracks.map(item => ({
 				id: item.id,
 				title: item.title,
 				artist: item.artist || item.authorName || "",
 				audioUrl: resolveMedia(item.audioUrl || item.audio_url),
-				coverUrl: resolveMedia(item.coverUrl || item.cover_url)
+				coverUrl: resolveMedia(item.coverImage || item.coverUrl || item.cover_url)
 			})));
 			notify(`Đã chuyển "${tr.title}" sang đĩa nhạc góc trên!`, "success");
 		} else {
@@ -429,7 +443,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		h3.textContent = track.title || "Không rõ tên";
 		const artistP = document.createElement("p");
 		artistP.className = "music-track-artist";
-		artistP.textContent = `${track.artist || "Ẩn danh"} · Đăng bởi ${track.authorName || track.name || "Thành viên"}`;
+		artistP.textContent = `${track.artist || "Ẩn danh"} · Đăng bởi ${track.uploaderName || track.authorName || track.name || "Thành viên"}`;
 		titleWrap.append(h3, artistP);
 
 		const genreTag = document.createElement("span");
@@ -465,7 +479,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		playsSpan.className = "music-time-label track-plays-count";
 		playsSpan.style.minWidth = "72px";
 		playsSpan.style.textAlign = "right";
-		playsSpan.textContent = `${Number(track.plays || 0)} lượt nghe`;
+		playsSpan.textContent = `${Number(track.playCount ?? track.plays ?? 0)} lượt nghe`;
 		progressRow.append(curTimeSpan, seekSlider, playsSpan);
 
 		const actions = document.createElement("div");
@@ -474,7 +488,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		const likeBtn = document.createElement("button");
 		likeBtn.type = "button";
 		likeBtn.className = `music-action-btn ${track.likedByMe ? "liked" : ""}`;
-		likeBtn.textContent = `♥ ${Number(track.likes || 0)} Thích`;
+		likeBtn.textContent = `♥ ${Number(track.likesCount ?? track.likes ?? 0)} Thích`;
 		likeBtn.addEventListener("click", async () => {
 			if (!currentUser) {
 				notify("Bạn cần đăng nhập để thả tim bài hát.", "warning");
@@ -486,15 +500,17 @@ document.addEventListener("DOMContentLoaded", () => {
 				const res = await fetch(`${MUSIC_API}/${encodeURIComponent(track.id)}/like`, {
 					method: "POST",
 					credentials: "include",
-					headers: { "Content-Type": "application/json" },
+					headers: getAuthHeaders({ "Content-Type": "application/json" }),
 					body: JSON.stringify({ liked: nextLiked })
 				});
 				const data = await res.json();
 				if (!res.ok) throw new Error(data.error || "Không thể thích bài hát.");
 				track.likedByMe = nextLiked;
-				track.likes = Number(data.likes ?? (nextLiked ? Number(track.likes || 0) + 1 : Math.max(0, Number(track.likes || 0) - 1)));
+				const newCount = Number(data.likeCount ?? data.likes ?? (nextLiked ? Number(track.likesCount ?? track.likes ?? 0) + 1 : Math.max(0, Number(track.likesCount ?? track.likes ?? 0) - 1)));
+				track.likesCount = newCount;
+				track.likes = newCount;
 				likeBtn.classList.toggle("liked", nextLiked);
-				likeBtn.textContent = `♥ ${track.likes} Thích`;
+				likeBtn.textContent = `♥ ${newCount} Thích`;
 			} catch (err) {
 				notify(err.message || "Lỗi cập nhật lượt thích.", "error");
 			} finally {
@@ -513,14 +529,24 @@ document.addEventListener("DOMContentLoaded", () => {
 					id: track.id,
 					title: track.title,
 					artist: track.artist || track.authorName || "",
-					audioUrl: resolveMedia(track.audioUrl || track.audio_url),
+										audioUrl: resolveMedia(track.audioUrl || track.audio_url),
 					coverUrl: resolveMedia(track.coverImage || track.coverUrl || track.cover_url)
 				});
 				notify(`Đang phát "${track.title}" trên đĩa nhạc góc trên!`, "success");
 			}
 		});
 
-		actions.append(likeBtn, globalBtn);
+		const downloadBtn = document.createElement("a");
+		downloadBtn.className = "music-action-btn";
+		downloadBtn.textContent = "⬇ Tải về";
+		const rawAudioUrl = resolveMedia(track.audioUrl || track.audio_url);
+		downloadBtn.href = rawAudioUrl.includes("://cloudinary.com") && !rawAudioUrl.includes("/raw/upload/")
+			? rawAudioUrl.replace("/upload/", "/upload/fl_attachment/")
+			: rawAudioUrl;
+		downloadBtn.download = `${track.title || "nhac-dieunw"}`;
+		downloadBtn.target = "_blank";
+
+		actions.append(likeBtn, globalBtn, downloadBtn);
 
 		const ownerId = String(track.userId || track.user_id || "");
 		const canDelete = currentUser && (String(currentUser.id) === ownerId || currentUser.isAdmin || currentUser.isModerator);
@@ -530,13 +556,14 @@ document.addEventListener("DOMContentLoaded", () => {
 			delBtn.className = "music-action-btn delete";
 			delBtn.textContent = "Xóa";
 			delBtn.addEventListener("click", async () => {
-				const ok = await askConfirm(`Bạn muốn xóa bài hát "${track.title}" khỏi Kho nhạc?`);
+				const ok = await askConfirm(`Bạn muốn xóa bài hát "${track.title}" khỏi Kho nhạc?`, "Xóa bài hát", true);
 				if (!ok) return;
 				delBtn.disabled = true;
 				try {
 					const res = await fetch(`${MUSIC_API}/${encodeURIComponent(track.id)}`, {
 						method: "DELETE",
-						credentials: "include"
+						credentials: "include",
+						headers: getAuthHeaders()
 					});
 					const data = await res.json();
 					if (!res.ok) throw new Error(data.error || "Không thể xóa bài hát.");
@@ -563,7 +590,7 @@ document.addEventListener("DOMContentLoaded", () => {
 			const matchQuery = !q
 				|| (t.title || "").toLowerCase().includes(q)
 				|| (t.artist || "").toLowerCase().includes(q)
-				|| (t.authorName || t.name || "").toLowerCase().includes(q);
+				|| (t.uploaderName || t.authorName || t.name || "").toLowerCase().includes(q);
 			return matchGenre && matchQuery;
 		});
 
@@ -580,7 +607,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 	async function loadTracks() {
 		try {
-			const res = await fetch(MUSIC_API, { credentials: "include" });
+			const res = await fetch(MUSIC_API, {
+				credentials: "include",
+				headers: getAuthHeaders()
+			});
 			const data = await res.json();
 			if (!res.ok) throw new Error(data.error || "Không thể tải Kho nhạc.");
 			allTracks = Array.isArray(data.tracks) ? data.tracks : [];
@@ -604,7 +634,10 @@ document.addEventListener("DOMContentLoaded", () => {
 		});
 	});
 
-	fetch(`${API_BASE}/api/auth/me`, { credentials: "include" })
+	fetch(`${API_BASE}/api/auth/me`, {
+		credentials: "include",
+		headers: getAuthHeaders()
+	})
 		.then(r => r.ok ? r.json() : { user: null })
 		.then(data => {
 			currentUser = data.user || null;
@@ -613,3 +646,4 @@ document.addEventListener("DOMContentLoaded", () => {
 		.catch(() => {})
 		.finally(() => loadTracks());
 });
+
