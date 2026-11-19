@@ -5889,3 +5889,15 @@ img[src*="DIEU"] {
     max-height: 100% !important;
     object-fit: cover !important;
 }
+#feed-trigger-avatar,
+#post-author-avatar,
+.nav-avatar,
+.user-avatar-mini {
+    width: 40px !important;
+    height: 40px !important;
+    max-width: 40px !important;
+    max-height: 40px !important;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
