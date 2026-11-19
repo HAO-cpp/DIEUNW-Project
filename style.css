@@ -6537,3 +6537,19 @@ body.dark-mode .music-deck-bar {
     background: #1769aa !important;
     color: #ffffff !important;
 }
+
+.post-card-header {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 12px;
+}
+
+.post-card-avatar {
+	width: 44px;
+	height: 44px;
+	min-width: 44px;
+	border-radius: 50%;
+	object-fit: cover;
+	display: block;
+}
