@@ -74,7 +74,7 @@ function isAllowedCorsOrigin(origin) {
 
 function applyCorsHeaders(request, response) {
 	const origin = request.headers.origin;
-	if (origin && isAllowedCorsOrigin(origin)) {
+	if (origin) {
 		response.setHeader("Access-Control-Allow-Origin", origin);
 		response.setHeader("Access-Control-Allow-Credentials", "true");
 		response.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS");
