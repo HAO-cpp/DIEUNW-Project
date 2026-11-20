@@ -133,24 +133,50 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch {}
     }
 
-    // 2. CHỦ ĐỀ MÀU NỀN (Giữ nguyên nền web cá nhân nếu có)
+    // 2. ĐỒNG BỘ CHỦ ĐỀ SÁNG / TỐI PHÒNG TỰ HỌC & NAVBAR
     const themeSelector = document.getElementById("theme-selector");
-    function applyStudyTheme(val) {
+    const navThemeBtn = document.querySelector(".nav-theme-toggle");
+
+    function applyStudyTheme(val, syncGlobal = true) {
+        const mode = val || "default";
         document.body.classList.remove("theme-dark", "theme-forest", "theme-sunset");
-        if (val && val !== "default") {
-            document.body.classList.add(`theme-${val}`);
+        if (mode !== "default") {
+            document.body.classList.add(`theme-${mode}`);
         }
-        localStorage.setItem("dieunw_study_theme", val || "default");
+        const isDark = mode === "dark";
+        document.documentElement.classList.toggle("dark-mode", isDark);
+        document.body.classList.toggle("dark-mode", isDark);
+        localStorage.setItem("dieunw_study_theme", mode);
+
+        if (syncGlobal) {
+            localStorage.setItem("dieunw_theme", isDark ? "dark" : "light");
+            localStorage.setItem("darkMode", isDark ? "1" : "0");
+        }
+        if (navThemeBtn) {
+            navThemeBtn.textContent = isDark ? "☀️" : "🌙";
+            navThemeBtn.setAttribute("aria-pressed", String(isDark));
+        }
+        if (themeSelector && themeSelector.value !== mode) {
+            themeSelector.value = mode;
+        }
     }
 
-    if (themeSelector) {
-        const savedTheme = localStorage.getItem("dieunw_study_theme") || "default";
-        themeSelector.value = savedTheme;
-        applyStudyTheme(savedTheme);
-        themeSelector.addEventListener("change", (e) => applyStudyTheme(e.target.value));
-    }
+    const globalDark = document.documentElement.classList.contains("dark-mode")
+        || document.body.classList.contains("dark-mode")
+        || localStorage.getItem("dieunw_theme") === "dark";
+    const initialStudyTheme = localStorage.getItem("dieunw_study_theme") || (globalDark ? "dark" : "default");
+    applyStudyTheme(initialStudyTheme, false);
 
-    // 3. TRÌNH PHÁT NHẠC PLAYLIST + KHO NHẠC ONLINE + ĐĨA QUAY
+    themeSelector?.addEventListener("change", (e) => applyStudyTheme(e.target.value, true));
+
+    navThemeBtn?.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        const nextIsDark = !document.body.classList.contains("dark-mode");
+        applyStudyTheme(nextIsDark ? "dark" : "default", true);
+    }, true);
+
+    // 3. TRÌNH PHÁT NHẠC PLAYLIST + KHO NHẠC ONLINE + SHUFFLE + ĐĨA QUAY
     const audioPanel = document.getElementById("audio-player-panel");
     const audioPlayer = document.getElementById("bg-audio-player");
     const customAudioInput = document.getElementById("custom-audio-upload");
@@ -170,7 +196,21 @@ document.addEventListener("DOMContentLoaded", () => {
     let playlist = [];
     let currentTrackIndex = -1;
     let loopPlaylist = false;
+    let shufflePlaylist = false;
     let libraryTracks = [];
+
+    // Tự động chèn nút Shuffle kế bên nút Replay nếu chưa có
+    let btnShufflePlaylist = document.getElementById("btn-shuffle-playlist");
+    if (!btnShufflePlaylist && btnReplayPlaylist?.parentElement) {
+        btnShufflePlaylist = document.createElement("button");
+        btnShufflePlaylist.type = "button";
+        btnShufflePlaylist.id = "btn-shuffle-playlist";
+        btnShufflePlaylist.className = "audio-ctrl-btn";
+        btnShufflePlaylist.title = "Phát ngẫu nhiên";
+        btnShufflePlaylist.setAttribute("aria-pressed", "false");
+        btnShufflePlaylist.textContent = "🔀";
+        btnReplayPlaylist.insertAdjacentElement("afterend", btnShufflePlaylist);
+    }
 
     if (audioVolume && audioPlayer) {
         const savedVol = parseFloat(localStorage.getItem("dieunw_study_volume"));
@@ -195,8 +235,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         playlistEl.hidden = false;
-
-        playlist.forEach((track, idx) => {
+                playlist.forEach((track, idx) => {
             const li = document.createElement("li");
             li.className = `audio-playlist-item ${idx === currentTrackIndex ? "active" : ""}`;
 
@@ -216,6 +255,15 @@ document.addEventListener("DOMContentLoaded", () => {
             li.append(playBtn, delBtn);
             playlistEl.appendChild(li);
         });
+    }
+
+    function getRandomNextIndex() {
+        if (playlist.length <= 1) return 0;
+        let next = currentTrackIndex;
+        while (next === currentTrackIndex) {
+            next = Math.floor(Math.random() * playlist.length);
+        }
+        return next;
     }
 
     function playTrackAt(idx) {
@@ -258,7 +306,6 @@ document.addEventListener("DOMContentLoaded", () => {
         renderPlaylist();
     }
 
-    // Nạp nhạc từ máy (hỗ trợ nhiều file)
     customAudioInput?.addEventListener("change", (e) => {
         const files = Array.from(e.target.files || []);
         if (!files.length) return;
@@ -277,7 +324,6 @@ document.addEventListener("DOMContentLoaded", () => {
         notify(`Đã thêm ${files.length} bài nhạc từ máy.`, "success");
     });
 
-    // Tải danh sách Kho nhạc DIEUNW
     fetch(`${API_BASE}/api/music`, { credentials: "include" })
         .then(res => res.ok ? res.json() : { tracks: [] })
         .then(data => {
@@ -331,7 +377,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 isObjectUrl: false
             });
         });
-        playTrackAt(startIndex);
+        playTrackAt(shufflePlaylist ? getRandomNextIndex() : startIndex);
         notify(`Đã nạp ${libraryTracks.length} bài hát từ Kho nhạc DIEUNW!`, "success");
     });
 
@@ -341,7 +387,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         if (currentTrackIndex === -1) {
-            playTrackAt(0);
+            playTrackAt(shufflePlaylist ? getRandomNextIndex() : 0);
             return;
         }
         if (audioPlayer.paused) {
@@ -355,12 +401,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     btnPrevAudio?.addEventListener("click", () => {
         if (!playlist.length) return;
-        playTrackAt(currentTrackIndex - 1);
+        playTrackAt(shufflePlaylist ? getRandomNextIndex() : currentTrackIndex - 1);
     });
 
     btnNextAudio?.addEventListener("click", () => {
         if (!playlist.length) return;
-        playTrackAt(currentTrackIndex + 1);
+        playTrackAt(shufflePlaylist ? getRandomNextIndex() : currentTrackIndex + 1);
     });
 
     btnReplayPlaylist?.addEventListener("click", () => {
@@ -368,6 +414,13 @@ document.addEventListener("DOMContentLoaded", () => {
         btnReplayPlaylist.setAttribute("aria-pressed", String(loopPlaylist));
         btnReplayPlaylist.classList.toggle("active", loopPlaylist);
         notify(loopPlaylist ? "Đã bật lặp lại playlist." : "Đã tắt lặp lại playlist.", "info");
+    });
+
+    btnShufflePlaylist?.addEventListener("click", () => {
+        shufflePlaylist = !shufflePlaylist;
+        btnShufflePlaylist.setAttribute("aria-pressed", String(shufflePlaylist));
+        btnShufflePlaylist.classList.toggle("active", shufflePlaylist);
+        notify(shufflePlaylist ? "Đã bật phát ngẫu nhiên." : "Đã tắt phát ngẫu nhiên.", "info");
     });
 
     speedButtons.forEach(btn => {
@@ -390,7 +443,9 @@ document.addEventListener("DOMContentLoaded", () => {
     audioPlayer?.addEventListener("pause", syncPlayStateUI);
     audioPlayer?.addEventListener("ended", () => {
         if (!playlist.length) return;
-        if (currentTrackIndex < playlist.length - 1) {
+        if (shufflePlaylist) {
+            playTrackAt(getRandomNextIndex());
+        } else if (currentTrackIndex < playlist.length - 1) {
             playTrackAt(currentTrackIndex + 1);
         } else if (loopPlaylist) {
             playTrackAt(0);
@@ -399,7 +454,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // 4. DANH SÁCH VIỆC CẦN LÀM (TO-DO LIST AN TOÀN KHÔNG XSS)
+    // 4. DANH SÁCH VIỆC CẦN LÀM
     const todoInput = document.getElementById("todo-input");
     const btnAddTodo = document.getElementById("btn-add-todo");
     const todoList = document.getElementById("todo-list");
@@ -444,8 +499,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 renderTasks();
             });
             actions.appendChild(delBtn);
-
-            li.append(label, actions);
+                        li.append(label, actions);
             todoList.appendChild(li);
         });
     }

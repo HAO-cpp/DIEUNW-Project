@@ -89,9 +89,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 	try {
 		window.dieunwApplySiteBg?.();
-	} catch {
-		// bỏ qua nếu chưa sẵn sàng
-	}
+	} catch {}
 
 	function setStatus(message, isError = false) {
 		status.textContent = message;
@@ -115,6 +113,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
 	function escapeRoomPart(value) {
 		return String(value || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 24);
+	}
+
+	function openFullProfilePage(user) {
+		if (!user?.id) return;
+		location.href = `./profile.html?userId=${encodeURIComponent(user.id)}`;
 	}
 
 	async function fetchUsers() {
@@ -155,6 +158,8 @@ document.addEventListener("DOMContentLoaded", () => {
 		const avatar = document.createElement("div");
 		avatar.className = "friends-avatar";
 		avatar.setAttribute("aria-hidden", "true");
+		avatar.style.cursor = "pointer";
+		avatar.addEventListener("click", () => openFriendProfile(user));
 		if (user.avatar && user.avatar.trim()) {
 			const img = document.createElement("img");
 			img.src = normalizeAvatar(user.avatar);
@@ -173,6 +178,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 		const details = document.createElement("div");
 		details.className = "friends-person-details";
+		details.style.cursor = "pointer";
+		details.addEventListener("click", () => openFriendProfile(user));
 		const name = document.createElement("h3");
 		name.textContent = user.name || user.email || "Thành viên DIEUNW";
 		const email = document.createElement("p");
@@ -202,7 +209,8 @@ document.addEventListener("DOMContentLoaded", () => {
 		} else {
 			actions.append(makeButton("Kết bạn", "friends-primary-button", () => sendRequest(user)));
 		}
-		actions.append(makeButton("Hồ sơ", "friends-secondary-button", () => openFriendProfile(user)));
+		actions.append(makeButton("Xem nhanh", "friends-secondary-button", () => openFriendProfile(user)));
+		actions.append(makeButton("Full hồ sơ", "friends-primary-button", () => openFullProfilePage(user)));
 
 		card.append(avatar, details, actions);
 		return card;
@@ -255,7 +263,7 @@ document.addEventListener("DOMContentLoaded", () => {
 						: "Chưa có tài khoản nào để gợi ý kết bạn.";
 			list.append(message);
 		} else {
-			filteredUsers.forEach((user, index) => list.append(makePersonCard(user, index)));
+						filteredUsers.forEach((user, index) => list.append(makePersonCard(user, index)));
 		}
 
 		if (selectedFriend) openFriendProfile(selectedFriend);
@@ -372,6 +380,20 @@ document.addEventListener("DOMContentLoaded", () => {
 		profileMessageButton.disabled = Boolean(currentUser && !isFriend);
 		profileMessageButton.textContent = currentUser && !isFriend ? "Kết bạn để nhắn tin" : "Nhắn tin";
 		profileMeetingButton.hidden = !isFriend;
+
+		const actionsBox = profileMessageButton.parentElement;
+		if (actionsBox) {
+			let fullBtn = document.getElementById("friend-profile-full-btn");
+			if (!fullBtn) {
+				fullBtn = document.createElement("a");
+				fullBtn.id = "friend-profile-full-btn";
+				fullBtn.className = "friends-primary-button";
+				fullBtn.style.textDecoration = "none";
+				fullBtn.textContent = "Xem hồ sơ đầy đủ";
+				actionsBox.appendChild(fullBtn);
+			}
+			fullBtn.href = `./profile.html?userId=${encodeURIComponent(friend.id)}`;
+		}
 	}
 
 	function openSelectedFriendMessages() {
@@ -389,7 +411,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		const roomMembers = [String(currentUser.id), String(friend.id)].sort().map(escapeRoomPart).join("-");
 		const roomName = `dieunw-${roomMembers}`;
 		document.getElementById("friends-meeting-title").textContent = `Jitsi với ${friend.name || friend.email}`;
-		meetingFrame.src = `https://meet.jit.si/${encodeURIComponent(roomName)}`;
+		meetingFrame.src = `https://jit.si{encodeURIComponent(roomName)}`;
 		meetingFrame.hidden = false;
 		meeting.hidden = false;
 		document.getElementById("friends-meeting-note").textContent = `Phòng ${roomName}. Người bạn cần tham gia cùng phòng này.`;

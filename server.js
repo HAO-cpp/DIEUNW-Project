@@ -62,7 +62,7 @@ const AVATAR_FRAME_COSTS = {
 };
 
 const ALLOWED_ORIGINS = new Set([
-	"https://hao-cpp.github.io",
+	"https://github.io",
 	"http://localhost:4173",
 	"http://127.0.0.1:4173"
 ]);
@@ -234,8 +234,6 @@ async function saveUploadedFile(filePart, allowedType = "any") {
 		isAudio: audioExts.has(ext)
 	};
 }
-
-
 function sanitizeMediaRef(value, maxLen = 500) {
 	const str = String(value || "").trim();
 	if (!str) return "";
@@ -463,7 +461,6 @@ function profileUser(db, row, viewerId = row?.id) {
 		studySetPlays: Number(setsStats?.totalPlays || 0)
 	};
 }
-
 function initializeDatabase(dbPath) {
 	if (dbPath !== ":memory:") mkdirSync(path.dirname(dbPath), { recursive: true });
 	const db = new Database(dbPath, {
@@ -734,9 +731,10 @@ function initializeDatabase(dbPath) {
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			title TEXT NOT NULL,
 			artist TEXT NOT NULL DEFAULT '',
-			genre TEXT NOT NULL DEFAULT 'Chill / Lofi',
+						genre TEXT NOT NULL DEFAULT 'Lo-fi / Chill',
 			cover_image TEXT NOT NULL DEFAULT '',
 			audio_url TEXT NOT NULL,
+			lyrics_json TEXT NOT NULL DEFAULT '[]',
 			duration_sec INTEGER NOT NULL DEFAULT 0,
 			play_count INTEGER NOT NULL DEFAULT 0,
 			created_at TEXT NOT NULL
@@ -747,15 +745,27 @@ function initializeDatabase(dbPath) {
 			created_at TEXT NOT NULL,
 			PRIMARY KEY(track_id, user_id)
 		);
+		CREATE TABLE IF NOT EXISTS music_playlists (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			title TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			cover_image TEXT NOT NULL DEFAULT '',
+			track_ids_json TEXT NOT NULL DEFAULT '[]',
+			created_at TEXT NOT NULL
+		);
 		CREATE TABLE IF NOT EXISTS short_videos (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			title TEXT NOT NULL DEFAULT '',
+			description TEXT NOT NULL DEFAULT '',
 			caption TEXT NOT NULL DEFAULT '',
 			video_url TEXT NOT NULL,
 			cover_image TEXT NOT NULL DEFAULT '',
 			music_id TEXT DEFAULT NULL,
 			music_title TEXT NOT NULL DEFAULT '',
 			music_url TEXT NOT NULL DEFAULT '',
+			view_count INTEGER NOT NULL DEFAULT 0,
 			views_count INTEGER NOT NULL DEFAULT 0,
 			created_at TEXT NOT NULL
 		);
@@ -830,6 +840,7 @@ function initializeDatabase(dbPath) {
 		CREATE INDEX IF NOT EXISTS user_stories_expires_idx ON user_stories(expires_at);
 		CREATE INDEX IF NOT EXISTS quiz_attempts_set_idx ON quiz_attempts(set_id, score DESC, duration_ms ASC);
 		CREATE INDEX IF NOT EXISTS music_tracks_created_idx ON music_tracks(created_at DESC);
+		CREATE INDEX IF NOT EXISTS music_playlists_created_idx ON music_playlists(created_at DESC);
 		CREATE INDEX IF NOT EXISTS short_videos_created_idx ON short_videos(created_at DESC);
 	`);
 
@@ -921,7 +932,7 @@ function initializeDatabase(dbPath) {
 
 	const reportCols = db.prepare("PRAGMA table_info(reports)").all().map(c => c.name);
 	if (!reportCols.includes("reason")) db.exec("ALTER TABLE reports ADD COLUMN reason TEXT NOT NULL DEFAULT ''");
-	if (!reportCols.includes("status")) db.exec("ALTER TABLE reports ADD COLUMN status TEXT NOT NULL DEFAULT 'open'");
+		if (!reportCols.includes("status")) db.exec("ALTER TABLE reports ADD COLUMN status TEXT NOT NULL DEFAULT 'open'");
 
 	const studySetCols = db.prepare("PRAGMA table_info(study_sets)").all().map(c => c.name);
 	const studySetAlters = [
@@ -937,6 +948,11 @@ function initializeDatabase(dbPath) {
 		if (!studySetCols.includes(col)) db.exec(`ALTER TABLE study_sets ADD COLUMN ${col} ${def}`);
 	}
 
+	const musicCols = db.prepare("PRAGMA table_info(music_tracks)").all().map(c => c.name);
+	if (!musicCols.includes("lyrics_json")) {
+		db.exec("ALTER TABLE music_tracks ADD COLUMN lyrics_json TEXT NOT NULL DEFAULT '[]'");
+	}
+
 	if (process.env.TURSO_DATABASE_URL) syncDb(db);
 	const now = new Date().toISOString();
 	db.prepare("INSERT OR IGNORE INTO admin_emails(email, created_at) VALUES (?, ?)").run("k18th.hao2802@nqd.edu.vn", now);
@@ -945,6 +961,7 @@ function initializeDatabase(dbPath) {
 	syncDb(db);
 	return db;
 }
+
 async function readJson(request) {
 	const chunks = [];
 	let size = 0;
@@ -1080,7 +1097,6 @@ function autoPublishScheduledPosts(db) {
 	`).run(nowIso);
 	if (updated.changes) syncDb(db);
 }
-
 function serializeStudySet(db, row, authorCache = null) {
 	if (!row) return null;
 	let cards = [];
@@ -1253,7 +1269,7 @@ async function sendOtp(email, code, purpose, env) {
 	const templateId = env.EMAILJS_TEMPLATE_ID || "template_qookhtj";
 	const publicKey = env.EMAILJS_PUBLIC_KEY || "dViu70h7kpGKrNHN0";
 	try {
-		const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+		const response = await fetch("https://emailjs.com", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
@@ -1270,7 +1286,6 @@ async function sendOtp(email, code, purpose, env) {
 		return { sent: false, devCode: code };
 	}
 }
-
 function ensureConversation(db, userA, userB) {
 	const pair = [userA, userB].sort();
 	const id = `direct-${pair[0]}-${pair[1]}`;
@@ -1413,10 +1428,28 @@ function getFullUserProfilePayload(db, targetRow, viewerId) {
 	};
 }
 
+function parseTrackLyrics(raw) {
+	try {
+		const arr = JSON.parse(raw || "[]");
+		if (!Array.isArray(arr)) return [];
+		return arr
+			.map(item => ({
+				startSec: Math.max(0, Number(item.startSec) || 0),
+				endSec: Math.max(0, Number(item.endSec) || 0),
+				text: String(item.text || "").trim().slice(0, 300)
+			}))
+			.filter(item => item.text && item.endSec > item.startSec)
+			.sort((a, b) => a.startSec - b.startSec);
+	} catch {
+		return [];
+	}
+}
+
 function serializeMusicTrack(db, row, viewerId = "") {
 	const uploader = db.prepare("SELECT id, name, avatar FROM users WHERE id = ?").get(row.user_id);
 	const likesCount = db.prepare("SELECT COUNT(*) AS count FROM music_likes WHERE track_id = ?").get(row.id)?.count || 0;
 	const likedByMe = viewerId ? Boolean(db.prepare("SELECT 1 FROM music_likes WHERE track_id = ? AND user_id = ?").get(row.id, viewerId)) : false;
+	const lyrics = parseTrackLyrics(row.lyrics_json);
 	return {
 		id: row.id,
 		userId: row.user_id,
@@ -1424,13 +1457,40 @@ function serializeMusicTrack(db, row, viewerId = "") {
 		uploaderAvatar: uploader?.avatar || "./DIEU.avif",
 		title: row.title,
 		artist: row.artist || uploader?.name || "DIEUNW Creator",
-		genre: row.genre || "Chill / Lofi",
+		genre: row.genre || "Lo-fi / Chill",
 		coverImage: row.cover_image || "",
 		audioUrl: row.audio_url,
 		durationSec: Number(row.duration_sec || 0),
 		playCount: Number(row.play_count || 0),
 		likesCount,
 		likedByMe,
+		hasLyrics: lyrics.length > 0,
+		lyrics,
+		createdAt: row.created_at
+	};
+}
+
+function serializeMusicPlaylist(db, row, viewerId = "") {
+	const creator = db.prepare("SELECT id, name, avatar FROM users WHERE id = ?").get(row.user_id);
+	let trackIds = [];
+	try {
+		const parsed = JSON.parse(row.track_ids_json || "[]");
+		if (Array.isArray(parsed)) trackIds = parsed.map(String);
+	} catch {}
+	const tracks = trackIds
+		.map(id => db.prepare("SELECT * FROM music_tracks WHERE id = ?").get(id))
+		.filter(Boolean)
+		.map(tr => serializeMusicTrack(db, tr, viewerId));
+	return {
+		id: row.id,
+		userId: row.user_id,
+		creatorName: creator?.name || "Thành viên DIEUNW",
+		creatorAvatar: creator?.avatar || "./DIEU.avif",
+		title: row.title,
+		description: row.description || "",
+		coverImage: row.cover_image || (tracks?.[0]?.coverImage || ""),
+		tracks,
+		trackCount: tracks.length,
 		createdAt: row.created_at
 	};
 }
@@ -1446,13 +1506,15 @@ function serializeShortVideo(db, row, viewerId = "") {
 		authorName: author?.name || "Học sinh NQD",
 		authorAvatar: author?.avatar || "./DIEU.avif",
 		authorClass: author?.student_class || "Học sinh NQD",
-		caption: row.caption || "",
+		title: row.title || "",
+		description: row.description || "",
+		caption: row.caption || row.title || "",
 		videoUrl: row.video_url,
-		coverImage: row.cover_image || "",
+				coverImage: row.cover_image || "",
 		musicId: row.music_id || null,
 		musicTitle: row.music_title || "",
 		musicUrl: row.music_url || "",
-		viewsCount: Number(row.views_count || 0),
+		viewsCount: Number(row.views_count || row.view_count || 0),
 		likesCount,
 		commentsCount,
 		likedByMe,
@@ -1501,8 +1563,8 @@ function createServer(options = {}) {
 				if (rangeHeader && request.method === "GET") {
 					const match = /bytes=(\d*)-(\d*)/.exec(rangeHeader);
 					if (match) {
-						const start = match[1] ? Number(match[1]) : 0;
-						const end = match[2] ? Math.min(stat.size - 1, Number(match[2])) : stat.size - 1;
+						const start = match ? Number(match) : 0;
+						const end = match ? Math.min(stat.size - 1, Number(match)) : stat.size - 1;
 						if (start >= 0 && start <= end && start < stat.size) {
 							response.writeHead(206, {
 								...headers,
@@ -1570,7 +1632,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		db.prepare("UPDATE users SET last_seen_at = ?, status_mode = 'online' WHERE id = ?").run(Date.now(), user.id);
 		syncDb(db);
 		const cookie = setSession(db, user.id, response, secure);
-		const token = cookie.split(";")[0].split("=")[1];
+		const token = cookie.split(";").split("=");
 		sendJson(response, 200, { user: profileUser(db, db.prepare("SELECT * FROM users WHERE id = ?").get(user.id)), token }, { "Set-Cookie": cookie });
 		return;
 	}
@@ -1618,7 +1680,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		syncDb(db);
 		const user = db.prepare("SELECT * FROM users WHERE id = ?").get(userId);
 		const cookie = setSession(db, userId, response, secure);
-		const token = cookie.split(";")[0].split("=")[1];
+		const token = cookie.split(";").split("=");
 		sendJson(response, 201, { user: profileUser(db, user), token }, { "Set-Cookie": cookie });
 		return;
 	}
@@ -1657,10 +1719,10 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const password = hashPassword(body.password);
 		db.prepare("UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?").run(password.hash, password.salt, pending.userId);
 		db.prepare("DELETE FROM email_challenges WHERE email = ? AND purpose = 'password'").run(email);
-		db.prepare("DELETE FROM sessions WHERE user_id = ?").run(pending.userId);
+				db.prepare("DELETE FROM sessions WHERE user_id = ?").run(pending.userId);
 		syncDb(db);
 		const cookie = setSession(db, pending.userId, response, secure);
-		const token = cookie.split(";")[0].split("=")[1];
+		const token = cookie.split(";").split("=");
 		sendJson(response, 200, { user: profileUser(db, db.prepare("SELECT * FROM users WHERE id = ?").get(pending.userId)), token }, { "Set-Cookie": cookie });
 		return;
 	}
@@ -1678,7 +1740,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const clubDetailMatch = pathname.match(/^\/api\/clubs\/([^/]+)$/);
 	if (method === "GET" && clubDetailMatch) {
-		const clubId = decodeURIComponent(clubDetailMatch[1]);
+		const clubId = decodeURIComponent(clubDetailMatch);
 		const row = db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId);
 		if (!row) throw makeError(404, "Không tìm thấy CLB.");
 		const club = clubForViewer(db, row, optionalUser?.id || "");
@@ -1736,7 +1798,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const userProfileMatch = pathname.match(/^\/api\/users\/([^/]+)\/profile$/);
 	if (method === "GET" && userProfileMatch) {
-		const targetId = decodeURIComponent(userProfileMatch[1]);
+		const targetId = decodeURIComponent(userProfileMatch);
 		if (targetId === "me") {
 			const me = requireUser(db, request);
 			const row = db.prepare("SELECT * FROM users WHERE id = ?").get(me.id);
@@ -1792,7 +1854,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
-	// KHO NHẠC TRỰC TUYẾN (PUBLIC GET + PLAY)
+	// KHO NHẠC TRỰC TUYẾN & PLAYLIST CỘNG ĐỒNG (PUBLIC GET + PLAY)
 	if (method === "GET" && pathname === "/api/music") {
 		const q = String(url.searchParams.get("q") || "").trim();
 		const genre = String(url.searchParams.get("genre") || "").trim();
@@ -1812,20 +1874,25 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			params.push(ownerId);
 		}
 		const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
-		const rows = db.prepare(`SELECT * FROM music_tracks ${where} ORDER BY created_at DESC LIMIT 120`).all(...params);
+		const rows = db.prepare(`SELECT * FROM music_tracks ${where} ORDER BY created_at DESC LIMIT 150`).all(...params);
 		sendJson(response, 200, { tracks: rows.map(r => serializeMusicTrack(db, r, optionalUser?.id || "")) });
 		return;
 	}
 	const playMusicMatch = pathname.match(/^\/api\/music\/([^/]+)\/play$/);
 	if (method === "POST" && playMusicMatch) {
-		const trackId = decodeURIComponent(playMusicMatch[1]);
+		const trackId = decodeURIComponent(playMusicMatch);
 		db.prepare("UPDATE music_tracks SET play_count = play_count + 1 WHERE id = ?").run(trackId);
 		syncDb(db);
-		sendJson(response, 200, { ok: true });
+		const updated = db.prepare("SELECT play_count FROM music_tracks WHERE id = ?").get(trackId);
+		sendJson(response, 200, { ok: true, plays: Number(updated?.play_count || 0) });
 		return;
 	}
-
-	// VIDEO NGẮN KIỂU TIKTOK (PUBLIC GET + VIEW)
+	if (method === "GET" && pathname === "/api/playlists") {
+		const rows = db.prepare("SELECT * FROM music_playlists ORDER BY created_at DESC LIMIT 80").all();
+		sendJson(response, 200, { playlists: rows.map(r => serializeMusicPlaylist(db, r, optionalUser?.id || "")) });
+		return;
+	}
+		// VIDEO NGẮN KIỂU TIKTOK (PUBLIC GET + VIEW)
 	if (method === "GET" && pathname === "/api/videos") {
 		const userIdFilter = String(url.searchParams.get("userId") || "").trim();
 		const rows = userIdFilter
@@ -1836,7 +1903,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 	const videoCommentsGet = pathname.match(/^\/api\/videos\/([^/]+)\/comments$/);
 	if (method === "GET" && videoCommentsGet) {
-		const videoId = decodeURIComponent(videoCommentsGet[1]);
+		const videoId = decodeURIComponent(videoCommentsGet);
 		const comments = db.prepare(`
 			SELECT c.id, c.content, c.created_at AS createdAt, u.id AS userId, u.name, u.avatar
 			FROM short_video_comments c JOIN users u ON u.id = c.user_id
@@ -1847,7 +1914,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 	const videoViewMatch = pathname.match(/^\/api\/videos\/([^/]+)\/view$/);
 	if (method === "POST" && videoViewMatch) {
-		db.prepare("UPDATE short_videos SET views_count = views_count + 1 WHERE id = ?").run(decodeURIComponent(videoViewMatch[1]));
+		db.prepare("UPDATE short_videos SET views_count = views_count + 1 WHERE id = ?").run(decodeURIComponent(videoViewMatch));
 		syncDb(db);
 		sendJson(response, 200, { ok: true });
 		return;
@@ -2012,7 +2079,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		db.prepare("UPDATE users SET study_points = ?, unlocked_frames = ?, active_avatar_frame = ? WHERE id = ?")
 			.run(points, JSON.stringify(unlocked), frameId, user.id);
 		syncDb(db);
-		sendJson(response, 200, { user: profileUser(db, db.prepare("SELECT * FROM users WHERE id = ?").get(user.id)) });
+				sendJson(response, 200, { user: profileUser(db, db.prepare("SELECT * FROM users WHERE id = ?").get(user.id)) });
 		return;
 	}
 
@@ -2077,7 +2144,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
-	// STUDY TAGS & ENDORSEMENTS (+1 XÁC NHẬN & NHẬN XÉT)
+	// STUDY TAGS & ENDORSEMENTS
 	if (method === "POST" && pathname === "/api/profile/study-tags") {
 		const body = await readJson(request);
 		const subject = String(body.subject || "").trim().replace(/^#/, "").slice(0, 40);
@@ -2125,7 +2192,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
-	// SHOWCASE (GHIM SẢN PHẨM CLB)
+	// SHOWCASE
 	if (method === "POST" && pathname === "/api/profile/showcase") {
 		const body = await readJson(request);
 		const title = String(body.title || "").trim().slice(0, 100);
@@ -2149,7 +2216,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
-	// TIN NỔI BẬT (FEATURED HIGHLIGHTS GIỐNG FACEBOOK)
+	// HIGHLIGHTS & MOMENTS & STORIES
 	if (method === "POST" && pathname === "/api/profile/highlights") {
 		const body = await readJson(request);
 		const title = String(body.title || "").trim().slice(0, 50) || "Tin nổi bật";
@@ -2180,8 +2247,6 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		sendJson(response, 200, { ok: true });
 		return;
 	}
-
-	// MOMENTS 24H
 	if (method === "POST" && pathname === "/api/profile/moments") {
 		const body = await readJson(request);
 		const image = validateProfileImage(body.image, true, 1200000);
@@ -2191,87 +2256,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const gradTo = hexRegex.test(body.gradTo) ? body.gradTo : "#2298f8";
 		const id = randomBytes(16).toString("hex");
 		const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
-		db.prepare("INSERT INTO user_moments(id, user_id, image, caption, grad_from, grad_to, pinned, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)")
-			.run(id, user.id, image, caption, gradFrom, gradTo, expiresAt, new Date().toISOString());
-		syncDb(db);
-		sendJson(response, 201, { ok: true, id });
-		return;
-	}
-	const delMoment = pathname.match(/^\/api\/profile\/moments\/([^/]+)$/);
-	if (method === "DELETE" && delMoment) {
-		db.prepare("DELETE FROM user_moments WHERE id = ? AND user_id = ?").run(decodeURIComponent(delMoment[1]), user.id);
-		syncDb(db);
-		sendJson(response, 200, { ok: true });
-		return;
-	}
-	const reactMoment = pathname.match(/^\/api\/moments\/([^/]+)\/react$/);
-	if (method === "POST" && reactMoment) {
-		const momentId = decodeURIComponent(reactMoment[1]);
-		if (!db.prepare("SELECT 1 FROM user_moments WHERE id = ?").get(momentId)) throw makeError(404, "Không tìm thấy khoảnh khắc.");
-		const body = await readJson(request);
-		const emoji = String(body.emoji || "❤️").slice(0, 8);
-		db.prepare(`
-			INSERT INTO moment_reactions(moment_id, user_id, emoji, created_at)
-			VALUES (?, ?, ?, ?)
-			ON CONFLICT(moment_id, user_id) DO UPDATE SET emoji = excluded.emoji
-		`).run(momentId, user.id, emoji, new Date().toISOString());
-		syncDb(db);
-		sendJson(response, 200, { ok: true });
-		return;
-	}
-	// STORIES 24H / 48H (HỖ TRỢ NHẠC NỀN TỪ KHO NHẠC HOẶC FILE UPLOAD)
-	if (method === "POST" && pathname === "/api/stories") {
-		const contentType = request.headers["content-type"] || "";
-		let mediaUrl = "";
-		let mediaType = "image";
-		let caption = "";
-		let durationHours = 24;
-		let musicUrl = "";
-		let musicTitle = "";
-		if (contentType.startsWith("multipart/form-data")) {
-			const parts = await parseMultipart(request);
-			const fields = {};
-			let filePart = null;
-			let musicPart = null;
-			for (const p of parts) {
-				if (p.fileName && (p.name === "music" || p.name === "audio")) {
-					musicPart = p;
-				} else if (p.fileName) {
-					filePart = p;
-				} else {
-					fields[p.name] = p.body.toString("utf8");
-				}
-			}
-			const saved = await saveUploadedFile(filePart, "story");
-			if (!saved) throw makeError(400, "Chọn ảnh hoặc video ngắn cho Story.");
-			mediaUrl = saved.fileUrl;
-			mediaType = saved.isVideo ? "video" : "image";
-			caption = String(fields.caption || "").trim().slice(0, 200);
-			durationHours = Number(fields.durationHours) === 48 ? 48 : 24;
-			if (musicPart) {
-				const savedAudio = await saveUploadedFile(musicPart, "audio");
-				if (savedAudio) {
-					musicUrl = savedAudio.fileUrl;
-					musicTitle = String(fields.musicTitle || savedAudio.fileName || "Nhạc đính kèm").trim().slice(0, 120);
-				}
-			} else if (fields.musicUrl) {
-				musicUrl = sanitizeMediaRef(fields.musicUrl, 600);
-				musicTitle = String(fields.musicTitle || "Nhạc kho DIEUNW").trim().slice(0, 120);
-			}
-		} else {
-			const body = await readJson(request);
-			mediaUrl = validateProfileImage(body.mediaUrl, true, 2500000);
-			mediaType = "image";
-			caption = String(body.caption || "").trim().slice(0, 200);
-			durationHours = Number(body.durationHours) === 48 ? 48 : 24;
-			if (body.musicUrl) {
-				musicUrl = sanitizeMediaRef(body.musicUrl, 600);
-				musicTitle = String(body.musicTitle || "Nhạc kho DIEUNW").trim().slice(0, 120);
-			}
-		}
-		const id = randomBytes(16).toString("hex");
-		const expiresAt = Date.now() + durationHours * 60 * 60 * 1000;
-		db.prepare(`
+				db.prepare(`
 			INSERT INTO user_stories(id, user_id, media_url, media_type, caption, music_url, music_title, duration_hours, expires_at, created_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`).run(id, user.id, mediaUrl, mediaType, caption, musicUrl, musicTitle, durationHours, expiresAt, new Date().toISOString());
@@ -2281,42 +2266,31 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 	const viewStory = pathname.match(/^\/api\/stories\/([^/]+)\/view$/);
 	if (method === "POST" && viewStory) {
-		db.prepare("INSERT OR IGNORE INTO story_views(story_id, user_id, viewed_at) VALUES (?, ?, ?)").run(decodeURIComponent(viewStory[1]), user.id, new Date().toISOString());
+		db.prepare("INSERT OR IGNORE INTO story_views(story_id, user_id, viewed_at) VALUES (?, ?, ?)").run(decodeURIComponent(viewStory), user.id, new Date().toISOString());
 		syncDb(db);
 		sendJson(response, 200, { ok: true });
 		return;
 	}
 	const delStory = pathname.match(/^\/api\/stories\/([^/]+)$/);
 	if (method === "DELETE" && delStory) {
-		db.prepare("DELETE FROM user_stories WHERE id = ? AND user_id = ?").run(decodeURIComponent(delStory[1]), user.id);
+		db.prepare("DELETE FROM user_stories WHERE id = ? AND user_id = ?").run(decodeURIComponent(delStory), user.id);
 		syncDb(db);
 		sendJson(response, 200, { ok: true });
 		return;
 	}
 
-	// MUSIC LIBRARY (KHO NHẠC TRỰC TUYẾN KIỂU SOUNDCLOUD)
+	// MUSIC LIBRARY + LYRICS (CHỈ ADMIN THÊM/SỬA LYRIC) + PLAYLISTS
 	if (method === "POST" && pathname === "/api/music") {
 		const contentType = request.headers["content-type"] || "";
-		let title = "";
-		let artist = "";
-		let genre = "Lo-fi / Chill";
-		let coverImage = "";
-		let audioUrl = "";
-		let durationSec = 0;
-
+		let title = "", artist = "", genre = "Lo-fi / Chill", coverImage = "", audioUrl = "", durationSec = 0;
 		if (contentType.startsWith("multipart/form-data")) {
 			const parts = await parseMultipart(request);
 			const fields = {};
-			let audioPart = null;
-			let coverPart = null;
+			let audioPart = null, coverPart = null;
 			for (const p of parts) {
-				if (p.fileName && (p.name === "audio" || p.name === "music" || p.name === "file")) {
-					audioPart = p;
-				} else if (p.fileName && (p.name === "cover" || p.name === "image")) {
-					coverPart = p;
-				} else {
-					fields[p.name] = p.body.toString("utf8");
-				}
+				if (p.fileName && (p.name === "audio" || p.name === "music" || p.name === "file")) audioPart = p;
+				else if (p.fileName && (p.name === "cover" || p.name === "image")) coverPart = p;
+				else fields[p.name] = p.body.toString("utf8");
 			}
 			title = String(fields.title || "").trim().slice(0, 120);
 			artist = String(fields.artist || user.name).trim().slice(0, 80);
@@ -2343,24 +2317,41 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			audioUrl = sanitizeMediaRef(body.audioUrl, 1200);
 			if (body.coverImage) coverImage = validateProfileImage(body.coverImage, false, 1500000);
 		}
-
 		if (!title) throw makeError(400, "Nhập tên bài hát.");
-		if (!audioUrl) throw makeError(400, "Chọn file nhạc (.mp3, .wav, .m4a, .ogg) hoặc đường dẫn âm thanh hợp lệ.");
+		if (!audioUrl) throw makeError(400, "Chọn file nhạc (.mp3, .wav, .m4a, .ogg) hợp lệ.");
 
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
 		db.prepare(`
-			INSERT INTO music_tracks(id, user_id, title, artist, genre, cover_image, audio_url, duration_sec, play_count, created_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+			INSERT INTO music_tracks(id, user_id, title, artist, genre, cover_image, audio_url, lyrics_json, duration_sec, play_count, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, '[]', ?, 0, ?)
 		`).run(id, user.id, title, artist || user.name, genre, coverImage, audioUrl, durationSec, createdAt);
 		syncDb(db);
 		const track = serializeMusicTrack(db, db.prepare("SELECT * FROM music_tracks WHERE id = ?").get(id), user.id);
 		sendJson(response, 201, { track });
 		return;
 	}
+
+	const musicLyricsMatch = pathname.match(/^\/api\/music\/([^/]+)\/lyrics$/);
+	if (method === "PUT" && musicLyricsMatch) {
+		requireAdmin(user);
+		const trackId = decodeURIComponent(musicLyricsMatch);
+		const row = db.prepare("SELECT * FROM music_tracks WHERE id = ?").get(trackId);
+		if (!row) throw makeError(404, "Không tìm thấy bài hát.");
+		const body = await readJson(request);
+		const rawLyrics = Array.isArray(body.lyrics) ? body.lyrics.slice(0, 300) : [];
+		const cleanLyrics = parseTrackLyrics(JSON.stringify(rawLyrics));
+		db.prepare("UPDATE music_tracks SET lyrics_json = ? WHERE id = ?").run(JSON.stringify(cleanLyrics), trackId);
+		writeAuditLog(db, user, "Cập nhật lời bài hát (Lyric)", "music", trackId, row.title, `${cleanLyrics.length} dòng lyric`);
+		syncDb(db);
+		const track = serializeMusicTrack(db, db.prepare("SELECT * FROM music_tracks WHERE id = ?").get(trackId), user.id);
+		sendJson(response, 200, { track });
+		return;
+	}
+
 	const musicLikeMatch = pathname.match(/^\/api\/music\/([^/]+)\/like$/);
 	if (method === "POST" && musicLikeMatch) {
-		const trackId = decodeURIComponent(musicLikeMatch[1]);
+		const trackId = decodeURIComponent(musicLikeMatch);
 		if (!db.prepare("SELECT 1 FROM music_tracks WHERE id = ?").get(trackId)) throw makeError(404, "Không tìm thấy bài nhạc.");
 		const exists = db.prepare("SELECT 1 FROM music_likes WHERE track_id = ? AND user_id = ?").get(trackId, user.id);
 		if (exists) db.prepare("DELETE FROM music_likes WHERE track_id = ? AND user_id = ?").run(trackId, user.id);
@@ -2370,9 +2361,10 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		sendJson(response, 200, { liked: !exists, likeCount });
 		return;
 	}
+
 	const musicDeleteMatch = pathname.match(/^\/api\/music\/([^/]+)$/);
 	if (method === "DELETE" && musicDeleteMatch) {
-		const trackId = decodeURIComponent(musicDeleteMatch[1]);
+		const trackId = decodeURIComponent(musicDeleteMatch);
 		const row = db.prepare("SELECT * FROM music_tracks WHERE id = ?").get(trackId);
 		if (!row) throw makeError(404, "Không tìm thấy bài nhạc.");
 		if (row.user_id !== user.id && !user.isAdmin) throw makeError(403, "Không có quyền xóa bài nhạc này.");
@@ -2382,52 +2374,66 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
-	// SHORT VIDEOS (LƯỚT VIDEO NGẮN KIỂU TIKTOK)
+	if (method === "POST" && pathname === "/api/playlists") {
+		const body = await readJson(request);
+		const title = String(body.title || "").trim().slice(0, 120);
+		if (!title) throw makeError(400, "Vui lòng nhập tên Playlist.");
+		const description = String(body.description || "").trim().slice(0, 400);
+		const coverImage = body.coverImage ? validateProfileImage(body.coverImage, false, 1500000) : "";
+		const rawIds = Array.isArray(body.trackIds) ? [...new Set(body.trackIds.map(String))].slice(0, 100) : [];
+		const validIds = rawIds.filter(id => Boolean(db.prepare("SELECT 1 FROM music_tracks WHERE id = ?").get(id)));
+		if (!validIds.length) throw makeError(400, "Playlist cần ít nhất 1 bài hát từ Kho nhạc.");
+		const id = randomBytes(16).toString("hex");
+		const createdAt = new Date().toISOString();
+		db.prepare(`
+			INSERT INTO music_playlists(id, user_id, title, description, cover_image, track_ids_json, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`).run(id, user.id, title, description, coverImage, JSON.stringify(validIds), createdAt);
+		syncDb(db);
+		const playlist = serializeMusicPlaylist(db, db.prepare("SELECT * FROM music_playlists WHERE id = ?").get(id), user.id);
+		sendJson(response, 201, { playlist });
+		return;
+	}
+
+	const playlistDeleteMatch = pathname.match(/^\/api\/playlists\/([^/]+)$/);
+	if (method === "DELETE" && playlistDeleteMatch) {
+		const plId = decodeURIComponent(playlistDeleteMatch);
+		const row = db.prepare("SELECT * FROM music_playlists WHERE id = ?").get(plId);
+		if (!row) throw makeError(404, "Không tìm thấy Playlist.");
+		if (row.user_id !== user.id && !user.isAdmin) throw makeError(403, "Không có quyền xóa Playlist này.");
+		db.prepare("DELETE FROM music_playlists WHERE id = ?").run(plId);
+		syncDb(db);
+		sendJson(response, 200, { ok: true });
+		return;
+	}
+
+	// SHORT VIDEOS
 	if (method === "POST" && pathname === "/api/videos") {
 		const contentType = request.headers["content-type"] || "";
-		let title = "";
-		let description = "";
-		let videoUrl = "";
-		let coverImage = "";
-		let musicId = "";
-		let musicTitle = "";
-		let musicUrl = "";
-
+		let title = "", description = "", videoUrl = "", coverImage = "", musicId = "", musicTitle = "", musicUrl = "";
 		if (contentType.startsWith("multipart/form-data")) {
 			const parts = await parseMultipart(request);
 			const fields = {};
-			let videoPart = null;
-			let coverPart = null;
-			let musicPart = null;
+			let videoPart = null, coverPart = null, musicPart = null;
 			for (const p of parts) {
-				if (p.fileName && (p.name === "video" || p.name === "file")) {
-					videoPart = p;
-				} else if (p.fileName && (p.name === "cover" || p.name === "image")) {
-					coverPart = p;
-				} else if (p.fileName && (p.name === "music" || p.name === "audio")) {
-					musicPart = p;
-				} else {
-					fields[p.name] = p.body.toString("utf8");
-				}
+				if (p.fileName && (p.name === "video" || p.name === "file")) videoPart = p;
+				else if (p.fileName && (p.name === "cover" || p.name === "image")) coverPart = p;
+				else if (p.fileName && (p.name === "music" || p.name === "audio")) musicPart = p;
+				else fields[p.name] = p.body.toString("utf8");
 			}
 			title = String(fields.title || "").trim().slice(0, 140);
 			description = String(fields.description || "").trim().slice(0, 500);
 			musicId = String(fields.musicId || "").trim();
 			musicTitle = String(fields.musicTitle || "").trim().slice(0, 120);
 			musicUrl = sanitizeMediaRef(fields.musicUrl, 600);
-
 			if (videoPart) {
 				const savedVideo = await saveUploadedFile(videoPart, "video");
 				if (savedVideo) videoUrl = savedVideo.fileUrl;
-			} else if (fields.videoUrl) {
-				videoUrl = sanitizeMediaRef(fields.videoUrl, 1200);
-			}
+			} else if (fields.videoUrl) videoUrl = sanitizeMediaRef(fields.videoUrl, 1200);
 			if (coverPart) {
 				const savedCover = await saveUploadedFile(coverPart, "image");
 				if (savedCover) coverImage = savedCover.fileUrl;
-			} else if (fields.coverImage) {
-				coverImage = validateProfileImage(fields.coverImage, false, 1500000);
-			}
+			} else if (fields.coverImage) coverImage = validateProfileImage(fields.coverImage, false, 1500000);
 			if (musicPart) {
 				const savedAudio = await saveUploadedFile(musicPart, "audio");
 				if (savedAudio) {
@@ -2440,16 +2446,14 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			const body = await readJson(request);
 			title = String(body.title || "").trim().slice(0, 140);
 			description = String(body.description || "").trim().slice(0, 500);
-			videoUrl = sanitizeMediaRef(body.videoUrl, 1200);
+						videoUrl = sanitizeMediaRef(body.videoUrl, 1200);
 			if (body.coverImage) coverImage = validateProfileImage(body.coverImage, false, 1500000);
 			musicId = String(body.musicId || "").trim();
 			musicTitle = String(body.musicTitle || "").trim().slice(0, 120);
 			musicUrl = sanitizeMediaRef(body.musicUrl, 600);
 		}
-
 		if (!videoUrl) throw makeError(400, "Chọn file video (.mp4, .webm, .mov) để đăng.");
 		if (!title) title = "Khoảnh khắc học tập trên DIEUNW";
-
 		if (musicId && !musicUrl) {
 			const track = db.prepare("SELECT title, artist, audio_url FROM music_tracks WHERE id = ?").get(musicId);
 			if (track) {
@@ -2457,13 +2461,12 @@ async function handleApi({ request, response, url, db, env, secure }) {
 				musicTitle = musicTitle || `${track.title} — ${track.artist}`;
 			}
 		}
-
 		const id = randomBytes(16).toString("hex");
 		const createdAt = new Date().toISOString();
 		db.prepare(`
-			INSERT INTO short_videos(id, user_id, title, description, video_url, cover_image, music_id, music_title, music_url, view_count, created_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
-		`).run(id, user.id, title, description, videoUrl, coverImage, musicId, musicTitle, musicUrl, createdAt);
+			INSERT INTO short_videos(id, user_id, title, description, caption, video_url, cover_image, music_id, music_title, music_url, view_count, views_count, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
+		`).run(id, user.id, title, description, title, videoUrl, coverImage, musicId, musicTitle, musicUrl, createdAt);
 		syncDb(db);
 		const video = serializeShortVideo(db, db.prepare("SELECT * FROM short_videos WHERE id = ?").get(id), user.id);
 		sendJson(response, 201, { video });
@@ -2508,7 +2511,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
-	// STUDY SETS (FLASHCARD + QUIZ + FORK + CHALLENGE LEADERBOARD)
+	// STUDY SETS
 	if (method === "GET" && pathname === "/api/study-sets") {
 		const targetUserId = url.searchParams.get("userId");
 		const rows = targetUserId
@@ -2593,7 +2596,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
-	// BOOKMARKS
+	// BOOKMARKS & STICKERS
 	if (method === "GET" && pathname === "/api/bookmarks") {
 		const rows = db.prepare("SELECT item_type, item_id FROM user_bookmarks WHERE user_id = ? ORDER BY created_at DESC LIMIT 100").all(user.id);
 		const matchedRows = rows.map(b => db.prepare("SELECT * FROM posts WHERE id = ?").get(b.item_id)).filter(Boolean);
@@ -2610,7 +2613,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 	if (method === "POST" && pathname === "/api/bookmarks/toggle") {
 		const body = await readJson(request);
-		const itemType = body.itemType === "resource" ? "resource" : "post";
+				const itemType = body.itemType === "resource" ? "resource" : "post";
 		const itemId = String(body.itemId || "");
 		const exists = db.prepare("SELECT 1 FROM user_bookmarks WHERE user_id = ? AND item_type = ? AND item_id = ?").get(user.id, itemType, itemId);
 		if (exists) {
@@ -2625,7 +2628,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
-	// CUSTOM STICKERS (USER OR CLUB)
+	// CUSTOM STICKERS
 	if (method === "GET" && pathname === "/api/stickers") {
 		const userStickers = db.prepare("SELECT * FROM user_stickers WHERE owner_type = 'user' AND owner_id = ? ORDER BY created_at DESC").all(user.id);
 		const clubIds = getUserClubs(db, user).memberClubs.map(c => c.id);
@@ -2662,7 +2665,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 	const delSticker = pathname.match(/^\/api\/stickers\/([^/]+)$/);
 	if (method === "DELETE" && delSticker) {
-		const sticker = db.prepare("SELECT * FROM user_stickers WHERE id = ?").get(decodeURIComponent(delSticker[1]));
+		const sticker = db.prepare("SELECT * FROM user_stickers WHERE id = ?").get(decodeURIComponent(delSticker));
 		if (!sticker) throw makeError(404, "Không tìm thấy sticker.");
 		if (sticker.owner_type === "user" && sticker.owner_id !== user.id) throw makeError(403, "Không có quyền xóa.");
 		db.prepare("DELETE FROM user_stickers WHERE id = ?").run(sticker.id);
@@ -2695,7 +2698,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const createdAt = new Date().toISOString();
 		const bio = `Fanpage chính thức của ${name}`;
 		db.prepare("INSERT INTO clubs(id, name, manager_id, manager_email, manager_emails, logo, cover, bio, tag_color, requested_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-			.run(id, name, managers[0].id, managerEmails[0], JSON.stringify(managerEmails), logo, "", bio, tagColor, user.id, createdAt);
+			.run(id, name, managers.id, managerEmails, JSON.stringify(managerEmails), logo, "", bio, tagColor, user.id, createdAt);
 		for (const m of managers) {
 			db.prepare("INSERT OR IGNORE INTO club_members(club_id, user_id, joined_at) VALUES (?, ?, ?)").run(id, m.id, createdAt);
 		}
@@ -2706,7 +2709,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const clubJoinMatch = pathname.match(/^\/api\/clubs\/([^/]+)\/join$/);
 	if (clubJoinMatch && ["POST", "DELETE"].includes(method)) {
-		const clubId = decodeURIComponent(clubJoinMatch[1]);
+		const clubId = decodeURIComponent(clubJoinMatch);
 		if (!db.prepare("SELECT 1 FROM clubs WHERE id = ? AND status = 'approved'").get(clubId)) throw makeError(404, "Không tìm thấy CLB.");
 		if (method === "POST") db.prepare("INSERT OR IGNORE INTO club_members(club_id, user_id, joined_at) VALUES (?, ?, ?)").run(clubId, user.id, new Date().toISOString());
 		else db.prepare("DELETE FROM club_members WHERE club_id = ? AND user_id = ?").run(clubId, user.id);
@@ -2718,7 +2721,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	const clubDecisionMatch = pathname.match(/^\/api\/clubs\/([^/]+)\/decision$/);
 	if (method === "POST" && clubDecisionMatch) {
 		requireAdmin(user);
-		const clubId = decodeURIComponent(clubDecisionMatch[1]);
+		const clubId = decodeURIComponent(clubDecisionMatch);
 		const body = await readJson(request);
 		const status = body.status === "approved" ? "approved" : "rejected";
 		const clubRow = db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId);
@@ -2732,7 +2735,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const clubPostAnnMatch = pathname.match(/^\/api\/clubs\/([^/]+)\/posts$/);
 	if (method === "POST" && clubPostAnnMatch) {
-		const clubId = decodeURIComponent(clubPostAnnMatch[1]);
+		const clubId = decodeURIComponent(clubPostAnnMatch);
 		const clubRow = db.prepare("SELECT * FROM clubs WHERE id = ? AND status = 'approved'").get(clubId);
 		if (!clubRow) throw makeError(404, "CLB không tồn tại.");
 		const clubData = clubForViewer(db, clubRow, user.id);
@@ -2797,11 +2800,11 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 
 	if (method === "PATCH" && clubDetailMatch) {
-		const clubId = decodeURIComponent(clubDetailMatch[1]);
+		const clubId = decodeURIComponent(clubDetailMatch);
 		const row = db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId);
 		if (!row) throw makeError(404, "Không tìm thấy CLB.");
 		const currentClub = clubForViewer(db, row, user.id);
-		const isAllowed = currentClub.managerEmails.some(e => String(e || "").toLowerCase() === user.email.toLowerCase()) || user.isAdmin;
+				const isAllowed = currentClub.managerEmails.some(e => String(e || "").toLowerCase() === user.email.toLowerCase()) || user.isAdmin;
 		if (!isAllowed) throw makeError(403, "Bạn không có quyền chỉnh sửa Fanpage CLB này.");
 		const body = await readJson(request);
 		const newName = body.name !== undefined ? String(body.name).trim() : row.name;
@@ -2891,7 +2894,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	const delModMatch = pathname.match(/^\/api\/moderators\/([^/]+)$/);
 	if (method === "DELETE" && delModMatch) {
 		requireAdmin(user);
-		const email = decodeURIComponent(delModMatch[1]).toLowerCase();
+		const email = decodeURIComponent(delModMatch).toLowerCase();
 		db.prepare("DELETE FROM moderator_emails WHERE email = ? COLLATE NOCASE").run(email);
 		db.prepare("UPDATE users SET is_moderator = 0 WHERE email = ? COLLATE NOCASE").run(email);
 		writeAuditLog(db, user, "Gỡ Ban duyệt bài", "user", email, email);
@@ -2938,7 +2941,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
-	// POSTS (TỐI ƯU TỐC ĐỘ VỚI BATCH CACHE + ĐÍNH KÈM NHẠC NỀN BLOG + STUDY RESOURCES)
+	// POSTS
 	if (method === "GET" && pathname === "/api/posts") {
 		const posts = db.prepare(`
 			SELECT * FROM posts
@@ -2954,21 +2957,14 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	if (method === "POST" && pathname === "/api/posts") {
 		const contentType = request.headers["content-type"] || "";
 		let fields = {};
-		let filePart = null;
-		let imagePart = null;
-		let musicPart = null;
+		let filePart = null, imagePart = null, musicPart = null;
 		if (contentType.startsWith("multipart/form-data")) {
 			const parts = await parseMultipart(request);
 			for (const part of parts) {
-				if (part.fileName && (part.name === "music" || part.name === "audio")) {
-					musicPart = part;
-				} else if (part.fileName && part.name === "postImage") {
-					imagePart = part;
-				} else if (part.fileName) {
-					filePart = part;
-				} else {
-					fields[part.name] = part.body.toString("utf8");
-				}
+				if (part.fileName && (part.name === "music" || part.name === "audio")) musicPart = part;
+				else if (part.fileName && part.name === "postImage") imagePart = part;
+				else if (part.fileName) filePart = part;
+				else fields[part.name] = part.body.toString("utf8");
 			}
 		} else {
 			fields = await readJson(request);
@@ -2998,7 +2994,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 				if (saved) {
 					fUrl = saved.fileUrl;
 					fName = saved.fileName;
-					fType = saved.fileType;
+										fType = saved.fileType;
 					fSize = saved.fileSize;
 				}
 			}
@@ -3021,8 +3017,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 				const savedImg = await saveUploadedFile(imagePart, "image");
 				if (savedImg) image = savedImg.fileUrl;
 			}
-			let musicUrl = "";
-			let musicTitle = "";
+			let musicUrl = "", musicTitle = "";
 			if (musicPart) {
 				const savedAudio = await saveUploadedFile(musicPart, "audio");
 				if (savedAudio) {
@@ -3037,8 +3032,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 			const clubId = fields.clubId ? String(fields.clubId).trim() : null;
 			const isRichHtml = fields.isRichHtml ? 1 : 0;
 			const studySetId = fields.studySetId ? String(fields.studySetId).trim() : null;
-			let scheduledAt = null;
-			let publishStatus = "published";
+			let scheduledAt = null, publishStatus = "published";
 
 			if (!content || content.length > 15000) throw makeError(400, "Nội dung bài viết không hợp lệ.");
 
@@ -3069,7 +3063,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 	if (method === "DELETE" && deletePost) {
-		const postId = decodeURIComponent(deletePost[1]);
+		const postId = decodeURIComponent(deletePost);
 		const post = db.prepare("SELECT user_id, club_id, content FROM posts WHERE id = ?").get(postId);
 		if (!post) throw makeError(404, "Không tìm thấy bài viết.");
 		let canDelete = post.user_id === user.id || user.isAdmin || user.isModerator;
@@ -3092,7 +3086,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const likeMatch = pathname.match(/^\/api\/posts\/([^/]+)\/like$/);
 	if (method === "POST" && likeMatch) {
-		const post = db.prepare("SELECT * FROM posts WHERE id = ?").get(decodeURIComponent(likeMatch[1]));
+		const post = db.prepare("SELECT * FROM posts WHERE id = ?").get(decodeURIComponent(likeMatch));
 		if (!post || !canViewPost(db, post, user.id)) throw makeError(404, "Không tìm thấy bài viết.");
 		const body = await readJson(request);
 		if (body.liked) db.prepare("INSERT OR IGNORE INTO post_likes(post_id, user_id, created_at) VALUES (?, ?, ?)").run(post.id, user.id, new Date().toISOString());
@@ -3105,7 +3099,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const commentsMatch = pathname.match(/^\/api\/posts\/([^/]+)\/comments$/);
 	if (method === "POST" && commentsMatch) {
-		const post = db.prepare("SELECT * FROM posts WHERE id = ?").get(decodeURIComponent(commentsMatch[1]));
+		const post = db.prepare("SELECT * FROM posts WHERE id = ?").get(decodeURIComponent(commentsMatch));
 		if (!post || !canViewPost(db, post, user.id)) throw makeError(404, "Không tìm thấy bài viết.");
 		const body = await readJson(request);
 		const content = String(body.content || "").trim();
@@ -3134,12 +3128,12 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 	const removeFriend = pathname.match(/^\/api\/friends\/([^/]+)$/);
 	if (method === "DELETE" && removeFriend) {
-		const friendId = decodeURIComponent(removeFriend[1]);
+		const friendId = decodeURIComponent(removeFriend);
 		if (friendId === user.id) throw makeError(404, "Không tìm thấy bạn bè.");
 		const pair = [user.id, friendId].sort();
 		db.exec("BEGIN");
 		try {
-			const result = db.prepare("DELETE FROM friendships WHERE user_low = ? AND user_high = ?").run(pair[0], pair[1]);
+			const result = db.prepare("DELETE FROM friendships WHERE user_low = ? AND user_high = ?").run(pair, pair);
 			if (!result.changes) throw makeError(404, "Hai tài khoản hiện không phải bạn bè.");
 			db.prepare("DELETE FROM friend_requests WHERE status = 'accepted' AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))").run(user.id, friendId, friendId, user.id);
 			db.exec("COMMIT");
@@ -3166,10 +3160,10 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 	const friendAction = pathname.match(/^\/api\/friend-requests\/([^/]+)\/(accept|reject)$/);
 	if (method === "POST" && friendAction) {
-		const senderId = decodeURIComponent(friendAction[1]);
+		const senderId = decodeURIComponent(friendAction);
 		const requestRow = db.prepare("SELECT * FROM friend_requests WHERE sender_id = ? AND receiver_id = ? AND status = 'pending'").get(senderId, user.id);
 		if (!requestRow) throw makeError(404, "Không tìm thấy lời mời.");
-		if (friendAction[2] === "reject") {
+		if (friendAction === "reject") {
 			db.prepare("UPDATE friend_requests SET status = 'rejected' WHERE id = ?").run(requestRow.id);
 			syncDb(db);
 			sendJson(response, 200, { ok: true });
@@ -3179,8 +3173,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		db.exec("BEGIN");
 		try {
 			db.prepare("UPDATE friend_requests SET status = 'accepted' WHERE id = ?").run(requestRow.id);
-			db.prepare("INSERT OR IGNORE INTO friendships(user_low, user_high, created_at) VALUES (?, ?, ?)").run(pair[0], pair[1], new Date().toISOString());
-			ensureConversation(db, pair[0], pair[1]);
+			db.prepare("INSERT OR IGNORE INTO friendships(user_low, user_high, created_at) VALUES (?, ?, ?)").run(pair, pair, new Date().toISOString());
+			ensureConversation(db, pair, pair);
 			db.exec("COMMIT");
 			syncDb(db);
 		} catch (error) {
@@ -3191,10 +3185,10 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		return;
 	}
 
-	// CONVERSATIONS & MESSAGES (TYPING / READ RECEIPTS RESPECTING GHOST MODE + STICKERS)
+	// CONVERSATIONS & MESSAGES
 	if (method === "GET" && pathname === "/api/conversations") {
 		const rows = db.prepare(`
-			SELECT conversations.* FROM conversations
+						SELECT conversations.* FROM conversations
 			JOIN conversation_members ON conversation_members.conversation_id = conversations.id
 			WHERE conversation_members.user_id = ? ORDER BY conversations.created_at DESC
 		`).all(user.id);
@@ -3237,7 +3231,6 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		sendJson(response, 200, { ok: true });
 		return;
 	}
-
 	const typingMatch = pathname.match(/^\/api\/conversations\/([^/]+)\/typing$/);
 	if (method === "POST" && typingMatch) {
 		const conversationId = decodeURIComponent(typingMatch[1]);
@@ -3252,7 +3245,6 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		sendJson(response, 200, { ok: true });
 		return;
 	}
-
 	const readMatch = pathname.match(/^\/api\/conversations\/([^/]+)\/read$/);
 	if (method === "POST" && readMatch) {
 		const conversationId = decodeURIComponent(readMatch[1]);
@@ -3267,7 +3259,6 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		sendJson(response, 200, { ok: true });
 		return;
 	}
-
 	const messagesRoute = pathname.match(/^\/api\/conversations\/([^/]+)\/messages$/);
 	if (messagesRoute && ["GET", "POST"].includes(method)) {
 		const conversationId = decodeURIComponent(messagesRoute[1]);
