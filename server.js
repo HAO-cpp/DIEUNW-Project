@@ -68,8 +68,7 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 function isAllowedCorsOrigin(origin) {
-	if (!origin) return true;
-	return ALLOWED_ORIGINS.has(origin) || origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:");
+	return true;
 }
 
 function applyCorsHeaders(request, response) {
@@ -83,6 +82,7 @@ function applyCorsHeaders(request, response) {
 		response.setHeader("Vary", "Origin");
 	}
 }
+
 
 function serializeCookie(name, value, { maxAge, secure }) {
 	const parts = [`${name}=${encodeURIComponent(value)}`, "HttpOnly", "Path=/"];
