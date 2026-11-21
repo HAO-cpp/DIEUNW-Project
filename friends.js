@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-	const API_BASE = "https://dieunw.onrender.com";
+	const API_BASE = (window.location && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.hostname.startsWith("192.168.") || window.location.port === "4174")) ? window.location.origin : "https://dieunw.onrender.com";
 	const FALLBACK_AVATAR = "./DIEU.avif";
 
 	const list = document.getElementById("friends-list");
@@ -411,7 +411,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		const roomMembers = [String(currentUser.id), String(friend.id)].sort().map(escapeRoomPart).join("-");
 		const roomName = `dieunw-${roomMembers}`;
 		document.getElementById("friends-meeting-title").textContent = `Jitsi với ${friend.name || friend.email}`;
-		meetingFrame.src = `https://jit.si{encodeURIComponent(roomName)}`;
+		meetingFrame.src = `https://meet.jit.si/${encodeURIComponent(roomName)}`;
 		meetingFrame.hidden = false;
 		meeting.hidden = false;
 		document.getElementById("friends-meeting-note").textContent = `Phòng ${roomName}. Người bạn cần tham gia cùng phòng này.`;

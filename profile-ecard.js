@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-	const API_BASE = "https://dieunw.onrender.com";
+	const API_BASE = (window.location && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.hostname.startsWith("192.168.") || window.location.port === "4174")) ? window.location.origin : "https://dieunw.onrender.com";
 
 	let activeProfileUser = null;
 	let viewerUser = null;

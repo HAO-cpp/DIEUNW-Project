@@ -3071,7 +3071,10 @@ body#study-page-body.theme-sunset {
 
 /* Open Book Reader Modal with Page Flip */
 .book-reader-overlay { position: fixed; inset: 0; z-index: 1500; display: grid; place-items: center; padding: 16px; background: rgba(12, 31, 48, 0.68); backdrop-filter: blur(5px); }
+.book-reader-overlay.book-reader-left-dock { place-items: stretch; justify-content: flex-start; padding: 0; }
 .book-reader-modal { width: min(820px, 100%); max-height: calc(100vh - 28px); display: flex; flex-direction: column; border-radius: 14px; border: 4px solid var(--book-color, #2298f8); background: #fdfaf3; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4); overflow: hidden; animation: nav-pop-in 0.22s ease both; }
+.book-reader-modal.book-left-sheet { height: 100vh; max-height: 100vh; width: min(520px, 85vw); border-radius: 0 14px 14px 0; animation: bookSlideInLeft 0.28s ease both; }
+@keyframes bookSlideInLeft { 0% { opacity: 0; transform: translateX(-100%); } 100% { opacity: 1; transform: translateX(0); } }
 .book-reader-topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px; background: var(--book-color, #1769aa); color: #ffffff; }
 .book-reader-topbar h2 { font-size: 16px; color: #ffffff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .book-reader-close { width: 32px; height: 32px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.22); color: #ffffff; font-size: 20px; cursor: pointer; flex-shrink: 0; }
