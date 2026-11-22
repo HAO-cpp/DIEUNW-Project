@@ -304,7 +304,7 @@ function parseEcardConfig(raw) {
 		bgImage: "",
 		overlayOpacity: 42,
 		textTone: "light",
-		tagline: "Học sinh THPT Nguyễn Quán Nho"
+		tagline: "Học sinh THPT Nguyễn Quang DIêu"
 	};
 	if (!raw) return fallback;
 	try {

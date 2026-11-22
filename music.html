@@ -395,8 +395,10 @@
 			.music-deck-bar { padding: 10px 12px; gap: 8px; }
 		}
 	</style>
+  <script src="https://unpkg.com"></script>
 </head>
 <body>
+<div id="app">
 	<header class="navbar nav-scroll">
 		<div class="nav-left">
 			<a href="./index.html" class="brand-logo-link">
@@ -546,5 +548,7 @@
 
 	<script src="./nav-profile.js?v=9" defer></script>
 	<script src="./music.js?v=9" defer></script>
+</div>
+<script>const { createApp } = Vue; createApp({}).mount("#app");</script>
 </body>
 </html>

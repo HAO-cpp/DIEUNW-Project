@@ -7,8 +7,10 @@
 	<link rel="stylesheet" href="./style.css?v=12">
 	<link rel="icon" type="image/png" href="./DIEU.avif?v=1">
 	<title>Học Nhóm - DIEUNW</title>
+  <script src="https://unpkg.com"></script>
 </head>
 <body class="group-page">
+<div id="app">
 	<header class="navbar nav-scroll">
 		<div class="nav-left">
 			<a href="./index.html" class="brand-logo-link">
@@ -216,5 +218,7 @@
 
 	<script src="./nav-profile.js?v=9" defer></script>
 	<script src="./hoc-nhom.js?v=9" defer></script>
+</div>
+<script>const { createApp } = Vue; createApp({}).mount("#app");</script>
 </body>
 </html>

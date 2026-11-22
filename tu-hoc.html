@@ -7,8 +7,10 @@
 	<link rel="stylesheet" href="./style.css?v=9">
 	<link rel="icon" type="image/png" href="./DIEU.avif?v=1">
 	<title>DIEUNW - Phòng Tự Học</title>
+  <script src="https://unpkg.com"></script>
 </head>
 <body id="study-page-body">
+<div id="app">
 	<header class="navbar nav-scroll">
 		<div class="nav-left">
 			<a href="./index.html" class="brand-logo-link">
@@ -151,5 +153,7 @@
 
 	<script src="./nav-profile.js?v=9" defer></script>
 	<script src="./tu-hoc.js?v=9" defer></script>
+</div>
+<script>const { createApp } = Vue; createApp({}).mount("#app");</script>
 </body>
 </html>

@@ -344,8 +344,10 @@
 			.video-nav-arrows { display: none; }
 		}
 	</style>
+  <script src="https://unpkg.com"></script>
 </head>
 <body class="videos-page">
+<div id="app">
 	<header class="navbar nav-scroll">
 		<div class="nav-left">
 			<a href="./index.html" class="brand-logo-link">
@@ -442,5 +444,7 @@
 
 	<script src="./nav-profile.js?v=9" defer></script>
 	<script src="./videos.js?v=9" defer></script>
+</div>
+<script>const { createApp } = Vue; createApp({}).mount("#app");</script>
 </body>
 </html>

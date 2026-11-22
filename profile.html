@@ -6,8 +6,10 @@
 	<link rel="stylesheet" href="./style.css?v=12">
 	<link rel="icon" type="image/png" href="./DIEU.avif?v=9">
 	<title>DIEUNW - Trang Cá Nhân</title>
+  <script src="https://unpkg.com"></script>
 </head>
 <body class="profile-page">
+<div id="app">
 	<header class="navbar nav-scroll">
 		<div class="nav-corner-dock">
 			<button type="button" class="nav-brand-toggle" aria-expanded="false" aria-controls="main-nav-menu" aria-label="Mở menu điều hướng DIEUNW">
@@ -714,7 +716,7 @@
 					<div class="ecard-left-content">
 						<span class="ecard-brand-chip">DIEUNW · E-CARD</span>
 						<span id="ecard-cohort-label" class="ecard-cohort-pill">NQD</span>
-						<p id="ecard-tagline-label" class="ecard-tagline-text">Học sinh THPT Nguyễn Quý Đức</p>
+						<p id="ecard-tagline-label" class="ecard-tagline-text">Học sinh THPT Nguyễn Quang DIêu</p>
 					</div>
 				</div>
 
@@ -938,5 +940,7 @@
 	<script src="./profile-auth.js?v=4" defer></script>
 	<script src="./profile-sections.js?v=4" defer></script>
 	<script src="./profile-ecard.js?v=4" defer></script>
+</div>
+<script>const { createApp } = Vue; createApp({}).mount("#app");</script>
 </body>
 </html>

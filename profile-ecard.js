@@ -302,7 +302,7 @@ document.addEventListener("DOMContentLoaded", () => {
 			rightHalf.style.setProperty("--ecard-r2", workingConfig.rightColor2 || "#2298f8");
 		}
 		if (taglineLabel) {
-			taglineLabel.textContent = workingConfig.tagline || (user.studentClass ? `Thành viên lớp ${user.studentClass}` : "Học sinh THPT Nguyễn Quý Đức");
+			taglineLabel.textContent = workingConfig.tagline || (user.studentClass ? `Thành viên lớp ${user.studentClass}` : "Học sinh THPT Nguyễn Quang DIêu");
 		}
 
 		const avatarImg = document.getElementById("ecard-avatar-img");
@@ -458,7 +458,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		ctx.font = "800 52px system-ui, -apple-system, Arial, sans-serif";
 		ctx.fillText(user.cohort || "NQD", 64, H - 155);
 
-		const tagline = workingConfig.tagline || (user.studentClass ? `Thành viên lớp ${user.studentClass}` : "Học sinh THPT Nguyễn Quý Đức");
+		const tagline = workingConfig.tagline || (user.studentClass ? `Thành viên lớp ${user.studentClass}` : "Học sinh THPT Nguyễn Quang DIêu");
 		ctx.fillStyle = "rgba(255, 255, 255, 0.94)";
 		ctx.font = "600 34px system-ui, -apple-system, Arial, sans-serif";
 		ctx.fillText(tagline.slice(0, 44), 64, H - 90);
