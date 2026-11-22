@@ -1,17 +1,12 @@
 (() => {
-    const API_BASE = (typeof window !== "undefined" && window.location && window.location.protocol.startsWith("http") && (
-        window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1" ||
-        window.location.hostname.startsWith("192.168.") ||
-        window.location.port === "4174"
-    )) ? window.location.origin : ("https://" + "dieunw" + ".onrender.com");
+    const API_BASE = "https://" + "dieunw" + ".onrender.com";
     const FALLBACK_AVATAR = "./DIEU.avif";
     const MUSIC_STATE_KEY = "dieunw_global_music_state";
 
     const originalFetch = window.fetch.bind(window);
     window.fetch = function (url, options = {}) {
         const urlStr = typeof url === "string" ? url : (url && typeof url.url === "string" ? url.url : "");
-        if (urlStr.includes("dieunw" + ".onrender.com") || (API_BASE && urlStr.startsWith(API_BASE))) {
+        if (urlStr.includes("dieunw" + ".onrender.com")) {
             const token = localStorage.getItem("session_token");
             if (token) {
                 const headers = new Headers(options.headers || {});
@@ -68,11 +63,7 @@
     function resolveMedia(url) {
         const raw = String(url || "").trim();
         if (!raw) return "";
-        if (raw.startsWith("data:")) return raw;
         if (raw.startsWith("/uploads/")) return `${API_BASE}${raw}`;
-        if (raw.startsWith("uploads/")) return `${API_BASE}/${raw}`;
-        const uploadMatch = raw.match(/\/uploads\/(.+)$/);
-        if (uploadMatch) return `${API_BASE}/uploads/${uploadMatch[1]}`;
         return raw;
     }
     window.dieunwResolveMedia = resolveMedia;
@@ -478,7 +469,6 @@
     let globalPlaylist = [];
     let globalIndex = -1;
     let globalLoop = true;
-    let globalShuffle = localStorage.getItem("dieunw_music_shuffle") === "1";
     let musicBtnRef = null;
     let musicPopoverRef = null;
     let lastSaveTick = 0;
@@ -548,8 +538,7 @@
             title: item.title,
             artist: item.artist || "",
             isLocal: Boolean(item.isLocal),
-            audioUrl: item.isLocal ? "" : String(item.audioUrl || item.audio_url || item.url || ""),
-            coverImage: item.coverImage || item.cover_url || item.coverUrl || ""
+            audioUrl: item.isLocal ? "" : String(item.audioUrl || item.audio_url || item.url || "")
         }));
 
         const safeIdx = globalIndex >= 0 && globalIndex < cleanList.length ? globalIndex : 0;
@@ -560,9 +549,6 @@
             isPlaying: Boolean(!globalAudioEl.paused && globalAudioEl.src),
             playbackRate: globalAudioEl.playbackRate || 1,
             loop: globalLoop,
-            shuffle: Boolean(globalShuffle),
-            track: cleanList[safeIdx] || null,
-            queue: cleanList,
             updatedAt: now
         };
         try {
@@ -575,23 +561,8 @@
             const raw = localStorage.getItem(MUSIC_STATE_KEY);
             if (!raw) return null;
             const parsed = JSON.parse(raw);
-            if (!parsed) return null;
-            let playlist = Array.isArray(parsed.playlist) ? parsed.playlist : (Array.isArray(parsed.queue) ? parsed.queue : []);
-            if (!playlist.length && parsed.track) playlist = [parsed.track];
-            if (!playlist.length) return null;
-            let index = Number(parsed.index);
-            if (Number.isNaN(index) || index < 0) {
-                index = parsed.track ? playlist.findIndex(t => String(t.id) === String(parsed.track.id)) : 0;
-            }
-            return {
-                playlist,
-                index: Math.max(0, index),
-                currentTime: Number(parsed.currentTime) || 0,
-                isPlaying: Boolean(parsed.isPlaying),
-                playbackRate: Number(parsed.playbackRate) || 1,
-                loop: parsed.loop !== false,
-                shuffle: Boolean(parsed.shuffle || localStorage.getItem("dieunw_music_shuffle") === "1")
-            };
+            if (!parsed || !Array.isArray(parsed.playlist) || !parsed.playlist.length) return null;
+            return parsed;
         } catch {
             return null;
         }
@@ -677,7 +648,6 @@
             </div>
             <p id="nav-music-now-title" style="margin:0;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Chọn Kho nhạc hoặc Tệp từ máy để phát</p>
             <div style="display:flex;align-items:center;justify-content:center;gap:8px;">
-                <button type="button" id="nav-music-shuffle" class="audio-ctrl-btn" title="Phát ngẫu nhiên" style="min-width:34px;height:34px;border-radius:9px;border:1px solid #cbd5e1;background:#fff;color:#173853;cursor:pointer;">🔀</button>
                 <button type="button" id="nav-music-prev" class="audio-ctrl-btn" style="min-width:34px;height:34px;border-radius:9px;border:1px solid #cbd5e1;background:#fff;color:#173853;cursor:pointer;">⏮</button>
                 <button type="button" id="nav-music-toggle" class="audio-ctrl-btn primary" style="min-width:42px;height:36px;border-radius:10px;border:0;background:#1769aa;color:#fff;font-weight:800;cursor:pointer;">▶</button>
                 <button type="button" id="nav-music-next" class="audio-ctrl-btn" style="min-width:34px;height:34px;border-radius:9px;border:1px solid #cbd5e1;background:#fff;color:#173853;cursor:pointer;">⏭</button>
@@ -702,31 +672,9 @@
         const nowTitleEl = popover.querySelector("#nav-music-now-title");
         const toggleBtn = popover.querySelector("#nav-music-toggle");
         const loopBtn = popover.querySelector("#nav-music-loop");
-        const shuffleBtn = popover.querySelector("#nav-music-shuffle");
         const listEl = popover.querySelector("#nav-music-list");
         const volSlider = popover.querySelector("#nav-music-volume");
         const fileInput = popover.querySelector("#nav-music-file-input");
-
-        function syncShuffleBtnUI() {
-            if (!shuffleBtn) return;
-            shuffleBtn.style.background = globalShuffle ? "#e0f2fe" : "#fff";
-            shuffleBtn.style.color = globalShuffle ? "#0369a1" : "#173853";
-            shuffleBtn.style.borderColor = globalShuffle ? "#0284c7" : "#cbd5e1";
-            shuffleBtn.style.opacity = globalShuffle ? "1" : "0.52";
-        }
-        syncShuffleBtnUI();
-
-        function getNextTrackIndex(step = 1) {
-            if (!globalPlaylist.length) return 0;
-            if (globalShuffle && globalPlaylist.length > 1) {
-                let rand = globalIndex;
-                while (rand === globalIndex) {
-                    rand = Math.floor(Math.random() * globalPlaylist.length);
-                }
-                return rand;
-            }
-            return ((globalIndex + step + globalPlaylist.length) % globalPlaylist.length);
-        }
 
         function applySpeedButtonUI(rate) {
             popover.querySelectorAll(".nav-spd-btn").forEach(b => {
@@ -936,20 +884,14 @@
         });
 
         popover.querySelector("#nav-music-prev").addEventListener("click", () => {
-            if (globalPlaylist.length) playAtIndex(getNextTrackIndex(-1));
+            if (globalPlaylist.length) playAtIndex(globalIndex - 1);
         });
         popover.querySelector("#nav-music-next").addEventListener("click", () => {
-            if (globalPlaylist.length) playAtIndex(getNextTrackIndex(1));
+            if (globalPlaylist.length) playAtIndex(globalIndex + 1);
         });
         loopBtn.addEventListener("click", () => {
             globalLoop = !globalLoop;
             loopBtn.style.opacity = globalLoop ? "1" : "0.48";
-            saveGlobalMusicState(true);
-        });
-        shuffleBtn?.addEventListener("click", () => {
-            globalShuffle = !globalShuffle;
-            localStorage.setItem("dieunw_music_shuffle", globalShuffle ? "1" : "0");
-            syncShuffleBtnUI();
             saveGlobalMusicState(true);
         });
 
@@ -980,8 +922,8 @@
         });
         audio.addEventListener("ended", () => {
             if (!globalPlaylist.length) return;
-            if (globalIndex < globalPlaylist.length - 1 || globalLoop || globalShuffle) {
-                playAtIndex(getNextTrackIndex(1));
+            if (globalIndex < globalPlaylist.length - 1 || globalLoop) {
+                playAtIndex(globalIndex + 1);
             } else {
                 syncPlayState();
                 saveGlobalMusicState(true);
@@ -1002,8 +944,6 @@
             globalPlaylist = restored.playlist;
             globalLoop = restored.loop !== false;
             loopBtn.style.opacity = globalLoop ? "1" : "0.48";
-            if (restored.shuffle) globalShuffle = true;
-            syncShuffleBtnUI();
             const safeIdx = Math.min(Math.max(0, Number(restored.index) || 0), globalPlaylist.length - 1);
             playAtIndex(safeIdx, {
                 autoPlay: Boolean(restored.isPlaying),
@@ -1185,20 +1125,14 @@
         const themeBtn = dock.querySelector("#nav-theme-toggle, .nav-theme-toggle");
         if (themeBtn && themeBtn.dataset.themeBound !== "1") {
             themeBtn.dataset.themeBound = "1";
-            const savedDark = localStorage.getItem("dieunw_dark_mode") === "1"
-                || localStorage.getItem("dieunw_theme") === "dark"
-                || localStorage.getItem("darkMode") === "1";
+            const savedDark = localStorage.getItem("dieunw_dark_mode") === "1";
             if (savedDark) {
                 document.body.classList.add("dark-mode");
-                document.documentElement.classList.add("dark-mode");
                 themeBtn.textContent = "☀️";
             }
             themeBtn.addEventListener("click", () => {
                 const isDark = document.body.classList.toggle("dark-mode");
-                document.documentElement.classList.toggle("dark-mode", isDark);
                 localStorage.setItem("dieunw_dark_mode", isDark ? "1" : "0");
-                localStorage.setItem("dieunw_theme", isDark ? "dark" : "light");
-                localStorage.setItem("darkMode", isDark ? "1" : "0");
                 themeBtn.textContent = isDark ? "☀️" : "🌙";
             });
         }

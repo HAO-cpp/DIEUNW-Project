@@ -123,14 +123,16 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 	});
 
-	// Theme toggle is now handled centrally by nav-profile.js
 	const themeBtn = document.getElementById("nav-theme-toggle");
-	if (localStorage.getItem("dieunw_dark_mode") === "1" || localStorage.getItem("dieunw_theme") === "dark" || localStorage.getItem("darkMode") === "1") {
+	if (localStorage.getItem("dieunw_dark_mode") === "1") {
 		document.body.classList.add("dark-mode");
-		document.documentElement.classList.add("dark-mode");
 		if (themeBtn) themeBtn.textContent = "☀️";
 	}
-	// Click listener removed — nav-profile.js is the single authority
+	themeBtn?.addEventListener("click", () => {
+		const isDark = document.body.classList.toggle("dark-mode");
+		localStorage.setItem("dieunw_dark_mode", isDark ? "1" : "0");
+		themeBtn.textContent = isDark ? "☀️" : "🌙";
+	});
 
 	if (location.hash === "#register" && loginView && registerView) {
 		loginView.style.display = "none";

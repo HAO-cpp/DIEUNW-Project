@@ -1563,8 +1563,8 @@ function createServer(options = {}) {
 				if (rangeHeader && request.method === "GET") {
 					const match = /bytes=(\d*)-(\d*)/.exec(rangeHeader);
 					if (match) {
-						const start = match[1] ? Number(match[1]) : 0;
-						const end = match[2] ? Math.min(stat.size - 1, Number(match[2])) : stat.size - 1;
+						const start = match ? Number(match) : 0;
+						const end = match ? Math.min(stat.size - 1, Number(match)) : stat.size - 1;
 						if (start >= 0 && start <= end && start < stat.size) {
 							response.writeHead(206, {
 								...headers,
@@ -1632,7 +1632,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		db.prepare("UPDATE users SET last_seen_at = ?, status_mode = 'online' WHERE id = ?").run(Date.now(), user.id);
 		syncDb(db);
 		const cookie = setSession(db, user.id, response, secure);
-		const token = cookie.split(";")[0].split("=")[1];
+		const token = cookie.split(";").split("=");
 		sendJson(response, 200, { user: profileUser(db, db.prepare("SELECT * FROM users WHERE id = ?").get(user.id)), token }, { "Set-Cookie": cookie });
 		return;
 	}
@@ -1680,7 +1680,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		syncDb(db);
 		const user = db.prepare("SELECT * FROM users WHERE id = ?").get(userId);
 		const cookie = setSession(db, userId, response, secure);
-		const token = cookie.split(";")[0].split("=")[1];
+		const token = cookie.split(";").split("=");
 		sendJson(response, 201, { user: profileUser(db, user), token }, { "Set-Cookie": cookie });
 		return;
 	}
@@ -1722,7 +1722,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 				db.prepare("DELETE FROM sessions WHERE user_id = ?").run(pending.userId);
 		syncDb(db);
 		const cookie = setSession(db, pending.userId, response, secure);
-		const token = cookie.split(";")[0].split("=")[1];
+		const token = cookie.split(";").split("=");
 		sendJson(response, 200, { user: profileUser(db, db.prepare("SELECT * FROM users WHERE id = ?").get(pending.userId)), token }, { "Set-Cookie": cookie });
 		return;
 	}
@@ -1740,7 +1740,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const clubDetailMatch = pathname.match(/^\/api\/clubs\/([^/]+)$/);
 	if (method === "GET" && clubDetailMatch) {
-		const clubId = decodeURIComponent(clubDetailMatch[1]);
+		const clubId = decodeURIComponent(clubDetailMatch);
 		const row = db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId);
 		if (!row) throw makeError(404, "Không tìm thấy CLB.");
 		const club = clubForViewer(db, row, optionalUser?.id || "");
@@ -1798,7 +1798,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const userProfileMatch = pathname.match(/^\/api\/users\/([^/]+)\/profile$/);
 	if (method === "GET" && userProfileMatch) {
-		const targetId = decodeURIComponent(userProfileMatch[1]);
+		const targetId = decodeURIComponent(userProfileMatch);
 		if (targetId === "me") {
 			const me = requireUser(db, request);
 			const row = db.prepare("SELECT * FROM users WHERE id = ?").get(me.id);
@@ -1880,7 +1880,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 	const playMusicMatch = pathname.match(/^\/api\/music\/([^/]+)\/play$/);
 	if (method === "POST" && playMusicMatch) {
-		const trackId = decodeURIComponent(playMusicMatch[1]);
+		const trackId = decodeURIComponent(playMusicMatch);
 		db.prepare("UPDATE music_tracks SET play_count = play_count + 1 WHERE id = ?").run(trackId);
 		syncDb(db);
 		const updated = db.prepare("SELECT play_count FROM music_tracks WHERE id = ?").get(trackId);
@@ -1903,7 +1903,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 	const videoCommentsGet = pathname.match(/^\/api\/videos\/([^/]+)\/comments$/);
 	if (method === "GET" && videoCommentsGet) {
-		const videoId = decodeURIComponent(videoCommentsGet[1]);
+		const videoId = decodeURIComponent(videoCommentsGet);
 		const comments = db.prepare(`
 			SELECT c.id, c.content, c.created_at AS createdAt, u.id AS userId, u.name, u.avatar
 			FROM short_video_comments c JOIN users u ON u.id = c.user_id
@@ -1914,7 +1914,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 	const videoViewMatch = pathname.match(/^\/api\/videos\/([^/]+)\/view$/);
 	if (method === "POST" && videoViewMatch) {
-		db.prepare("UPDATE short_videos SET views_count = views_count + 1 WHERE id = ?").run(decodeURIComponent(videoViewMatch[1]));
+		db.prepare("UPDATE short_videos SET views_count = views_count + 1 WHERE id = ?").run(decodeURIComponent(videoViewMatch));
 		syncDb(db);
 		sendJson(response, 200, { ok: true });
 		return;
@@ -2266,14 +2266,14 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 	const viewStory = pathname.match(/^\/api\/stories\/([^/]+)\/view$/);
 	if (method === "POST" && viewStory) {
-		db.prepare("INSERT OR IGNORE INTO story_views(story_id, user_id, viewed_at) VALUES (?, ?, ?)").run(decodeURIComponent(viewStory[1]), user.id, new Date().toISOString());
+		db.prepare("INSERT OR IGNORE INTO story_views(story_id, user_id, viewed_at) VALUES (?, ?, ?)").run(decodeURIComponent(viewStory), user.id, new Date().toISOString());
 		syncDb(db);
 		sendJson(response, 200, { ok: true });
 		return;
 	}
 	const delStory = pathname.match(/^\/api\/stories\/([^/]+)$/);
 	if (method === "DELETE" && delStory) {
-		db.prepare("DELETE FROM user_stories WHERE id = ? AND user_id = ?").run(decodeURIComponent(delStory[1]), user.id);
+		db.prepare("DELETE FROM user_stories WHERE id = ? AND user_id = ?").run(decodeURIComponent(delStory), user.id);
 		syncDb(db);
 		sendJson(response, 200, { ok: true });
 		return;
@@ -2335,7 +2335,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	const musicLyricsMatch = pathname.match(/^\/api\/music\/([^/]+)\/lyrics$/);
 	if (method === "PUT" && musicLyricsMatch) {
 		requireAdmin(user);
-		const trackId = decodeURIComponent(musicLyricsMatch[1]);
+		const trackId = decodeURIComponent(musicLyricsMatch);
 		const row = db.prepare("SELECT * FROM music_tracks WHERE id = ?").get(trackId);
 		if (!row) throw makeError(404, "Không tìm thấy bài hát.");
 		const body = await readJson(request);
@@ -2351,7 +2351,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const musicLikeMatch = pathname.match(/^\/api\/music\/([^/]+)\/like$/);
 	if (method === "POST" && musicLikeMatch) {
-		const trackId = decodeURIComponent(musicLikeMatch[1]);
+		const trackId = decodeURIComponent(musicLikeMatch);
 		if (!db.prepare("SELECT 1 FROM music_tracks WHERE id = ?").get(trackId)) throw makeError(404, "Không tìm thấy bài nhạc.");
 		const exists = db.prepare("SELECT 1 FROM music_likes WHERE track_id = ? AND user_id = ?").get(trackId, user.id);
 		if (exists) db.prepare("DELETE FROM music_likes WHERE track_id = ? AND user_id = ?").run(trackId, user.id);
@@ -2364,10 +2364,10 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const musicDeleteMatch = pathname.match(/^\/api\/music\/([^/]+)$/);
 	if (method === "DELETE" && musicDeleteMatch) {
-		const trackId = decodeURIComponent(musicDeleteMatch[1]);
+		const trackId = decodeURIComponent(musicDeleteMatch);
 		const row = db.prepare("SELECT * FROM music_tracks WHERE id = ?").get(trackId);
 		if (!row) throw makeError(404, "Không tìm thấy bài nhạc.");
-		if (row.user_id !== user.id && !user.is_admin && !user.isAdmin) throw makeError(403, "Không có quyền xóa bài nhạc này.");
+		if (row.user_id !== user.id && !user.isAdmin) throw makeError(403, "Không có quyền xóa bài nhạc này.");
 		db.prepare("DELETE FROM music_tracks WHERE id = ?").run(trackId);
 		syncDb(db);
 		sendJson(response, 200, { ok: true });
@@ -2397,10 +2397,10 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const playlistDeleteMatch = pathname.match(/^\/api\/playlists\/([^/]+)$/);
 	if (method === "DELETE" && playlistDeleteMatch) {
-		const plId = decodeURIComponent(playlistDeleteMatch[1]);
+		const plId = decodeURIComponent(playlistDeleteMatch);
 		const row = db.prepare("SELECT * FROM music_playlists WHERE id = ?").get(plId);
 		if (!row) throw makeError(404, "Không tìm thấy Playlist.");
-		if (row.user_id !== user.id && !user.is_admin && !user.isAdmin) throw makeError(403, "Không có quyền xóa Playlist này.");
+		if (row.user_id !== user.id && !user.isAdmin) throw makeError(403, "Không có quyền xóa Playlist này.");
 		db.prepare("DELETE FROM music_playlists WHERE id = ?").run(plId);
 		syncDb(db);
 		sendJson(response, 200, { ok: true });
@@ -2665,7 +2665,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 	const delSticker = pathname.match(/^\/api\/stickers\/([^/]+)$/);
 	if (method === "DELETE" && delSticker) {
-		const sticker = db.prepare("SELECT * FROM user_stickers WHERE id = ?").get(decodeURIComponent(delSticker[1]));
+		const sticker = db.prepare("SELECT * FROM user_stickers WHERE id = ?").get(decodeURIComponent(delSticker));
 		if (!sticker) throw makeError(404, "Không tìm thấy sticker.");
 		if (sticker.owner_type === "user" && sticker.owner_id !== user.id) throw makeError(403, "Không có quyền xóa.");
 		db.prepare("DELETE FROM user_stickers WHERE id = ?").run(sticker.id);
@@ -2698,7 +2698,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		const createdAt = new Date().toISOString();
 		const bio = `Fanpage chính thức của ${name}`;
 		db.prepare("INSERT INTO clubs(id, name, manager_id, manager_email, manager_emails, logo, cover, bio, tag_color, requested_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-			.run(id, name, managers[0].id, managerEmails[0], JSON.stringify(managerEmails), logo, "", bio, tagColor, user.id, createdAt);
+			.run(id, name, managers.id, managerEmails, JSON.stringify(managerEmails), logo, "", bio, tagColor, user.id, createdAt);
 		for (const m of managers) {
 			db.prepare("INSERT OR IGNORE INTO club_members(club_id, user_id, joined_at) VALUES (?, ?, ?)").run(id, m.id, createdAt);
 		}
@@ -2709,7 +2709,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const clubJoinMatch = pathname.match(/^\/api\/clubs\/([^/]+)\/join$/);
 	if (clubJoinMatch && ["POST", "DELETE"].includes(method)) {
-		const clubId = decodeURIComponent(clubJoinMatch[1]);
+		const clubId = decodeURIComponent(clubJoinMatch);
 		if (!db.prepare("SELECT 1 FROM clubs WHERE id = ? AND status = 'approved'").get(clubId)) throw makeError(404, "Không tìm thấy CLB.");
 		if (method === "POST") db.prepare("INSERT OR IGNORE INTO club_members(club_id, user_id, joined_at) VALUES (?, ?, ?)").run(clubId, user.id, new Date().toISOString());
 		else db.prepare("DELETE FROM club_members WHERE club_id = ? AND user_id = ?").run(clubId, user.id);
@@ -2721,7 +2721,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	const clubDecisionMatch = pathname.match(/^\/api\/clubs\/([^/]+)\/decision$/);
 	if (method === "POST" && clubDecisionMatch) {
 		requireAdmin(user);
-		const clubId = decodeURIComponent(clubDecisionMatch[1]);
+		const clubId = decodeURIComponent(clubDecisionMatch);
 		const body = await readJson(request);
 		const status = body.status === "approved" ? "approved" : "rejected";
 		const clubRow = db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId);
@@ -2735,7 +2735,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const clubPostAnnMatch = pathname.match(/^\/api\/clubs\/([^/]+)\/posts$/);
 	if (method === "POST" && clubPostAnnMatch) {
-		const clubId = decodeURIComponent(clubPostAnnMatch[1]);
+		const clubId = decodeURIComponent(clubPostAnnMatch);
 		const clubRow = db.prepare("SELECT * FROM clubs WHERE id = ? AND status = 'approved'").get(clubId);
 		if (!clubRow) throw makeError(404, "CLB không tồn tại.");
 		const clubData = clubForViewer(db, clubRow, user.id);
@@ -2800,7 +2800,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 
 	if (method === "PATCH" && clubDetailMatch) {
-		const clubId = decodeURIComponent(clubDetailMatch[1]);
+		const clubId = decodeURIComponent(clubDetailMatch);
 		const row = db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId);
 		if (!row) throw makeError(404, "Không tìm thấy CLB.");
 		const currentClub = clubForViewer(db, row, user.id);
@@ -2894,7 +2894,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	const delModMatch = pathname.match(/^\/api\/moderators\/([^/]+)$/);
 	if (method === "DELETE" && delModMatch) {
 		requireAdmin(user);
-		const email = decodeURIComponent(delModMatch[1]).toLowerCase();
+		const email = decodeURIComponent(delModMatch).toLowerCase();
 		db.prepare("DELETE FROM moderator_emails WHERE email = ? COLLATE NOCASE").run(email);
 		db.prepare("UPDATE users SET is_moderator = 0 WHERE email = ? COLLATE NOCASE").run(email);
 		writeAuditLog(db, user, "Gỡ Ban duyệt bài", "user", email, email);
@@ -3063,7 +3063,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const deletePost = pathname.match(/^\/api\/posts\/([^/]+)$/);
 	if (method === "DELETE" && deletePost) {
-		const postId = decodeURIComponent(deletePost[1]);
+		const postId = decodeURIComponent(deletePost);
 		const post = db.prepare("SELECT user_id, club_id, content FROM posts WHERE id = ?").get(postId);
 		if (!post) throw makeError(404, "Không tìm thấy bài viết.");
 		let canDelete = post.user_id === user.id || user.isAdmin || user.isModerator;
@@ -3086,7 +3086,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const likeMatch = pathname.match(/^\/api\/posts\/([^/]+)\/like$/);
 	if (method === "POST" && likeMatch) {
-		const post = db.prepare("SELECT * FROM posts WHERE id = ?").get(decodeURIComponent(likeMatch[1]));
+		const post = db.prepare("SELECT * FROM posts WHERE id = ?").get(decodeURIComponent(likeMatch));
 		if (!post || !canViewPost(db, post, user.id)) throw makeError(404, "Không tìm thấy bài viết.");
 		const body = await readJson(request);
 		if (body.liked) db.prepare("INSERT OR IGNORE INTO post_likes(post_id, user_id, created_at) VALUES (?, ?, ?)").run(post.id, user.id, new Date().toISOString());
@@ -3099,7 +3099,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const commentsMatch = pathname.match(/^\/api\/posts\/([^/]+)\/comments$/);
 	if (method === "POST" && commentsMatch) {
-		const post = db.prepare("SELECT * FROM posts WHERE id = ?").get(decodeURIComponent(commentsMatch[1]));
+		const post = db.prepare("SELECT * FROM posts WHERE id = ?").get(decodeURIComponent(commentsMatch));
 		if (!post || !canViewPost(db, post, user.id)) throw makeError(404, "Không tìm thấy bài viết.");
 		const body = await readJson(request);
 		const content = String(body.content || "").trim();
@@ -3128,12 +3128,12 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 	const removeFriend = pathname.match(/^\/api\/friends\/([^/]+)$/);
 	if (method === "DELETE" && removeFriend) {
-		const friendId = decodeURIComponent(removeFriend[1]);
+		const friendId = decodeURIComponent(removeFriend);
 		if (friendId === user.id) throw makeError(404, "Không tìm thấy bạn bè.");
 		const pair = [user.id, friendId].sort();
 		db.exec("BEGIN");
 		try {
-			const result = db.prepare("DELETE FROM friendships WHERE user_low = ? AND user_high = ?").run(pair[0], pair[1]);
+			const result = db.prepare("DELETE FROM friendships WHERE user_low = ? AND user_high = ?").run(pair, pair);
 			if (!result.changes) throw makeError(404, "Hai tài khoản hiện không phải bạn bè.");
 			db.prepare("DELETE FROM friend_requests WHERE status = 'accepted' AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))").run(user.id, friendId, friendId, user.id);
 			db.exec("COMMIT");
@@ -3160,11 +3160,10 @@ async function handleApi({ request, response, url, db, env, secure }) {
 	}
 	const friendAction = pathname.match(/^\/api\/friend-requests\/([^/]+)\/(accept|reject)$/);
 	if (method === "POST" && friendAction) {
-		const senderId = decodeURIComponent(friendAction[1]);
-		const actionType = friendAction[2];
+		const senderId = decodeURIComponent(friendAction);
 		const requestRow = db.prepare("SELECT * FROM friend_requests WHERE sender_id = ? AND receiver_id = ? AND status = 'pending'").get(senderId, user.id);
 		if (!requestRow) throw makeError(404, "Không tìm thấy lời mời.");
-		if (actionType === "reject") {
+		if (friendAction === "reject") {
 			db.prepare("UPDATE friend_requests SET status = 'rejected' WHERE id = ?").run(requestRow.id);
 			syncDb(db);
 			sendJson(response, 200, { ok: true });
@@ -3174,8 +3173,8 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		db.exec("BEGIN");
 		try {
 			db.prepare("UPDATE friend_requests SET status = 'accepted' WHERE id = ?").run(requestRow.id);
-			db.prepare("INSERT OR IGNORE INTO friendships(user_low, user_high, created_at) VALUES (?, ?, ?)").run(pair[0], pair[1], new Date().toISOString());
-			ensureConversation(db, pair[0], pair[1]);
+			db.prepare("INSERT OR IGNORE INTO friendships(user_low, user_high, created_at) VALUES (?, ?, ?)").run(pair, pair, new Date().toISOString());
+			ensureConversation(db, pair, pair);
 			db.exec("COMMIT");
 			syncDb(db);
 		} catch (error) {

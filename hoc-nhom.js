@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-	const API_BASE = (window.location && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.hostname.startsWith("192.168.") || window.location.port === "4174")) ? window.location.origin : "https://dieunw.onrender.com";
+	const API_BASE = "https://dieunw.onrender.com";
 	const POSTS_API = `${API_BASE}/api/posts`;
 
 	const tabButtons = [...document.querySelectorAll(".group-tab[data-tab]")];
@@ -595,7 +595,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		const fullRoom = clean.startsWith("dieunw-") ? clean : `dieunw-${clean}`;
 		if (meetingPlaceholder) meetingPlaceholder.hidden = true;
 		meetingFrame.hidden = false;
-		meetingFrame.src = `https://meet.jit.si/${encodeURIComponent(fullRoom)}`;
+		meetingFrame.src = `https://jit.si{encodeURIComponent(fullRoom)}`;
 	}
 
 	roomForm?.addEventListener("submit", e => {

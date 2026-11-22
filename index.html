@@ -246,7 +246,148 @@
 	<script src="./nav-profile.js?v=9" defer></script>
 	<script src="./profile-auth.js?v=9" defer></script>
 	<script src="./script.js?v=9" defer></script>
+<<<<<<< HEAD
 </div>
 <script>const { createApp } = Vue; createApp({}).mount("#app");</script>
+=======
+	<script>
+(() => {
+	if (window.__dieunwCoreReady) return;
+	window.__dieunwCoreReady = true;
+
+	const API_BASE = "https://dieunw.onrender.com";
+	const THEME_KEY = "dieunw_theme";
+	const MUSIC_STATE_KEY = "dieunw_global_music_state";
+
+	// 1. ĐỒNG BỘ CHẾ ĐỘ SÁNG / TỐI TOÀN SITE
+	function applyGlobalTheme(isDark) {
+		document.documentElement.classList.toggle("dark-mode", isDark);
+		document.body?.classList.toggle("dark-mode", isDark);
+		document.body?.classList.toggle("theme-dark", isDark);
+		localStorage.setItem(THEME_KEY, isDark ? "dark" : "light");
+		localStorage.setItem("darkMode", isDark ? "1" : "0");
+		document.querySelectorAll("#nav-theme-toggle, .nav-theme-toggle").forEach(btn => {
+			btn.textContent = isDark ? "☀️" : "🌙";
+			btn.setAttribute("aria-pressed", String(isDark));
+		});
+	}
+
+	const savedDark = localStorage.getItem(THEME_KEY) === "dark" || localStorage.getItem("darkMode") === "1";
+	applyGlobalTheme(savedDark);
+
+	document.addEventListener("click", (e) => {
+		const btn = e.target instanceof Element ? e.target.closest("#nav-theme-toggle, .nav-theme-toggle") : null;
+		if (!btn) return;
+		e.preventDefault();
+		const nextDark = !document.documentElement.classList.contains("dark-mode");
+		applyGlobalTheme(nextDark);
+		if (location.pathname.includes("tu-hoc")) {
+			localStorage.setItem("dieunw_study_theme", nextDark ? "dark" : "default");
+			const sel = document.getElementById("theme-selector");
+			if (sel) sel.value = nextDark ? "dark" : "default";
+		}
+	});
+
+	// 2. TRÌNH PHÁT NHẠC NỀN XUYÊN TRANG KHÔNG NGẮT QUÃNG + SHUFFLE
+	let globalAudio = document.getElementById("dieunw-global-audio");
+	if (!globalAudio) {
+		globalAudio = document.createElement("audio");
+		globalAudio.id = "dieunw-global-audio";
+		globalAudio.preload = "auto";
+		document.body.appendChild(globalAudio);
+	}
+
+	let state = {
+		track: null,
+		queue: [],
+		currentTime: 0,
+		isPlaying: false,
+		shuffle: localStorage.getItem("dieunw_music_shuffle") === "1"
+	};
+
+	try {
+		const raw = JSON.parse(localStorage.getItem(MUSIC_STATE_KEY) || "null");
+		if (raw && typeof raw === "object") state = { ...state, ...raw };
+	} catch {}
+
+	function saveMusicState() {
+		state.currentTime = Number(globalAudio.currentTime || 0);
+		state.isPlaying = Boolean(!globalAudio.paused && globalAudio.src);
+		localStorage.setItem(MUSIC_STATE_KEY, JSON.stringify(state));
+	}
+
+	function resolveUrl(u) {
+		const s = String(u || "").trim();
+		if (!s) return "";
+		return s.startsWith("/uploads/") ? `${API_BASE}${s}` : s;
+	}
+
+	function playNextGlobal(step = 1) {
+		if (!Array.isArray(state.queue) || !state.queue.length) return;
+		const idx = state.queue.findIndex(t => String(t.id) === String(state.track?.id));
+		let nextIdx = 0;
+		if (state.shuffle && state.queue.length > 1) {
+			nextIdx = idx;
+			while (nextIdx === idx) nextIdx = Math.floor(Math.random() * state.queue.length);
+		} else {
+			nextIdx = idx === -1 ? 0 : (idx + step + state.queue.length) % state.queue.length;
+		}
+		window.dieunwPlayGlobalTrack(state.queue[nextIdx], state.queue);
+	}
+
+	window.dieunwPlayGlobalTrack = (track, queue = []) => {
+		if (!track?.audioUrl) return;
+		state.track = { ...track, audioUrl: resolveUrl(track.audioUrl) };
+		if (Array.isArray(queue) && queue.length) {
+			state.queue = queue.map(q => ({ ...q, audioUrl: resolveUrl(q.audioUrl) }));
+		}
+		if (typeof track.shuffle === "boolean") state.shuffle = track.shuffle;
+
+		const startAt = Number(track.startTime || 0);
+		globalAudio.src = state.track.audioUrl;
+		globalAudio.onloadedmetadata = () => {
+			if (startAt > 0 && startAt < globalAudio.duration) {
+				globalAudio.currentTime = startAt;
+			}
+			globalAudio.play().catch(() => {});
+		};
+		globalAudio.play().catch(() => {});
+		saveMusicState();
+	};
+
+	window.dieunwPauseGlobalMusic = () => {
+		globalAudio.pause();
+		state.isPlaying = false;
+		saveMusicState();
+	};
+
+	globalAudio.addEventListener("timeupdate", () => {
+		if (Math.floor(globalAudio.currentTime) % 2 === 0) saveMusicState();
+	});
+	globalAudio.addEventListener("ended", () => playNextGlobal(1));
+	window.addEventListener("beforeunload", saveMusicState);
+	window.addEventListener("pagehide", saveMusicState);
+
+	// Khôi phục phát nhạc ngay lập tức khi vừa chuyển sang trang mới
+	if (state.track?.audioUrl && state.isPlaying) {
+		globalAudio.src = resolveUrl(state.track.audioUrl);
+		const resumeAt = Number(state.currentTime || 0);
+		globalAudio.addEventListener("loadedmetadata", () => {
+			if (resumeAt > 0 && resumeAt < globalAudio.duration) {
+				globalAudio.currentTime = resumeAt;
+			}
+			globalAudio.play().catch(() => {
+				const resumeOnTap = () => {
+					globalAudio.play().catch(() => {});
+					document.removeEventListener("pointerdown", resumeOnTap);
+				};
+				document.addEventListener("pointerdown", resumeOnTap, { once: true });
+			});
+		}, { once: true });
+	}
+})();
+</script>
+
+>>>>>>> parent of 94d0818 (fix)
 </body>
 </html>

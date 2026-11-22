@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-    const API_BASE = (window.location && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.hostname.startsWith("192.168.") || window.location.port === "4174")) ? window.location.origin : "https://dieunw.onrender.com";
+    const API_BASE = "https://dieunw.onrender.com";
 
     function notify(message, type = "info") {
         if (typeof window.dieunwToast === "function") {
@@ -169,8 +169,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     themeSelector?.addEventListener("change", (e) => applyStudyTheme(e.target.value, true));
 
-    // nav-profile.js now handles theme toggle centrally — removed duplicate listener
-    // navThemeBtn click listener removed to avoid conflict
+    navThemeBtn?.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        const nextIsDark = !document.body.classList.contains("dark-mode");
+        applyStudyTheme(nextIsDark ? "dark" : "default", true);
+    }, true);
 
     // 3. TRÌNH PHÁT NHẠC PLAYLIST + KHO NHẠC ONLINE + SHUFFLE + ĐĨA QUAY
     const audioPanel = document.getElementById("audio-player-panel");
