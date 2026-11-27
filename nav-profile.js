@@ -622,8 +622,11 @@
         `;
 
         const avatarLink = dock.querySelector(".nav-avatar-link");
-        if (avatarLink) dock.insertBefore(btn, avatarLink);
-        else dock.appendChild(btn);
+        if (avatarLink && avatarLink.parentNode) {
+            avatarLink.parentNode.insertBefore(btn, avatarLink);
+        } else {
+            dock.appendChild(btn);
+        }
 
         const popover = document.createElement("section");
         popover.id = "nav-music-popover";
