@@ -1798,14 +1798,14 @@ async function handleApi({ request, response, url, db, env, secure }) {
 
 	const userProfileMatch = pathname.match(/^\/api\/users\/([^/]+)\/profile$/);
 	if (method === "GET" && userProfileMatch) {
-		const targetId = decodeURIComponent(userProfileMatch);
+		const targetId = decodeURIComponent(userProfileMatch.at(1));
 		if (targetId === "me") {
 			const me = requireUser(db, request);
 			const row = db.prepare("SELECT * FROM users WHERE id = ?").get(me.id);
 			sendJson(response, 200, getFullUserProfilePayload(db, row, me.id));
 			return;
 		}
-		const targetRow = db.prepare("SELECT * FROM users WHERE id = ?").get(targetId);
+		const targetRow = db.prepare("SELECT * FROM users WHERE id = ? OR email = ? COLLATE NOCASE").get(targetId, targetId);
 		if (!targetRow) throw makeError(404, "Không tìm thấy học sinh này.");
 		sendJson(response, 200, getFullUserProfilePayload(db, targetRow, optionalUser?.id || ""));
 		return;
