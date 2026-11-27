@@ -1112,6 +1112,7 @@
                 e.stopPropagation();
                 const willOpen = menu.hidden;
                 menu.hidden = !willOpen;
+                menu.style.display = willOpen ? "grid" : "none";
                 menu.classList.toggle("open", willOpen);
                 activeBrandBtn.setAttribute("aria-expanded", String(willOpen));
                 syncMenuGridMode(menu);
@@ -1119,6 +1120,7 @@
             document.addEventListener("click", (e) => {
                 if (!menu.hidden && !menu.contains(e.target) && !activeBrandBtn.contains(e.target)) {
                     menu.hidden = true;
+                    menu.style.display = "none";
                     menu.classList.remove("open");
                     activeBrandBtn.setAttribute("aria-expanded", "false");
                     syncMenuGridMode(menu);

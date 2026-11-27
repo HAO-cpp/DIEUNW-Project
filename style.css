@@ -352,6 +352,16 @@ body.dark-mode .nav-theme-toggle {
     .nav-menu.nav-dropdown-panel[hidden] {
         display: none !important;
     }
+
+    .nav-menu.nav-dropdown-panel.open,
+    .nav-menu.nav-dropdown-panel:not([hidden]) {
+        display: grid !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        z-index: 9999 !important;
+    }
+
 }
 
 /* =========================================================
