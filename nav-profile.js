@@ -1103,40 +1103,39 @@
             menu.hidden = true;
         }
 
-        buildGroupedMenuContent(menu, existingLinks);
-        setupGlobalMusicDock(dock);
-
-        const brandBtn = dock.querySelector(".nav-brand-toggle");
-        if (brandBtn && menu && brandBtn.dataset.navBound !== "1") {
-            brandBtn.dataset.navBound = "1";
-            brandBtn.addEventListener("click", (e) => {
+                const activeBrandBtn = dock.querySelector(".nav-brand-toggle");
+        if (activeBrandBtn && menu && activeBrandBtn.dataset.navBound !== "1") {
+            activeBrandBtn.dataset.navBound = "1";
+            activeBrandBtn.addEventListener("click", (e) => {
                 e.stopPropagation();
                 const willOpen = menu.hidden;
                 menu.hidden = !willOpen;
-                brandBtn.setAttribute("aria-expanded", String(willOpen));
+                menu.classList.toggle("open", willOpen);
+                activeBrandBtn.setAttribute("aria-expanded", String(willOpen));
                 syncMenuGridMode(menu);
             });
             document.addEventListener("click", (e) => {
-                if (!menu.hidden && !menu.contains(e.target) && !brandBtn.contains(e.target)) {
+                if (!menu.hidden && !menu.contains(e.target) && !activeBrandBtn.contains(e.target)) {
                     menu.hidden = true;
-                    brandBtn.setAttribute("aria-expanded", "false");
+                    menu.classList.remove("open");
+                    activeBrandBtn.setAttribute("aria-expanded", "false");
                     syncMenuGridMode(menu);
                 }
             });
         }
 
-        const themeBtn = dock.querySelector("#nav-theme-toggle, .nav-theme-toggle");
-        if (themeBtn && themeBtn.dataset.themeBound !== "1") {
-            themeBtn.dataset.themeBound = "1";
+        const activeThemeBtn = dock.querySelector("#nav-theme-toggle, .nav-theme-toggle");
+        if (activeThemeBtn && activeThemeBtn.dataset.themeBound !== "1") {
+            activeThemeBtn.dataset.themeBound = "1";
             const savedDark = localStorage.getItem("dieunw_dark_mode") === "1";
             if (savedDark) {
                 document.body.classList.add("dark-mode");
-                themeBtn.textContent = "☀️";
+                activeThemeBtn.textContent = "☀️";
             }
-            themeBtn.addEventListener("click", () => {
+            activeThemeBtn.addEventListener("click", () => {
                 const isDark = document.body.classList.toggle("dark-mode");
                 localStorage.setItem("dieunw_dark_mode", isDark ? "1" : "0");
-                themeBtn.textContent = isDark ? "☀️" : "🌙";
+                activeThemeBtn.textContent = isDark ? "☀️" : "🌙";
             });
         }
 
