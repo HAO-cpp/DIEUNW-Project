@@ -1632,7 +1632,7 @@ async function handleApi({ request, response, url, db, env, secure }) {
 		db.prepare("UPDATE users SET last_seen_at = ?, status_mode = 'online' WHERE id = ?").run(Date.now(), user.id);
 		syncDb(db);
 		const cookie = setSession(db, user.id, response, secure);
-		const token = cookie.split(";").split("=");
+		const token = cookie.split(";")[0].split("=")[1] || "";
 		sendJson(response, 200, { user: profileUser(db, db.prepare("SELECT * FROM users WHERE id = ?").get(user.id)), token }, { "Set-Cookie": cookie });
 		return;
 	}
