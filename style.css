@@ -349,6 +349,9 @@ body.dark-mode .nav-theme-toggle {
         grid-template-columns: 1fr;
         width: min(250px, calc(100vw - 20px));
     }
+    .nav-menu.nav-dropdown-panel[hidden] {
+        display: none !important;
+    }
 }
 
 /* =========================================================

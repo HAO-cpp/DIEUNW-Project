@@ -1103,7 +1103,9 @@
             menu.hidden = true;
         }
 
-                const activeBrandBtn = dock.querySelector(".nav-brand-toggle");
+        buildGroupedMenuContent(menu, existingLinks);
+        setupGlobalMusicDock(dock);
+        const activeBrandBtn = header.querySelector(".nav-brand-toggle");
         if (activeBrandBtn && menu && activeBrandBtn.dataset.navBound !== "1") {
             activeBrandBtn.dataset.navBound = "1";
             activeBrandBtn.addEventListener("click", (e) => {
